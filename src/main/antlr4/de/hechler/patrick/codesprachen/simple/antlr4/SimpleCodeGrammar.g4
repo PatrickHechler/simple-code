@@ -5,6 +5,9 @@ r
 	WS//TODO
 ;
 
+OFFEN:'offen';
+KONST:'konst';
+
 NAME
 :
 	[a-zA-Z_-]+
