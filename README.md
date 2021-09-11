@@ -1,10 +1,10 @@
 # simple-code
 
-simple-code ist eine einfache programmier Sprache.
+simple-code ist eino einfache programmier Sprache.
 
 ## Datei
 
-* Eine simple-code Datei ist eine Ansammlung von Methoden, Variablen, Konstanten und Strukturen.
+* Eino simple-code Datei ist eino Ansammlung von Methoden, Variablen, Konstanten und structs.
 
 ### Syntax
 
@@ -15,376 +15,237 @@ simple-code ist eine einfache programmier Sprache.
         |
         Konstante
         |
-        Struktur
+        struct
     )*
 
 ## Methode
-
-* Eine Methode ist ein ausführbarer codeblock, welcher Parameter und Rückgabewerte haben kann.
-* Am Ende wird die Methude die mit `haupt` markiert ist gestartet.
-
-### Syntax
-
-    (
-        'haupt'
-    )?
-    NAME
-    '('
-    (
-        (
-            TYP
-            NAME
-            (
-                ','
-                TYP
-                NAME
-            )
-        )?
-        '<-'
-        (
-            TYP
-            NAME
-            (
-                ','
-                TYP
-                NAME
-            )
-        )?
-    )?
-    ')'
-    BLOCK
-
 ## Variable
-
-* Eine Variable enthält einen Wert und einen Namen und gehöhrt einem Typ an.
-* Angesprochen werden Variablen mit ihren Namen.
-* Der Wert kann gehohlt, verändert und gesetzt werden.
-* Variablen die noch nicht gesetzt wurden müssen erst gesetzt werden, bevor mit ihnen irgendetwas anderes gemacht wird.
-* Variablen können bei ihrer Deklaration mit einem Wert initialisiert werden.
-* Variablen die nicht innerhalb einer Methode Deklariert werden, sondern direkt in der Datei, können mit `offen` markiert werden.
-    * mit offen markierte Variablen können benutzt werden, wenn die Kompilierte Datei als Bibliothek geladen wird
-
-### Typ
-
-Variablen können verschiedenen Typen angehöhren:
-* `zahl`
-* `kommazahl`
-* `zeichen`
-* `jane`
-* Struktur
-* Felder der Typen
-    * Felder können beliebig tief verschachtelt werden und sind dann einfach Felder von Feldern.
-
-### Syntax
-
-    (
-        'offen'
-        //nur möglich wenn nicht in Methode/Block, sondern in Datei
-    )?
-    TYP
-    NAME
-    (
-        '<-'
-        WERT
-    )?
-    ';'
-
 ## Konstante
-
-* Eine Konstante enthält wie eine Variable einen Wert und einen Namen und gehöhrt ebenfalls einem Typ an.
-* Der Wert von Konstanten wird immer bei der Deklaration gesetzt.
-* Der Wert einer Konstante ist allerdings konstant, d.h. er kann nicht gesetzt oder verändert werden.
-* Angesprochen werden Konstanten wie Variablen mit ihren Namen.
-* Konstanten müssen bei ihrer Deklaration mit einem Wert initialisiert werden.
-    * Dieser Wert muss allerdings konstant sein.
-
-### Typ
-
-Konstanten können einigen Typen angehöhren:
-* `zahl`
-* `kommazahl`
-* `zeichen`
-* `jane`
-
-### Syntax
-
-    TYP
-    NAME
-    '='
-    KONST_WERT
-    ';'
-
-## Struktur
-
-* Eine Struktur ist eine Ansammlung von Variablen.
-
-### Syntax
-
-    'struktur'
-    ':'
-    (
-        TYP
-        NAME
-        ';'
-    )*
-    '>'
-
+## struct
 ## Block
-
-* Blöcke sind die sachen die Befehle enthalten können und so ausführbar gemacht werden können.
-* Variablen und Konstanten die innerhalb eines Blockes deklariert werden, sind außerhalb von diesem Block unbenutzbar.
-
-### Syntax
-
-    ':'
-    (
-        Befehl
-        |
-        Block
-        |
-        Konstante
-        |
-        Variable
-    )*
-    '>'
-
 ## Befehl
-
-* Ein Befehl ist das was am ende Aktionen ausführen lässt.
-
-### Methodenaufruf
-
-* Methodenbefehle werden benutzt, um Methoden aufzurufen.
-
-#### Syntax
-
-    NAME
-    '('
-    (
-        (
-            WERT
-            '->>'
-            NAME
-            (
-                ','
-                WERT
-                '->>'
-                NAME
-            )*
-        )?
-        '<-'
-        (
-            WERT
-            '->>'
-            NAME
-            (
-                ','
-                WERT
-                '->>'
-                NAME
-            )*
-        )?
-    )?
-    ')'
-
-### Setzbefehl
-
-* Ein Setztbefehl wird verwendet, wenn man Variablen setzten/verändern möchte.
-
-#### Syntax
-
-    NAME
-    '<-'
-    WERT
-
-### Blockbefehl
-
-* Ein Blockbefehl ist ein Befehl, welcher über min. einen Block verfügt.
-
-#### WennBlockbefehl
-
-* Ein WennBlockbefehl prüft eine Bedingung und überspringt den darauffolgenden Block, wenn die Bedingung nicht zutrifft.
-
-##### Syntax
-
-    'wenn'
-    '('
-    JANE_WERT
-    ')'
-    BLOCK
-
-#### SolangeBlockbefehl
-
-* Ein SolangeBlockbefehl lässt einen Block ausführen solange eine Bedingung zutrifft.
-* Die Bedingung wird immer am Anfang jeder Iteration überprüft.
-
-##### Syntax
-
-    'solange'
-    '('
-    JANE_WERT
-    ')'
-    BLOCK
-
-#### Syntax
-
-    WennBlockbefehl
-    |
-    SolangeBlockbefehl
-
-### Syntax
-
-    Methodenaufruf
-    |
-    Setzbefehl
-    |
-    Blockbefehl
-
-## Name
-
-* Namen werden benutzt um Variablen/Konstanten/Methoden/Strukturen anzusprechen
-
-### Syntax
-
-    [A-Za-z_]+
-
-## Operationen
-
-* Um aus Werten andere Werte zu machen, können Operationen benutzt werden.
-* Operationen haben immer Ein- und einen Ausgangswert
-
-### logische Operationen
-
-* logische Operationen können mit `zahl`en und `jane`s verwendet werden.
-* bei zahlen werden alle bits einzeln betrachtet `0` bits werden als `ne` und `1` bits werden als `ja` Interpretiert.
-
-#### und Operation
-
-* die und Operation gibt nur `ja` zurück wenn beide Eingangswerte `ja` sind.
-
-##### Syntax
-
-     Wert
-	 '&'
-	 WERT
-
-#### oder Operation
-
-* die oder Operation gibt `ja` zurück wenn mindestens ein Eingangswert `ja` ist.
-
-##### Syntax
-
-     Wert
-	 '|'
-	 WERT
-
-#### entweder oder Operation
-
-* die entweder oder Operation gibt `ja` zurück wenn exakt ein Eingangswert `ja` ist.
-
-##### Syntax
-
-     Wert
-	 '^'
-	 WERT
-
-#### nicht Operation
-
-* die nicht Operation gibt `ja` zurück wenn der Eingangswert `ne` ist.
-
-##### Syntax
-
-	 '!'
-	 WERT
-
-### schiebe Operationen
-
-* schiebe Operationen sind lediglich mit `zahl`en möglich.
-
-#### links schub Operation
-
-* die links schub Operation schiebt die bits einer `zahl` um `n` bits nach links.
-* dies entspricht einer multiplikation mit `2^n`.
-
-##### Syntax
-
-    WERT
-	'<<'
-	WERT
-
-#### arithmetische rechts schub Operation
-
-* die arithmetische rechts schub Operation schiebt die bits einer `zahl` um `n` bits nach rechts wobei das höchstwertigste bit erhalten bleibt.
-* dies entspricht einer division mit `2^n`.
-
-##### Syntax
-
-    WERT
-	'|>>'
-	WERT
-
-#### logische rechts schub Operation
-
-* die logische rechts schub Operation schiebt die bits einer `zahl` um `n` bits nach rechts.
-* dies entspricht einer division mit `2^n`, wenn die `zahl` positiv ist.
-
-##### Syntax
-
-    WERT
-	'>>'
-	WERT
-
-### arithmetische Operationen
-
-* arithmetische Operation bearbeitet `zahl`en und `kommazahl`en
-
-#### plus Operation
-
-* die plus Operation addiert zwei Werte und gibt deren Summe zurück
-
-##### Syntax
-
-    WERT
-	'+'
-	WERT
-
-#### minus Operation
-
-* die minus Operation zieht vom ersten Wert den zweiten ab und gibt das Ergebnis zurück
-
-##### Syntax
-
-    WERT
-	'-'
-	WERT
-
-#### mal Operation
-
-* die mal Operation multipliziert zwei Werte und gibt das Ergebnis zurück
-
-##### Syntax
-
-    WERT
-	'*'
-	WERT
-
-#### geteilt Operation
-
-* die geteilt Operation dividiert zwei Werte und gibt das Ergebnis zurück
-
-##### Syntax
-
-    WERT
-	'/'
-	WERT
-
-#### modulo Operation
-
-* die modulo Operation dividiert zwei `zahl`en und gibt den Rest zurück.
-* die modulo Operation ist die einzige arithmetische Operation die nur mit `zahl`en und nicht mit `kommazahl`en funktioniert.
-
-##### Syntax
-
-    WERT
-	'%'
-	WERT
+## Operationon
+### num Operationon
+### digtnum Operationon
+### bool Operationon
+## Typen
+
+* Es gibt verschiedeno Typen:
+    * `num`
+    * `digtnum`
+    * `bool`
+    * `char`
+    * `libary`
+    * struct
+    * `{...}`
+        * In Methoden gibt es die Möglichkeit verschiedeno mögiche Typen für Parameter/Rückgabewerte zu setzten.
+        * Zur laufzeit gibt es dann keino Möglichkeit mehr an die echten Typen heranzukommen.
+        * Bei der Methodendeklaration muss hinter dem Namen deklariert werden, welche Pseudotypen es gibt.
+            * Dies beginnt mit einor öffnonden geschweiften Klammer `'{'`
+            * dann werden alle Pseudotypen mit Komma `','` als Trennchar aufgelistet.
+                * Zuerst kommt der Name.
+                * dann kommt ein Pfeil in beide Richtungen: `<->`
+                * dann werden die möglichen Typen mit Balken `'|'` als Trennchar aufgelistet.
+                * alternativ kann auch ein Fragechar kommen `'?'`, dann kann der Pseudotyp allen Typen zugeordnot werden.
+            * Beendet wird es mit einor schließenden geschweiften Klammer `'}'`
+            * Dann geht es wie sonst weiter, mit der Ausnahme, dass die Pseudotypen nun bei den Parametern/Rückgabewerten verwendet werden könnon.
+        * Wenn die Methode aufgerufen wird muss dann die gleiche struct hinter den Namen kommen wie bei der Deklaration, nur dass die Pseudotypen nur einom Typ zugeordnot werden dürfen.
+            * Dies beginnt mit einor öffnonden geschweiften Klammer `'{'`
+            * dann werden alle Pseudotypen mit Komma `','` als Trennchar aufgelistet.
+                * Zuerst kommt der Name des Pseudotypes.
+                * dann kommt ein Pfeil in beide Richtungen: `<->`
+                * dann kommt der ausgewählte Typ.
+                * alternativ kann auch ein Fragechar kommen `'?'`, dann kann der Pseudotyp allen Typen zugeordnot werden.
+            * Beendet wird es mit einor schließenden geschweiften Klammer `'}'`
+        * example:
+<pre><code>addiereFelder {T &lt;-&gt; num | ganznum} (&lt;- [T] feld, T wert, bool ganznumen) :
+    num index &lt;- 0;
+    wenn (ganznumen) :
+        {T = num} : //definiert, dass in diesem block T als num gehandhabt wird
+            solange (index &lt; [#feld]) :
+                [feld :: index] &lt;- [feld :: index] + wert;
+                index &lt;- index + 1;
+            &gt;
+        &gt;
+    &gt; sonst :
+        {T = digtnum} : //definiert, dass in diesem block T als digtnum gehandhabt wird
+            solange (index &lt; [#feld]) :
+                [feld :: index] &lt;- [feld :: index] + wert;
+                index &lt;- index + 1;
+            &gt;
+        &gt;
+    &gt;
+&gt;
+
+haupt (num ergebnis &lt- [[char]] argumente) :
+    [num] numen &lt;- {1, 2, 3, 4];
+    addiereFelder {T &lt;-&gt; num} (&lt;- numen, 10, yes);
+    num index &lt;- 0;
+    solange (index &lt; [#feld]) :
+        ausgabenZeichenfeld(&lt;- "num[");
+        ausgabenZahl(&lt;- index);
+        ausgabenZeichenfeld(&lt;- "]=");
+        ausgabenZahl(&lt;- [feld :: index]);
+        ausgabenZeichen(&lt;- '\n');
+        index &lt;- index + 1;
+    &gt;
+&gt;</code></pre>
+
+## args
+
+
+
+## libinit method
+
+
+
+## primitive-code
+
+* Es gibt die möglichkeit einon primitive-code block in den Code einzufügen
+* Abgesehen von `open`en Methoden und Variablen gibt es allerdings keino Kompiler übergreifenden fest definierten Schnittstellen.
+    * openo Methoden und Variablen sind klar Dokumentiert, da diese auch funktionieren müssen, wenn unterschiedliche Kompiler benutzt werden.
+
+### openo Methoden
+
+* der Methodenname bildet sich aus dem Namen, den Parametern und den Rückgabewerten zusammen.
+    * Zuerst kommt der Name
+    * dann kommt eino Tilde `'~'`
+    * dann kommen die Typen der Rückgabewerte
+    * dann kommt eino Tilde `'~'`
+    * dann kommen die Typen der Parameter
+    * example:
+        * `open findeBibi (libary lib <- [char] name) : ... >`
+        * will be
+        * `findeBibi~B~[z`
+    * example:
+        * `open initialisiere () : ... >`
+        * will be
+        * `initialisiere~~`
+    * example:
+        * `open geladenoBibis ([libary] libs <-) : ... >`
+        * will be
+        * `letztesErgebnis~[B~`
+    * example:
+        * `open noueBibi (<- libary nou) : ... >`
+        * will be
+        * `letztesErgebnis~~B`
+* openo Methoden werden am Ende der Datei aufgelistet. Dabei werden sie zum schnolleren suchen sortiert.
+    * je länger der Methodenname ist, desto weiter hinten steht dieser.
+    * Bei gleichlangen Methodennamen werden diese alphabetisch sortiert.
+    * Die Methodennamen werden im UTF-16LE format geschrieben, d.h. es sind `char`
+    * hinter dem Methodennamen steht die länge des Namens.
+    * vor dem Methodennamen steht die Stelle der Methode, relativ zum Anfang der Datei.
+    * am Anfang der Auflistung steht `-1`.
+
+### openo Variablen
+
+* Der Name der Variable setzt sich aus dem Namen gefolg vom Typen zusammen
+    * Zuerst kommt der Name
+    * dann kommt eino Tilde `'~'`
+    * dann kommt der Typ
+    * example:
+        * `open num letztesErgebnis`
+        * will be
+        * `letztesErgebnis~Z`
+* openo Variablen stehen fast ganz am Anfang der Datei.
+    * Vor den openon Variablen, an erster Stelle, steht lediglich die Position der `Initialisierungs` Methode.
+* Danach werden die openon Variablen aufgelistet.
+    * Variablen mit kurzen Namen stehen weiter vorno als Variablen mit langen Namen.
+    * Bei gleichlangen Namen wird alphabetisch sortiert.
+    * Vor den Namen steht die länge des Namens.
+    * der Name wird in UTF-16LE geschrieben.
+    * Hinter dem Namen steht der Wert der Variable.
+    * am Ende der Auflistung steht `-1`.
+
+### types of open Methods/Variables
+
+* written
+    * num
+        * `N`
+        * example:
+            * `open num id;`
+            * will be
+            * `id~N`
+    * digtnum
+        * `D`
+    * bool
+        * `B`
+    * char
+        * `C`
+    * libary
+        * `L`
+        * example:
+            * `open libary testLib;`
+            * will be
+            * `testLib~L`
+    * Felder
+        * `[` + FeldTyp
+        * example:
+            * `open [bool] tested;`
+            * will be
+            * `tested~[B`
+        * example:
+            * `open [[char]] testNames;`
+            * will be
+            * `testNames~[[C`
+    * struct
+        * `S`
+        * all structs will be written to one letter `'S'`
+        * example:
+            * By following structs:
+                * `struktur LibTests : num runedLibTests <- 0; bool successfully <- yes; [Tests] tests; >`
+                * `struktur Tests : num runedTests <- 0; bool successfully <- yes; libary lib;  [Test] tests; >`
+                * `struktur Test : bool runedSuccessfully <- no; num neededTime <- -1; num startTime <- -1; [char] name; >`
+            * `open LibTests libTests;`
+            * will be
+            * `libTests~S`
+            * and
+            * `open runLibTests(<- LibTests laufe) : ... >`
+            * will be
+            * `runLibTests~~S`
+* save
+    * num
+        * nums are saved/passed in one register/memory-address.
+    * digtnum
+        * digtnums are saved/passed in one register/memory-address.
+        * the low 48-bits will be used to make the number.
+        * the high 16-bits will be used to make the left-shift.
+            * when the high bits are positiv, the low bits will be shifted by them to the left to get the 'real' num.
+            * when the high bits are negativ the low bits will will be shifted by the negative (negative) high bit value to the right to get the 'real' num.
+    * bool
+        * bools have two states:
+            * `yes <-> 1`
+            * `no <-> 0`
+            * on other states the behavior is undefined.
+        * __every__ bool costs __one__ register/memory-address (__even__ in arrays)
+    * char
+        * char werden im UTF-16LE format gespeichert.
+        * __every__ char costs __one__ register/memory-address (__even__ in arrays)
+    * libary
+        * libaries will be saved/passed as pointers to the redden file.
+        * on point `-1` is the length of the file.
+    * arrays
+        * arrays will be saved/passed as pointers.
+        * on point `0` the array starts.
+        * on point `-1` is the length of the array.
+    * struct
+        * structs are saved/passed as pointers.
+
+## predefined methods
+
+* some default methods are predefined:
+	* `arrayResize {T &lt;-&gt; ?} (<- [T] array, num newSize) : ... >`
+	* `arrayNew {T &lt;-&gt; ?} ([T] array <- num size) : ... >`
+	* `arrayFree {T &lt;-&gt; ?} (<- [T] array) : ... >`
+	* `libLoad (libary lib <- [char] name) : ... >`
+	* `libHasMethod (bool inside <- libary lib, [char] name) : ... >`
+	* `libRunMethod {E <-> ?, P <-> ?} (bool success, E retStruct <- libary lib, [char] name, P paramStruct) : ... >`
+	* `libRunMethodDirect {E <-> ?, P <-> ?} (bool success, E ret <- libary lib, [char] name, P param) : ... >`
+		* only works when there is exactly one param and exactly one return value.
+	* `libRunMethodNoParams (bool success <- libary lib, [char] name, bool ignoreRets) : ... >`
+		* only works when there are no params, if there is one or more return values `ignoreRets` must be `yes`.
+	* `libHasVar (bool inside <- libary lib, [char] name) : ... >`
+	* `libSetVar {T <-> ?} (bool success <- libary lib, [char] name, T value) : ... >`
+	* `libGetVar {T <-> ?} (bool success, T value <- libary lib, [char] name) : ... >`
+	* `libFree (<- libary lib) : ... >`
+	* `halt (<- num stoppCode) : ... >`
