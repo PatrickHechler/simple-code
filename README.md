@@ -5,17 +5,20 @@ simple-code is a simple programming language.
 ## file
 
 * a simple-code file is a collection of dependencies, functions, variables and structures.
-
-    (    
-        dependency    
-        |    
-        function    
-        |    
-        variable    
-        |    
-        structure    
-    )*    
-    EOF    
+<code>
+<pre>
+(
+    dependency
+    |
+    variable
+    |
+    structure
+    |
+    function
+)*
+EOF
+</pre>
+</code>
 
 ### dependency
 
@@ -88,6 +91,10 @@ a variable can be used by all functions
     * `[VALUE] <-- [VALUE] ;`
 * FUNC_CALL
     * `call [NAME] ;`
+* WHILE
+    * `while \( [VALUE] \) [COMMAND]
+* IF
+    * `if [COMMAND] ( else [COMMAND] )?`
 
 ### VALUE
 
@@ -127,7 +134,7 @@ a variable can be used by all functions
 * constant-floating-point-number
     * `-?[0-9]*.[0-9]*`
 
-## default functions
+## predefined functions
 
 ### exit
 `func exp exit (num enum)`
@@ -138,3 +145,27 @@ exits the program
 
 ### numToFp
 `func exp numToFp (fpnum fpn) --> <fpnum n>`
+
+## predefined  structures
+
+### file
+`struct file {`
+
+`num id,`
+
+`num lock,`
+
+`num reserved1`
+
+`num reserved2`
+
+`}`
+
+### file stream
+`struct file_stream {`
+
+`struct file* file,`
+
+`num pos,`
+
+`}`
