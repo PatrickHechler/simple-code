@@ -82,7 +82,7 @@ a variable can be used by all functions
 ### COMMAND
 
 * BLOCK
-    * `{ ( [COMMAND] ; )* }`
+    * `{ ( [COMMAND] )* }`
 * VAR_DECL
     * `var [TYPE] [NAME] ( <-- [VALUE] )? ;`
 * ASSIGN
