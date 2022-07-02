@@ -5,8 +5,7 @@ simple-code is a simple programming language.
 ## file
 
 * a simple-code file is a collection of dependencies, functions, variables and structures.
-<code>
-<pre>
+<code><pre>
 (
     dependency
     |
@@ -17,8 +16,7 @@ simple-code is a simple programming language.
     function
 )*
 EOF
-</pre>
-</code>
+</pre></code>
 
 ### dependency
 
@@ -166,23 +164,19 @@ exits the program
 ## predefined  structures
 
 ### file
-<code>
-<pre>
+<code><pre>
 struct file {
     num id,
     num lock,
     num reserved1,
     num reserved2
 }
-</pre>
-</code>
+</pre></code>
 
 ### file stream
-<code>
-<pre>
+<code><pre>
 struct file_stream {
     struct file* file,
     num pos
 }
-</pre>
-</code>
+</pre></code>
