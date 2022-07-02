@@ -88,41 +88,58 @@ a variable can be used by all functions
 * VAR_DECL
     * `var [TYPE] [NAME] ( <-- [VALUE] )? ;`
 * ASSIGN
-    * `[VALUE] <-- [VALUE] ;`
+    * `[POSTFIX_EXP] <-- [VALUE] ;`
 * FUNC_CALL
-    * `call [NAME] ;`
+    * `call [POSTFIX_EXP] ;`
 * WHILE
     * `while \( [VALUE] \) [COMMAND]
 * IF
-    * `if [COMMAND] ( else [COMMAND] )?`
+    * `if \( [VALUE] \) [COMMAND] ( else [COMMAND] )?`
 
 ### VALUE
 
-* add-expression
-    * `add-expression ( ( \+ | - ) add-expression )*`
-    * a add-expression aritmetically adds or subtracts
-* mul-expression
-    * `or-expression ( ( * | / | % ) or-expression )*`
-    * a mul-expression aritmetically multiplies or divides and uses reminder or result as new value
-* or-expression
-    * `and-expression ( \| and-expression )*`
-* and-expression
-    * `un-expression ( & un-expression )*`
-* un-expression
-    * `( - | ~ )? cast-expression`
-    * a un-expression aritmetically negates or binary inverts
-* cast-expression
-    * `( \( [TYPE] \) )? ref-expression`
-    * a cast-expression never changes the value
-* ref-expression
-    * `direct-expression ( \* | \[ [VALUE] \] )?`
-    * a ref-expression extractes a element from a array or dereferences the pointer
-* direct-expression
-    * `constant-number`
-    * `constant-floating-point-number`
-    * `[NAME] ( : [NAME] )?`
+* VALUE
+    * `[COND_EXP]`
+* COND_EXP
+    * `[LOR_EXP] ( \? [VALUE] : [COND_EXP] )?`
+* LOR_EXP
+    * `[LAND_EXP] ( ( \|\| ) [LAND_EXP] )*`
+* LAND_EXP
+    * `[OR_EXP] ( ( && ) [OR_EXP] )*`
+* OR_EXP
+    * `[XOR_EXP] ( ( \| ) [XOR_EXP] )*`
+* XOR_EXP
+    * `[AND_EXP] ( ( ^ ) [AND_EXP] )*`
+* AND_EXP
+    * `[EQ_EXP] ( ( & ) [EQ_EXP] )*`
+* EQ_EXP
+    * `[REL_EXP] ( ( != | == ) [REL_EXP] )*`
+* REL_EXP
+    * `[REL_EXP] ( ( > | >= | <= | < ) [REL_EXP] )*`
+* SHIFT_EXP
+    * `[SHIFT_EXP] ( ( << | >> | >>> ) [SHIFT_EXP] )*`
+* ADD_EXP
+    * `[MUL_EXP] ( ( \+ | - ) [MUL_EXP] )*`
+* MUL_EXP
+    * `[CAST_EXP] ( ( \* | / | % ) [CAST_EXP] )*`
+* CAST_EXP
+    * `( \( [TYPE] \) )? [UNARY_EXP]`
+* UNARY_EXP
+    * `( - | & | ~ | ! )? [POSTFIX_EXP]`
+* POSTFIX_EXP
+    * `[DIRECT_EXP] ( \* | \[ [VALUE] \] )?`
+* DIRECT_EXP
+    * `[STRING]+`
+    * `[CHARACTER]`
+    * `[NUM]`
+    * `[FPNUM]`
+    * `[NAME] ( : [NAME] )*`
     * `\( [VALUE] \)`
-* constant-number
+* STRING
+    * `"([^"\\]|\\["rnt0\\])*"`
+* CHARACTER
+    * `'([^'\\]|\\['rnt0\\])'`
+* NUM
     * `-?[0-9]+`
     * `HEX-[0-9A-F]+`
     * `UHEX-[0-9A-F]+`
@@ -131,7 +148,7 @@ a variable can be used by all functions
     * `NBIN-[01]+`
     * `OCT-[0-7]+`
     * `NOCT-[0-7]+`
-* constant-floating-point-number
+* FPNUM
     * `-?[0-9]*.[0-9]*`
 
 ## predefined functions
@@ -149,23 +166,23 @@ exits the program
 ## predefined  structures
 
 ### file
-`struct file {`
-
-`num id,`
-
-`num lock,`
-
-`num reserved1`
-
-`num reserved2`
-
-`}`
+<code>
+<pre>
+struct file {
+    num id,
+    num lock,
+    num reserved1,
+    num reserved2
+}
+</pre>
+</code>
 
 ### file stream
-`struct file_stream {`
-
-`struct file* file,`
-
-`num pos,`
-
-`}`
+<code>
+<pre>
+struct file_stream {
+    struct file* file,
+    num pos
+}
+</pre>
+</code>
