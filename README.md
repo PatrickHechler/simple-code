@@ -4,19 +4,8 @@ simple-code is a simple programming language.
 
 ## file
 
+`( dependency | variable | structure | function )* EOF`
 * a simple-code file is a collection of dependencies, functions, variables and structures.
-<code><pre>
-(
-    dependency
-    |
-    variable
-    |
-    structure
-    |
-    function
-)*
-EOF
-</pre></code>
 
 ### dependency
 
