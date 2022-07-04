@@ -9,8 +9,8 @@ simple-code is a simple programming language.
 
 ### dependency
 
-`dep '[DEPENDENCY]' ;`
-* the DEPENDENCY is the path relative from a included source directory
+`dep [STRING] ;`
+* the STRING is the path relative from a included source directory
 * file type:
     * the DEPENDENCY is either a symbol-file (`*.psf`)
     * or a simple-code source file (`*.s`)
@@ -61,11 +61,13 @@ a variable can be used by all functions
 * types:
     * `num` : a 64-bit number
     * `fpnum` : a 64-bit floating point number
-    * `char` : a 16-bit character
+    * `dword` : a 32-bit number
+    * `word` : a 16-bit character/number
+    * `char` : same as `word`
     * `byte` : a 8-bit number
     * `struct [NAME]` : a structure of types
-    * `[TYPE] \*` : a pointer to a type
-    * `[TYPE] \[ \]` : a array of a type
+    * `[TYPE] #` : a pointer to a type
+    * `[TYPE] \[ [VALUE]? \]` : a array of a type
     * `\( ( [NAMED_TYPE_LIST] | ... ) \) ( --> < ( [NAMED_TYPE_LIST] | ... ) > )?` : a function call structure
 
 ### COMMAND
@@ -79,7 +81,7 @@ a variable can be used by all functions
 * FUNC_CALL
     * `call [POSTFIX_EXP] ;`
 * WHILE
-    * `while \( [VALUE] \) [COMMAND]
+    * `while \( [VALUE] \) [COMMAND]`
 * IF
     * `if \( [VALUE] \) [COMMAND] ( else [COMMAND] )?`
 
@@ -112,9 +114,9 @@ a variable can be used by all functions
 * CAST_EXP
     * `( \( [TYPE] \) )? [UNARY_EXP]`
 * UNARY_EXP
-    * `( - | & | ~ | ! )? [POSTFIX_EXP]`
+    * `( \+ | - | & | ~ | ! )? [POSTFIX_EXP]`
 * POSTFIX_EXP
-    * `[DIRECT_EXP] ( \* | \[ [VALUE] \] )?`
+    * `[DIRECT_EXP] ( # | \[ [VALUE] \] )*`
 * DIRECT_EXP
     * `[STRING]+`
     * `[CHARACTER]`
@@ -136,7 +138,13 @@ a variable can be used by all functions
     * `OCT-[0-7]+`
     * `NOCT-[0-7]+`
 * FPNUM
-    * `-?[0-9]*.[0-9]*`
+    * `-?([0-9]*.[0-9]+|[0-9]+.[0-9]*)`
+
+## comments
+
+`// [^\n]* \n | /\* ( [^\*] | \* [^/] )* \*/`
+
+comments are treated like whitespace, they are allowed everywhere exept in the middle of a token (but betwen any two tokens)
 
 ## predefined functions
 
