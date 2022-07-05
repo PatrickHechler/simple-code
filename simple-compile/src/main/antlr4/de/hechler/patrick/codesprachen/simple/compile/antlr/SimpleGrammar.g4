@@ -11,12 +11,27 @@ import java.util.function.*;
 import java.util.*;
 import java.io.*;
 import java.nio.file.*;
-import de.hechler.patrick.codesprachen.simple.*;
+import de.hechler.patrick.codesprachen.simple.compile.objects.antl.*;
 }
 
-simpleFile:
+@parser::members {
+	private String string(String raw) {
+		assert raw.charAt(0) == '"';
+		assert raw.charAt(raw.length() - 1) == '"' : raw = raw.substring(1, raw.length() - 1);
+		StringBuilder build = new StringBuilder(raw.length());
+		for (int index = 0; index != -1;) {
+			int newIndex = raw.indexOf('\\', index);
+			build.append(raw, index, (newIndex == -1 ? raw.length() : newIndex) - index);
+			index = newIndex;
+		}
+		return build.toString();
+	}
+}
+
+simpleFile [SimpleFile file]:
 	(
 		dependency
+		{file.addDependency($dependency.depend);}
 		|
 		variable
 		|
@@ -27,8 +42,9 @@ simpleFile:
 	EOF
 ;
 
-dependency:
+dependency returns [String depend]:
 	DEP STRING SEMI
+	{$depend = string($STRING.getText());}
 ;
 variable:
 	VAR EXP? type NAME SEMI
