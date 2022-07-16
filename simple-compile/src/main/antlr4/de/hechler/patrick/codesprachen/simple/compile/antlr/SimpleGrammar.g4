@@ -12,19 +12,52 @@ import java.util.*;
 import java.io.*;
 import java.nio.file.*;
 import de.hechler.patrick.codesprachen.simple.compile.objects.antl.*;
+import de.hechler.patrick.codesprachen.simple.compile.objects.antl.values.*;
+import de.hechler.patrick.codesprachen.simple.compile.objects.antl.commands.*;
+import de.hechler.patrick.codesprachen.simple.compile.objects.antl.types.*;
 }
 
 @parser::members {
 	private String string(String raw) {
-		assert raw.charAt(0) == '"';
-		assert raw.charAt(raw.length() - 1) == '"' : raw = raw.substring(1, raw.length() - 1);
+		assert raw.charAt(0) == '"' : raw;
+		assert raw.charAt(raw.length() - 1) == '"' : raw;
+		raw = raw.substring(1, raw.length() - 1);
 		StringBuilder build = new StringBuilder(raw.length());
-		for (int index = 0; index != -1;) {
+		for (int index = 0;;) {
 			int newIndex = raw.indexOf('\\', index);
 			build.append(raw, index, (newIndex == -1 ? raw.length() : newIndex) - index);
 			index = newIndex;
+			if (index != -1) {
+				build.append(character0(raw.substring(index, index + 2)));
+			} else break;
 		}
 		return build.toString();
+	}
+	private char character(String raw) {
+		assert raw.charAt(0) == '\'';
+		assert raw.charAt(raw.length() - 1) == '\'';
+		return character(raw.substring(1, raw.length() - 2));
+	}
+	private char character0(String raw) {
+		if (raw.length() == 1) {
+			assert raw.charAt(0) != '\\';
+			return raw.charAt(0);
+		}
+		assert raw.charAt(0) == '\\' : raw;
+		switch (raw.charAt(0)) {
+		case '\'':
+			return '\'';
+		case 'r':
+			return '\r';
+		case 'n':
+			return '\n';
+		case 't':
+			return '\t';
+		case '0':
+			return '\0';
+		default:
+			throw new AssertionError(raw);
+		}
 	}
 }
 
@@ -34,10 +67,13 @@ simpleFile [SimpleFile file]:
 		{file.addDependency($dependency.depend);}
 		|
 		variable
+		{file.addVariable($variable.vari);}
 		|
 		structure
+		{file.addStructure($structure.struct);}
 		|
 		function
+		{file.addFunction($function.func);}
 	)*
 	EOF
 ;
@@ -46,288 +82,434 @@ dependency returns [String depend]:
 	DEP STRING SEMI
 	{$depend = string($STRING.getText());}
 ;
-variable:
+variable returns [SimpleVariable vari]:
 	VAR EXP? type NAME SEMI
+	{$vari = new SimpleVariable($type.t, $NAME.getText());}
 ;
-structure:
+structure returns [SimpleStructure struct]:
 	STRUCT NAME OPEN_CODE_BLOCK
 		namedTypeList
 	CLOSE_CODE_BLOCK
+	{$struct = new SimpleStructure($NAME.getText(), $namedTypeList.list);}
 ;
-function:
-	FUNC EXP? MAIN? NAME
-	OPEN_SMALL_BLOCK namedTypeList CLOSE_SMALL_BLOCK
-	( ARROW_RIGTH SMALLER namedTypeList GREATHER )?
+function returns [SimpleFunction func]:
+	{
+		List<SimpleVariable> results = null;
+		boolean export = false;
+		boolean main = false;
+	}
+	FUNC
+	(
+		EXP
+		{export = true;}
+	)?
+	(
+		MAIN
+		{main = true;}
+	)?
+	NAME
+	OPEN_SMALL_BLOCK args = namedTypeList CLOSE_SMALL_BLOCK
+	(
+		ARROW_RIGTH SMALLER res = namedTypeList GREATHER
+		{results = $res.list;}
+	)?
 	commandBlock
+	{$func = new SimpleFunction(export, main, $NAME.getText(), $args.list, results, $commandBlock.cmd);}
 ;
 
-value:
+value returns [SimpleValue val]:
 	expCond
+	{$val = $expCond.val;}
 ;
-expCond:
-	expLOr
+expCond returns [SimpleValue val]:
+	f = expLOr
+	{$val = $f.val;}
 	(
-		QUESTION_MARK value COLON expCond
+		QUESTION_MARK p = value COLON n = expCond
+		{$val = $val.addExpCond($p.val, $n.val);}
 	)?
 ;
-expLOr:
-	expLAnd
+expLOr returns [SimpleValue val]:
+	f = expLAnd
+	{$val = $f.val;}
 	(
 		(
 			SINGLE_OR
 		)
-		expLAnd
+		o = expLAnd
+		{$val = $val.addExpLOr($o.val);}
 	)*
 ;
-expLAnd:
-	expOr
+expLAnd returns [SimpleValue val]:
+	f = expOr
+	{$val = $f.val;}
 	(
 		(
 			SINGLE_AND
 		)
-		expOr
+		o = expOr
+		{$val = $val.addExpLAnd($o.val);}
 	)*
 ;
-expOr:
-	expXor
+expOr returns [SimpleValue val]:
+	f = expXor
+	{$val = $f.val;}
 	(
 		(
 			DOUBLE_OR
 		)
-		expXor
+		o = expXor
+		{$val = $val.addExpOr($o.val);}
 	)*
 ;
-expXor:
-	expAnd
+expXor returns [SimpleValue val]:
+	f = expAnd
+	{$val = $f.val;}
 	(
 		(
 			XOR
 		)
-		expAnd
+		o = expAnd
+		{$val = $val.addExpXor($o.val);}
 	)*
 ;
-expAnd:
-	expEq
+expAnd returns [SimpleValue val]:
+	f = expEq
+	{$val = $f.val;}
 	(
 		(
 			DOUBLE_AND
 		)
-		expEq
+		o = expEq
+		{$val = $val.addExpAnd($o.val);}
 	)*
 ;
-expEq:
-	expRel
+expEq returns [SimpleValue val]:
+	f = expRel
+	{$val = $f.val;}
 	(
+		{boolean equal;}
 		(
 			EQUAL
+			{equal = true;}
 			|
 			NOT_EQUAL
+			{equal = false;}
 		)
-		expRel
+		o = expRel
+		{$val = $val.addExpEq(equal, $o.val);}
 	)*
 ;
-expRel:
-	expShift
+expRel returns [SimpleValue val]:
+	f = expShift
+	{$val = $f.val;}
 	(
+		{int type;}
 		(
 			GREATHER
+			{type = SimpleValue.EXP_GREATHER;}
 			|
 			GREATHER_EQUAL
+			{type = SimpleValue.EXP_GREATHER_EQUAL;}
 			|
 			SMALLER_EQUAL
+			{type = SimpleValue.EXP_SMALLER_EQUAL;}
 			|
 			SMALLER
+			{type = SimpleValue.EXP_SMALLER;}
 		)
-		expShift
+		o = expShift
+		{$val = $val.addExpRel(type, $o.val);}
 	)*
 ;
-expShift:
-	expAdd
+expShift returns [SimpleValue val]:
+	f = expAdd
+	{$val = $f.val;}
 	(
+		{int type;}
 		(
 			SHIFT_LEFT
+			{type = SimpleValue.EXP_SHIFT_LEFT;}
 			|
 			SHIFT_LOGIC_RIGTH
+			{type = SimpleValue.EXP_SHIFT_LOGIC_RIGTH;}
 			|
 			SHIFT_ARITMETIC_RIGTH
+			{type = SimpleValue.EXP_SHIFT_ARITMETIC_RIGTH;}
 		)
-		expAdd
+		o = expAdd
+		{$val = $val.addExpShift(type, $o.val);}
 	)*
 ;
-expAdd:
-	expMul
+expAdd returns [SimpleValue val]:
+	f = expMul
+	{$val = $f.val;}
 	(
+		{boolean add;}
 		(
 			PLUS
+			{add = true;}
 			|
 			MINUS
+			{add = false;}
 		)
-		expMul
+		o = expMul
+		{$val = $val.addExpAdd(add, $o.val);}
 	)*
 ;
-expMul:
-	expCast
+expMul returns [SimpleValue val]:
+	f = expCast
+	{$val = $f.val;}
 	(
+		{int type;}
 		(
 			STAR
+			{type = SimpleValue.EXP_MULTIPLY;}
 			|
 			DIVIDE
+			{type = SimpleValue.EXP_DIVIDE;}
 			|
 			MODULO
+			{type = SimpleValue.EXP_MODULO;}
 		)
-		expCast
+		o = expCast
+		{$val = $val.addExpMul(type, $o.val);}
 	)*
 ;
-expCast:
+expCast returns [SimpleValue val]:
+	{SimpleType t = null;}
 	(
 		OPEN_SMALL_BLOCK type CLOSE_SMALL_BLOCK
+		{t = $type.t;}
 	)?
-	expUnary
+	e = expUnary
+	{
+		if (t != null) {
+			$val = $e.val.addExpCast(t);
+		} else {
+			$val = $e.val;
+		}
+	}
 ;
-expUnary:
+expUnary returns [SimpleValue val]:
+	{int type = SimpleValue.EXP_UNARY_NONE;}
 	(
 		PLUS
+		{type = SimpleValue.EXP_UNARY_PLUS;}
 		|
 		MINUS
+		{type = SimpleValue.EXP_UNARY_MINUS;}
 		|
 		SINGLE_AND
+		{type = SimpleValue.EXP_UNARY_AND;}
 		|
 		BITWISE_NOT
+		{type = SimpleValue.EXP_UNARY_BITWISE_NOT;}
 		|
 		BOOLEAN_NOT
-		
+		{type = SimpleValue.EXP_UNARY_BOOLEAN_NOT;}
 	)?
-	expPostfix
+	e = expPostfix
+	{$val = $e.val.addExpUnary(type);}
 ;
-expPostfix:
-	expDirect
+expPostfix returns [SimpleValue val]:
+	f = expDirect
+	{$val = $f.val;}
 	(
 		DIAMOND // dereference pointer
+		{$val = $val.addExpDerefPointer();}
 		|
-		OPEN_ARRAY_BLOCK value CLOSE_ARRAY_BLOCK
+		OPEN_ARRAY_BLOCK o = value CLOSE_ARRAY_BLOCK
+		{$val = $val.addExpArrayRef($o.val);}
 	)*
 ;
-expDirect:
-	STRING+
-	|
-	CHARACTER
-	|
-	NUMBER_DEC
-	|
-	NUMBER_HEX
-	|
-	NUMBER_NHEX
-	|
-	NUMBER_UHEX
-	|
-	NUMBER_BIN
-	|
-	NUMBER_NBIN
-	|
-	NUMBER_OCT
-	|
-	NUMBER_NOCT
-	|
-	NUMBER_FP
-	|
-	NAME
+expDirect returns [SimpleValue val]:
 	(
-		COLON NAME
+		{List<String> strs = new ArrayList<>();}
+		(
+			t = STRING
+			{strs.add(string($t.getText()));}
+		)+
+		{$val = new SimpleStringValue(strs);}
+	)
+	|
+	t = CHARACTER
+	{$val = new SimpleCharacterValue(character($t.getText()));}
+	|
+	t = NUMBER_DEC
+	{$val = new SimpleNumberValue(64, Long.parseLong($t.getText()));}
+	|
+	t = NUMBER_HEX
+	{$val = new SimpleNumberValue(64, Long.parseLong($t.getText().substring(4), 16));}
+	|
+	t = NUMBER_NHEX
+	{$val = new SimpleNumberValue(64, Long.parseLong($t.getText().substring(4), 16));}
+	|
+	t = NUMBER_UHEX
+	{$val = new SimpleNumberValue(64, Long.parseUnsignedLong($t.getText().substring(5), 16));}
+	|
+	t = NUMBER_BIN
+	{$val = new SimpleNumberValue(64, Long.parseLong($t.getText().substring(4), 2));}
+	|
+	t = NUMBER_NBIN
+	{$val = new SimpleNumberValue(64, Long.parseLong($t.getText().substring(4), 2));}
+	|
+	t = NUMBER_OCT
+	{$val = new SimpleNumberValue(64, Long.parseLong($t.getText().substring(4), 7));}
+	|
+	t = NUMBER_NOCT
+	{$val = new SimpleNumberValue(64, Long.parseLong($t.getText().substring(4), 7));}
+	|
+	t = NUMBER_FP
+	{$val = new SimpleFPNumberValue(64, Double.parseDouble($t.getText()));}
+	|
+	t = NAME
+	{$val = new SimpleVariableUseValue($t.getText());}
+	(
+		COLON t = NAME
+		{$val = $val.addExpNameRef($t.getText());}
 	)*
 	|
-	OPEN_SMALL_BLOCK value CLOSE_SMALL_BLOCK
+	OPEN_SMALL_BLOCK v = value CLOSE_SMALL_BLOCK
+	{$val = $v.val;}
 ;
 
-type:
+type returns [SimpleType t]:
 	(
 		typePrim
+		{$t = $typePrim.t;}
 		|
 		typeStruct
+		{$t = $typeStruct.t;}
 		|
 		typeFunc
+		{$t = $typeFunc.t;}
 	)
 	(
 		DIAMOND // pointer
+		{$t = $t.pointer();}
 		|
+		{SimpleValue val = null;}
 		OPEN_ARRAY_BLOCK
-		value?
+		(
+			value
+			{val = $value.val;}
+		)?
 		CLOSE_ARRAY_BLOCK
+		{$t = $t.array(val);}
 	)*
 ;
 
-typePrim:
+typePrim returns [SimpleType t]:
 	NUM
+	{$t = SimpleType.NUM;}
 	|
 	FPNUM
+	{$t = SimpleType.FPNUM;}
 	|
 	DWORD
+	{$t = SimpleType.DWORD;}
 	|
 	WORD
+	{$t = SimpleType.WORD;}
 	|
 	BYTE
+	{$t = SimpleType.BYTE;}
 ;
 
-typeStruct:
+typeStruct returns [SimpleStructType t]:
 	STRUCT NAME
+	{return new SimpleStructType($NAME.getText());}
 ;
 
-typeFunc:
-	OPEN_SMALL_BLOCK namedTypeList CLOSE_SMALL_BLOCK
+typeFunc returns [SimpleType t]:
+	{List<SimpleVariable> results = null;}
+	OPEN_SMALL_BLOCK args = namedTypeList CLOSE_SMALL_BLOCK
 	(
-		ARROW_RIGTH SMALLER namedTypeList GREATHER
+		ARROW_RIGTH SMALLER res = namedTypeList GREATHER
+		{results = $res.list;}
 	)?
+	{$t = new SimpleFuncType($args.list, results);}
 ;
 
-namedTypeList:
+namedTypeList returns [List<SimpleVariable> list]:
+	{$list = new ArrayList<>();}
 	(
-		type NAME
+		ft = type fn =  NAME
+		{$list.add(new SimpleVariable($ft.t, $fn.getText()));}
 		(
-			COMMA type NAME
+			COMMA ots = type ons = NAME
+			{$list.add(new SimpleVariable($ots.t, $ons.getText()));}
 		)*
 	)?
 ;
 
-command:
+command returns [SimpleCommand cmd]:
 	commandBlock
+	{$cmd = $commandBlock.cmd;}
 	|
 	commandVarDecl
+	{$cmd = $commandVarDecl.cmd;}
 	|
 	commandAssign
+	{$cmd = $commandAssign.cmd;}
 	|
 	commandFuncCall
+	{$cmd = $commandFuncCall.cmd;}
 	|
 	commandWhile
+	{$cmd = $commandWhile.cmd;}
 	|
 	commandIf
+	{$cmd = $commandIf.cmd;}
 ;
-commandBlock:
+commandBlock returns [SimpleCommandBlock cmd]:
+	{List<SimpleCommand> cmds = new ArrayList<>();}
 	OPEN_CODE_BLOCK
 	(
 		command
+		{cmds.add($command.cmd);}
 	)*
 	CLOSE_CODE_BLOCK
+	{$cmd = SimpleCommandBlock.create(cmds);}
 ;
-commandVarDecl:
+commandVarDecl returns [SimpleCommandVarDecl cmd]:
 	VAR type NAME
+	{$cmd = SimpleCommandVarDecl.create($type.t, $NAME.getText());}
 	(
 		ARROW_LEFT value
+		{$cmd.initValue($value.val);}
 	)?
 	SEMI
 ;
-commandAssign:
+commandAssign returns [SimpleCommandAssign cmd]:
 	expPostfix ARROW_LEFT value SEMI
+	{$cmd = SimpleCommandAssign.create($expPostfix.val, $value.val);}
 ;
-commandFuncCall:
-	CALL POSTFIX_EXP
+commandFuncCall returns [SimpleCommandFuncCall cmd]:
+	CALL expPostfix SEMI
+	{$cmd = SimpleCommandFuncCall.create($expPostfix.val);}
 ;
-commandWhile:
-	WHILE OPEN_SMALL_BLOCK value CLOSE_SMALL_BLOCK command
-;
-commandIf:
-	IF OPEN_SMALL_BLOCK value CLOSE_SMALL_BLOCK command
+commandWhile returns [SimpleCommandWhile cmd]:
+	WHILE OPEN_SMALL_BLOCK value CLOSE_SMALL_BLOCK
+	{SimpleCommand whileCmd;}
 	(
-		ELSE command
+		command
+		{whileCmd = $command.cmd;}
+		|
+		SEMI
+		{whileCmd = null;}
+	)
+	{$cmd = SimpleCommandWhile.create($value.val, whileCmd);}
+;
+commandIf returns [SimpleCommandIf cmd]:
+	IF OPEN_SMALL_BLOCK value CLOSE_SMALL_BLOCK ic = command
+	{SimpleCommand elseCmd = null;}
+	(
+		ELSE ec = command
+		{elseCmd = $ec.cmd;}
 	)?
+	{$cmd = SimpleCommandIf.create($value.val, $ic.cmd, elseCmd);}
 ;
 
 STRING :

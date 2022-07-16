@@ -48,7 +48,7 @@ public class SimpleCompiler {
 		prework.add(target);
 		if ( !working) {
 			working = true;
-			new Thread(() -> {
+			Thread worker = new Thread(() -> {
 				try {
 					precompileQueue();
 				} finally {
@@ -57,7 +57,9 @@ public class SimpleCompiler {
 						notify();
 					}
 				}
-			}, "simple precompile").start();
+			}, "simple precompiler");
+			worker.setPriority(Math.min(worker.getPriority() + 2, Thread.MAX_PRIORITY));
+			worker.start();
 		}
 		assert old == null;
 	}
@@ -67,7 +69,7 @@ public class SimpleCompiler {
 			CompileTarget pc = prework.poll();
 			if (pc == null) return;
 			try {
-				try (Reader r = Files.newBufferedReader(pc.src, cs)) {
+				try (Reader r = Files.newBufferedReader(pc.source, cs)) {
 					ANTLRInputStream in = new ANTLRInputStream();
 					in.load(r, 1024, 1024);
 					SimpleGrammarLexer lexer = new SimpleGrammarLexer(in);
@@ -100,17 +102,17 @@ public class SimpleCompiler {
 	
 	private static class CompileTarget {
 		
-		private final Path     src;
-		private final Path     exp;
-		private final PatrFile bin;
+		private final Path     source;
+		private final Path     exports;
+		private final PatrFile binary;
 		private final boolean  neverExe;
 		
 		private volatile SimpleFile file;
 		
 		public CompileTarget(Path src, Path exp, PatrFile bin, boolean neverExe) {
-			this.src = src;
-			this.exp = exp;
-			this.bin = bin;
+			this.source = src;
+			this.exports = exp;
+			this.binary = bin;
 			this.neverExe = neverExe;
 		}
 		

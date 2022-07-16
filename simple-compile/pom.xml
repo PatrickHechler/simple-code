@@ -27,7 +27,7 @@
 		<dependency>
 			<groupId>de.hechler.patrick.codesprachen.primitive</groupId>
 			<artifactId>assemble</artifactId>
-			<version>12.2.0</version>
+			<version>12.2.1</version>
 		</dependency>
 	</dependencies>
 	<build>
