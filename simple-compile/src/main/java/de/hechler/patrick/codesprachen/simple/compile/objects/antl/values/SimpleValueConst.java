@@ -1,7 +1,13 @@
 package de.hechler.patrick.codesprachen.simple.compile.objects.antl.values;
 
+import de.hechler.patrick.codesprachen.simple.compile.objects.antl.types.SimpleType;
+
 public abstract class SimpleValueConst extends SimpleValueNoConst {
 	
+	public SimpleValueConst(SimpleType type) {
+		super(type);
+	}
+
 	/**
 	 * used when this constant contains of data and not a number (for example a string)
 	 * <p>

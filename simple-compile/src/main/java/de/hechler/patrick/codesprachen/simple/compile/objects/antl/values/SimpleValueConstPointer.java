@@ -6,6 +6,7 @@ import de.hechler.patrick.codesprachen.primitive.assemble.enums.Commands;
 import de.hechler.patrick.codesprachen.primitive.assemble.objects.Command;
 import de.hechler.patrick.codesprachen.primitive.assemble.objects.Param;
 import de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder;
+import de.hechler.patrick.codesprachen.simple.compile.objects.antl.types.SimpleType;
 
 public abstract class SimpleValueConstPointer extends SimpleValueConst {
 	
@@ -16,14 +17,14 @@ public abstract class SimpleValueConstPointer extends SimpleValueConst {
 	public final int    elementBits;
 	public long         addr = -1L;
 	
-	public SimpleValueConstPointer(byte[] data, int elementSize) {
-		super();
+	public SimpleValueConstPointer(SimpleType mytype, byte[] data, int elementSize) {
+		super(mytype);
 		this.data = data;
 		this.elementBits = elementSize;
 	}
 	
 	@Override
-	public void loadValue(int targetRegister, boolean[] blockedRegisters, List <Command> commands, long pos) {
+	public long loadValue(int targetRegister, boolean[] blockedRegisters, List <Command> commands, long pos) {
 		assert !blockedRegisters[targetRegister];
 		blockedRegisters[targetRegister] = true;
 		assert this.addr != -1L;
@@ -35,7 +36,10 @@ public abstract class SimpleValueConstPointer extends SimpleValueConst {
 		build.art = ParamBuilder.A_NUM;
 		build.v1 = addr;
 		p2 = build.build();
-		commands.add(new Command(Commands.CMD_LEA, p1, p2));
+		Command addCmd = new Command(Commands.CMD_LEA, p1, p2);
+		pos += addCmd.length();
+		commands.add(addCmd);
+		return pos;
 	}
 	
 	@Override

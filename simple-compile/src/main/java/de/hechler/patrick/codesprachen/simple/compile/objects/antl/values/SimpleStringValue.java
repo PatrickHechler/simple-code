@@ -3,10 +3,21 @@ package de.hechler.patrick.codesprachen.simple.compile.objects.antl.values;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
+import de.hechler.patrick.codesprachen.simple.compile.objects.antl.types.SimpleType;
+import de.hechler.patrick.codesprachen.simple.compile.objects.antl.types.SimpleTypeArray;
+
 public class SimpleStringValue extends SimpleValueConstPointer {
 	
 	public SimpleStringValue(List <String> strs) {
-		super(data(strs), 16);
+		this(data(strs));
+	}
+	
+	public SimpleStringValue(byte[] data) {
+		super(type(data), data, 16);
+	}
+	
+	private static final SimpleType type(byte[] data) {
+		return new SimpleTypeArray(SimpleType.UWORD, data.length >> 1);
 	}
 	
 	private static final byte[] data(List <String> strs) {

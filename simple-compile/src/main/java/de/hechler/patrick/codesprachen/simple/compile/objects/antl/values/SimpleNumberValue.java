@@ -6,6 +6,8 @@ import de.hechler.patrick.codesprachen.primitive.assemble.enums.Commands;
 import de.hechler.patrick.codesprachen.primitive.assemble.objects.Command;
 import de.hechler.patrick.codesprachen.primitive.assemble.objects.Param;
 import de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder;
+import de.hechler.patrick.codesprachen.simple.compile.objects.antl.types.SimpleType;
+import de.hechler.patrick.codesprachen.simple.compile.objects.antl.types.SimpleTypePrimitive;
 
 public class SimpleNumberValue extends SimpleValueConst implements SimpleValue {
 	
@@ -18,6 +20,15 @@ public class SimpleNumberValue extends SimpleValueConst implements SimpleValue {
 	}
 	
 	public SimpleNumberValue(int bits, boolean signed, long value) {
+		this(type(bits, signed), bits, signed, value);
+	}
+	
+	public SimpleNumberValue(SimpleType t, long value) {
+		this(t, bits(t), signed(t), value);
+	}
+	
+	private SimpleNumberValue(SimpleType t, int bits, boolean signed, long value) {
+		super(t);
 		this.bits = bits;
 		this.signed = signed;
 		switch (bits) {
@@ -35,6 +46,61 @@ public class SimpleNumberValue extends SimpleValueConst implements SimpleValue {
 			break;
 		default:
 			throw new InternalError("unknown bits value: " + bits);
+		}
+	}
+	
+	private static final int bits(SimpleType t) {
+		if (t.isPrimitive()) {
+			return ((SimpleTypePrimitive) t).bits();
+		} else if (t.isPointerOrArray()) {
+			return 64;
+		} else if (t.isStruct()) {
+			throw new IllegalStateException("struct type can not be represented by a number value");
+		} else {
+			throw new IllegalStateException("type is not primitive, no pointer/array and no struct! t: '" + t + "'");
+		}
+	}
+	
+	private static final boolean signed(SimpleType t) {
+		if (t.isPrimitive()) {
+			return ((SimpleTypePrimitive) t).signed();
+		} else if (t.isPointerOrArray()) {
+			return true;
+		} else if (t.isStruct()) {
+			throw new IllegalStateException("struct type can not be represented by a number value");
+		} else {
+			throw new IllegalStateException("type is not primitive, no pointer/array and no struct! t: '" + t + "'");
+		}
+	}
+	
+	private static final SimpleType type(int bits, boolean signed) {
+		switch (bits) {
+		case 64:
+			if (signed) {
+				return SimpleType.NUM;
+			} else {
+				return SimpleType.UNUM;
+			}
+		case 32:
+			if (signed) {
+				return SimpleType.DWORD;
+			} else {
+				return SimpleType.UDWORD;
+			}
+		case 16:
+			if (signed) {
+				return SimpleType.WORD;
+			} else {
+				return SimpleType.UWORD;
+			}
+		case 8:
+			if (signed) {
+				return SimpleType.BYTE;
+			} else {
+				return SimpleType.UBYTE;
+			}
+		default:
+			throw new InternalError();
 		}
 	}
 	

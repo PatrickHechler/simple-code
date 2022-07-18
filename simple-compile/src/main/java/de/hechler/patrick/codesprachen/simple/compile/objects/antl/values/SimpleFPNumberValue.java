@@ -3,12 +3,14 @@ package de.hechler.patrick.codesprachen.simple.compile.objects.antl.values;
 import java.util.List;
 
 import de.hechler.patrick.codesprachen.primitive.assemble.objects.Command;
+import de.hechler.patrick.codesprachen.simple.compile.objects.antl.types.SimpleType;
 
 public class SimpleFPNumberValue extends SimpleValueConst implements SimpleValue {
 	
 	public final double value;
 	
 	public SimpleFPNumberValue(double value) {
+		super(SimpleType.FPNUM);
 		this.value = value;
 	}
 	

@@ -33,7 +33,7 @@ public interface SimpleValue {
 	 * after this method returns the {@code blockedRegisters} will additionally contain the {@code targetRegister}.<br>
 	 * {@code blockedRegisters} is not allowed to contain {@code targetRegister}
 	 * <p>
-	 * if this value represents an array or pointer the address of the first/target element is loaded
+	 * if this value represents an array or structure (or pointer) the address of the first/target element is loaded
 	 * <p>
 	 * the return value will be the new length of the binary in bytes
 	 * <p>
@@ -50,6 +50,8 @@ public interface SimpleValue {
 	 *                         the current length of current the binary in bytes
 	 */
 	long loadValue(int targetRegister, boolean[] blockedRegisters, List <Command> commands, long pos);
+	
+	SimpleType type();
 	
 	boolean isConstant();
 	
@@ -86,5 +88,7 @@ public interface SimpleValue {
 	SimpleValue addExpDerefPointer();
 	
 	SimpleValue addExpArrayRef(SimpleValue val);
+	
+	SimpleValue addExpNameRef(String text);
 	
 }
