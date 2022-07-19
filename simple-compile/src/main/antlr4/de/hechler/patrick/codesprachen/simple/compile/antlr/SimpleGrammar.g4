@@ -67,7 +67,7 @@ simpleFile [SimpleFile file]:
 		{file.addDependency($dependency.name, $dependency.depend);}
 		|
 		variable [file]
-		{file.addVariable($variable.vari);}
+		{file.addVariable($variable.vari, $variable.export);}
 		|
 		structure [file]
 		{file.addStructure($structure.struct);}
@@ -85,8 +85,14 @@ dependency returns [String name, String depend]:
 		$depend = string($STRING.getText());
 	}
 ;
-variable [SimplePool pool] returns [SimpleVariable vari]:
-	VAR EXP? type [pool] NAME SEMI
+variable [SimplePool pool] returns [SimpleVariable vari, boolean export]:
+	{$export = false;}
+	VAR
+	(
+		EXP
+		{$export = true;}
+	)?
+	type [pool] NAME SEMI
 	{$vari = new SimpleVariable($type.t, $NAME.getText());}
 ;
 structure [SimplePool pool] returns [SimpleStructType struct]:
@@ -337,7 +343,7 @@ expDirect [SimplePool pool] returns [SimpleValue val]:
 			{strs.add(string($t.getText()));}
 		)+
 		{
-			SimpleValueConstPointer dataVal = new SimpleStringValue(strs);
+			SimpleValueDataPointer dataVal = new SimpleStringValue(strs);
 			pool.registerDataValue(dataVal);
 			$val = dataVal;
 		}

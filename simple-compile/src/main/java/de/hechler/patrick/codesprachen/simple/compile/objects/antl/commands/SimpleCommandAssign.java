@@ -3,7 +3,6 @@ package de.hechler.patrick.codesprachen.simple.compile.objects.antl.commands;
 import de.hechler.patrick.codesprachen.simple.compile.objects.antl.SimplePool;
 import de.hechler.patrick.codesprachen.simple.compile.objects.antl.types.SimpleType;
 import de.hechler.patrick.codesprachen.simple.compile.objects.antl.values.SimpleValue;
-import de.hechler.patrick.codesprachen.simple.compile.objects.antl.values.SimpleVariableValue;
 
 public class SimpleCommandAssign implements SimpleCommand {
 	
@@ -18,13 +17,13 @@ public class SimpleCommandAssign implements SimpleCommand {
 	}
 	
 	public static SimpleCommandAssign create(SimplePool pool, SimpleValue target, SimpleValue value) {
-		SimpleType tt = target.type();
-		SimpleType vt = value.type();
-		if (vt.isArray() || tt.isArray() || vt.isStruct() || tt.isStruct()) {
-			throw new IllegalStateException("can not assign with array/structure values! (target: " + tt + " value: " + vt + ")");
+		SimpleType t = value.type();
+		if ( !t.isPrimitive() && !t.isPointer()) {
+			throw new IllegalStateException("can not assign with array/structure values! (target: " + target + " value: " + value + ")");
 		}
-		if (! (target instanceof SimpleVariableValue)) {
-			target = target.addExpUnary(pool, SimpleValue.EXP_UNARY_AND);
+		t = target.type();
+		if ( !t.isPrimitive() && !t.isPointer()) {
+			throw new IllegalStateException("can not assign with array/structure values! (target: " + target + " value: " + value + ")");
 		}
 		return new SimpleCommandAssign(pool, target, value);
 	}

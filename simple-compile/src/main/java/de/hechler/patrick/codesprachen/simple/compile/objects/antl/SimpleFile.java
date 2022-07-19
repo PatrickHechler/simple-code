@@ -20,6 +20,7 @@ import de.hechler.patrick.codesprachen.simple.compile.objects.antl.commands.Simp
 import de.hechler.patrick.codesprachen.simple.compile.objects.antl.types.SimpleFuncType;
 import de.hechler.patrick.codesprachen.simple.compile.objects.antl.types.SimpleStructType;
 import de.hechler.patrick.codesprachen.simple.compile.objects.antl.types.SimpleType;
+import de.hechler.patrick.codesprachen.simple.compile.objects.antl.values.SimpleStringValue;
 import de.hechler.patrick.codesprachen.simple.compile.objects.antl.values.SimpleValue;
 import de.hechler.patrick.codesprachen.simple.compile.objects.antl.values.SimpleValueDataPointer;
 import de.hechler.patrick.codesprachen.simple.compile.objects.antl.values.SimpleVariableValue;
@@ -32,7 +33,7 @@ public class SimpleFile implements SimplePool {
 	private final Map <String, SimpleVariable>   vars         = new HashMap <>();
 	private final Map <String, SimpleStructType> structs      = new HashMap <>();
 	private final Map <String, SimpleFunction>   funcs        = new HashMap <>();
-	private final List <SimpleValueDataPointer> datas        = new ArrayList <>();
+	private final List <SimpleValueDataPointer>  datas        = new ArrayList <>();
 	private final List <SimpleExportable>        exports      = new ArrayList <>();
 	private SimpleFunction                       main         = null;
 	
@@ -168,6 +169,24 @@ public class SimpleFile implements SimplePool {
 		throw new IllegalArgumentException("there is nothign with the given name!");
 	}
 	
+	@Override
+	public SimpleDependency getDependency(String name) {
+		SimpleDependency dep = dependencies.get(name);
+		if (dep == null) {
+			throw new NoSuchElementException("there is no dependency with the name '" + name + "'");
+		}
+		return dep;
+	}
+	
+	@Override
+	public SimpleFunction getFunction(String name) {
+		SimpleFunction func = funcs.get(name);
+		if (func == null) {
+			throw new NoSuchElementException("there is no function with the name '" + name + "'");
+		}
+		return func;
+	}
+	
 	public class SimpleFuncPool implements SimplePool {
 		
 		private final SimpleFuncType func;
@@ -182,8 +201,13 @@ public class SimpleFile implements SimplePool {
 		}
 		
 		@Override
-		public SimplePool newSubPool(SimpleCommandBlock block) {
-			return new SimpleSubPool(SimpleFuncPool.this, block);
+		public SimplePool newSubPool() {
+			return new SimpleSubPool(SimpleFuncPool.this);
+		}
+		
+		@Override
+		public void initBlock(SimpleCommandBlock block) {
+			throw new InternalError("this method should be called only on sub pools!");
 		}
 		
 		@Override
@@ -206,26 +230,51 @@ public class SimpleFile implements SimplePool {
 			SimpleFile.this.registerDataValue(dataVal);
 		}
 		
+		@Override
+		public SimpleDependency getDependency(String name) {
+			return SimpleFile.this.getDependency(name);
+		}
+		
+		@Override
+		public SimpleFunction getFunction(String name) {
+			return SimpleFile.this.getFunction(name);
+		}
+		
 	}
 	
 	public static class SimpleSubPool implements SimplePool {
 		
-		public final SimplePool         parent;
-		public final SimpleCommandBlock block;
+		public final SimplePool   parent;
+		public SimpleCommandBlock block;
 		
-		public SimpleSubPool(SimplePool parent, SimpleCommandBlock block) {
+		public SimpleSubPool(SimplePool parent) {
 			this.parent = parent;
-			this.block = block;
+		}
+		
+		private SimplePool p() {
+			SimplePool p = parent;
+			while (p.getClass() == SimpleSubPool.class) {
+				p = ((SimpleSubPool) p).parent;
+			}
+			return p;
 		}
 		
 		@Override
 		public SimpleStructType getStructure(String name) {
-			return parent.getStructure(name);
+			return p().getStructure(name);
 		}
 		
 		@Override
-		public SimplePool newSubPool(SimpleCommandBlock block) {
-			return new SimpleSubPool(this, block);
+		public SimplePool newSubPool() {
+			return new SimpleSubPool(this);
+		}
+		
+		@Override
+		public void initBlock(SimpleCommandBlock block) {
+			if (block != null) {
+				throw new IllegalStateException("blockalready initilized!");
+			}
+			this.block = block;
 		}
 		
 		@Override
@@ -243,33 +292,72 @@ public class SimpleFile implements SimplePool {
 		
 		@Override
 		public void registerDataValue(SimpleValueDataPointer dataVal) {
-			parent.registerDataValue(dataVal);
+			p().registerDataValue(dataVal);
+		}
+		
+		@Override
+		public SimpleDependency getDependency(String name) {
+			return p().getDependency(name);
+		}
+		
+		@Override
+		public SimpleFunction getFunction(String name) {
+			return p().getFunction(name);
 		}
 		
 	}
 	
 	@Override
-	public SimplePool newSubPool(SimpleCommandBlock block) {
-		throw new InternalError("this method should be only called on function pools not on the file pool!");
+	public SimplePool newSubPool() {
+		throw new InternalError("this method should be only called on function and sub pools not on the file pool!");
+	}
+	
+	@Override
+	public void initBlock(SimpleCommandBlock block) {
+		throw new InternalError("this method should be only called on sub pools not on the file pool!");
 	}
 	
 	private static final SimpleType DEPENDENCY_TYPE = new SimpleStructType("--DEPENDENCY--", Collections.emptyList());
 	
-	private static class SimpleDependency extends SimpleVariable {
+	public static class SimpleDependency extends SimpleVariable {
 		
-		private final String                         depend;
-		private final Map <String, SimpleExportable> imps;
+		public final SimpleValueDataPointer         name;
+		public final String                         depend;
+		public final Map <String, SimpleExportable> imps;
 		
 		public SimpleDependency(String depend) {
 			super(DEPENDENCY_TYPE, "");
+			this.name = null;
 			this.depend = depend;
 			this.imps = null;
 		}
 		
 		public SimpleDependency(String name, String depend, Map <String, SimpleExportable> imps) {
 			super(DEPENDENCY_TYPE, name);
+			this.name = new SimpleStringValue(normalize(depend));
 			this.depend = depend;
-			this.imps = imps;
+			this.imps = Collections.unmodifiableMap(imps);
+		}
+		
+		private static final List <String> normalize(String depend) {
+			String[] segs = depend.replace('\\', '/').split("\\/");
+			int len, start, i;
+			for (start = 0; start < segs.length && segs[start].isEmpty(); start ++ );
+			for (i = start, len = segs.length; i < len;) {
+				switch (segs[i]) {
+				case ".":
+					System.arraycopy(segs, i + 1, segs, i, len - i);
+					break;
+				case "..":
+					System.arraycopy(segs, i + 1, segs, i - 1, len - i);
+					i -- ;
+					len -- ;
+					break;
+				default:
+					i ++ ;
+				}
+			}
+			return Arrays.asList(segs).subList(start, start + len);
 		}
 		
 		@Override

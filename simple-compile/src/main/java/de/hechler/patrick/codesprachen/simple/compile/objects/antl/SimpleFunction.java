@@ -10,8 +10,10 @@ import de.hechler.patrick.codesprachen.simple.compile.objects.antl.types.SimpleF
 
 public class SimpleFunction implements SimpleExportable {
 	
-	public long                     address;
-	public List <Command>           cmds = null;
+	public boolean                  addrVars;
+	public int                      regVars = -1;
+	public long                     address = -1L;
+	public List <Command>           cmds    = null;
 	public final boolean            export;
 	public final boolean            main;
 	public final String             name;

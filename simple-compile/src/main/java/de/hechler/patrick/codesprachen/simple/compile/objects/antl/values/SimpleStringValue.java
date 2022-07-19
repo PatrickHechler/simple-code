@@ -28,14 +28,16 @@ public class SimpleStringValue extends SimpleValueDataPointer {
 				throw new OutOfMemoryError();
 			}
 		}
-		byte[] bytes = new byte[len];
+		byte[] bytes = new byte[len + 2];
 		int off = 0;
 		for (String str : strs) {
 			byte[] cpy = str.getBytes(StandardCharsets.UTF_16LE);
 			System.arraycopy(cpy, 0, bytes, off, cpy.length);
 			off += cpy.length;
 		}
-		assert off == bytes.length;
+		assert off == bytes.length - 2;
+		// bytes[bytes.length - 2] = 0;
+		// bytes[bytes.length - 1] = 0;
 		return bytes;
 	}
 	
