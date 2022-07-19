@@ -9,13 +9,11 @@ simple-code is a simple programming language.
 
 ### dependency
 
-`dep [STRING] ;`
+`dep [NAME] [STRING] ;`
 * the STRING is the path relative from a included source directory
 * file type:
-    * the DEPENDENCY is either a symbol-file (`*.psf`)
-    * or a simple-code source file (`*.s`)
-    * or a primitive-code source file (`*.psc`)
-* if the DEPENDENCY is a source file (primitive or simple) only the export-symbols will be extracted and used
+    * the DEPENDENCY is always treated as simple-export-file
+* to use a import from a dependency use `dependency_name` `:` `import_name`
 
 ### function
 
@@ -47,7 +45,7 @@ a variable can be used by all functions
 
 ### NAME
 
-`[a-zA-Z_]*`
+`[a-zA-Z][a-zA-Z_0-9]*`
 
 ### NAMED_TYPE_LIST
 `( [PARAMETER] ( , [PARAMETER] )* )?`
@@ -79,7 +77,7 @@ a variable can be used by all functions
 * ASSIGN
     * `[POSTFIX_EXP] <-- [VALUE] ;`
 * FUNC_CALL
-    * `call [POSTFIX_EXP] ;`
+    * `call [NAME] ( : [NAME] )? [POSTFIX_EXP] ;`
 * WHILE
     * `while \( [VALUE] \) [COMMAND]`
 * IF

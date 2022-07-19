@@ -1,5 +1,6 @@
 package de.hechler.patrick.codesprachen.simple.compile.objects.antl.values;
 
+import de.hechler.patrick.codesprachen.simple.compile.objects.antl.SimplePool;
 import de.hechler.patrick.codesprachen.simple.compile.objects.antl.types.SimpleType;
 
 public abstract class SimpleValueConst extends SimpleValueNoConst {
@@ -7,37 +8,37 @@ public abstract class SimpleValueConst extends SimpleValueNoConst {
 	public SimpleValueConst(SimpleType type) {
 		super(type);
 	}
-
+	
 	/**
-	 * used when this constant contains of data and not a number (for example a string)
+	 * used when this constant is built of data and not a number (for example a string)
 	 * <p>
 	 * a constant number casted to a pointer type will still return <code>false</code>, since the number value is known at compile time
 	 * 
-	 * @return <code>true</code> when this value is a data pointer value and has not a constant number
+	 * @return <code>true</code> when this value is a data pointer/array value and has not a constant number
 	 */
-	protected boolean isDataPointer() {
+	protected boolean isDataPointerOrArray() {
 		return false;
 	}
 	
 	@Override
-	public boolean isConstDataPointer() {
-		return isDataPointer();
+	public boolean isConstData() {
+		return isDataPointerOrArray();
 	}
 	
 	@Override
-	public boolean isConstNoDataPointer() {
-		return !isDataPointer();
+	public boolean isConstNoData() {
+		return !isDataPointerOrArray();
 	}
 	
-	protected abstract boolean implicitNumber();
+	public abstract boolean implicitNumber();
 	
-	protected abstract boolean implicitFPNumber();
+	public abstract boolean implicitFPNumber();
 	
-	protected abstract long getNumber();
+	public abstract long getNumber();
 	
-	protected abstract int getNumberBits();
+	public abstract int getNumberBits();
 	
-	protected abstract double getFPNumber();
+	public abstract double getFPNumber();
 	
 	@Override
 	public final boolean isConstant() {
@@ -45,7 +46,7 @@ public abstract class SimpleValueConst extends SimpleValueNoConst {
 	}
 	
 	@Override
-	public SimpleValue addExpCond(SimpleValue val, SimpleValue val2) {
+	public SimpleValue addExpCond(SimplePool pool, SimpleValue val, SimpleValue val2) {
 		if ( !implicitNumber()) {
 			assert implicitFPNumber();
 			if (getFPNumber() != 0.0) {
@@ -53,7 +54,7 @@ public abstract class SimpleValueConst extends SimpleValueNoConst {
 			} else {
 				return val2;
 			}
-		} else if (isDataPointer() || getNumber() != 0L) {
+		} else if (isDataPointerOrArray() || getNumber() != 0L) {
 			return val;
 		} else {
 			return val2;
@@ -61,11 +62,50 @@ public abstract class SimpleValueConst extends SimpleValueNoConst {
 	}
 	
 	@Override
-	public SimpleValue addExpLOr(SimpleValue val) {
+	public SimpleValue addExpCast(SimplePool pool, SimpleType type) {
+		if (t.isArray() || t.isStruct()) {
+			throw new InternalError("arrays and structures should overwrite this method!");
+		}
+		if (type.isArray()) {
+			throw new IllegalStateException("can not cast from '" + t + "' to '" + type + "'");
+		}
+		if (type == t) {
+			return this;
+		} else if (type.isStruct()) {
+			throw new IllegalStateException("can not cast from '" + t + "' to '" + type + "'");
+		} else if (type.isPointer() ^ t.isPointer()) {
+			if (t == SimpleType.FPNUM || type == SimpleType.FPNUM) {
+				throw new IllegalStateException("can not cast from '" + t + "' to '" + type + "'");
+			} else if (t.isPointer()) {
+				long num = getNumber();
+				return new SimpleNumberValue(type, num == 0L ? -1L : num);
+			} else {
+				long num = getNumber();
+				return new SimpleNumberValue(type, num == -1L ? 0L : num);
+			}
+		} else if (type.isPointer() /* && t.isPointer() */) {
+			return new SimpleNumberValue(type, getNumber());
+		} else if (t == SimpleType.FPNUM ^ type == SimpleType.FPNUM) {
+			if (t == SimpleType.FPNUM) {
+				return new SimpleNumberValue(type, (long) getFPNumber());
+			} else {
+				return new SimpleFPNumberValue((double) getNumber());
+			}
+			// } else if (t == SimpleType.FPNUM) { // if (type == t) return this; at start
+			// return new SimpleFPNumberValue(getFPNumber());
+		} else if (t.isPrimitive() && type.isPrimitive()) {
+			return new SimpleNumberValue(type, getNumber());
+		} else {
+			throw new InternalError("unknown cast!");
+		}
+	}
+	
+	@Override
+	public SimpleValue addExpLOr(SimplePool pool, SimpleValue val) {
 		if (val.isConstant()) {
 			return logicOr((SimpleValueConst) val);
 		}
-		return super.addExpLOr(val);
+		return super.addExpLOr(pool, val);
 	}
 	
 	private SimpleValue logicOr(SimpleValueConst val) {
@@ -76,11 +116,11 @@ public abstract class SimpleValueConst extends SimpleValueNoConst {
 	}
 	
 	@Override
-	public SimpleValue addExpLAnd(SimpleValue val) {
+	public SimpleValue addExpLAnd(SimplePool pool, SimpleValue val) {
 		if (val.isConstant()) {
 			return logicAnd((SimpleValueConst) val);
 		}
-		return super.addExpLAnd(val);
+		return super.addExpLAnd(pool, val);
 	}
 	
 	private SimpleValue logicAnd(SimpleValueConst val) {
@@ -91,11 +131,11 @@ public abstract class SimpleValueConst extends SimpleValueNoConst {
 	}
 	
 	@Override
-	public SimpleValue addExpOr(SimpleValue val) {
+	public SimpleValue addExpOr(SimplePool pool, SimpleValue val) {
 		if (val.isConstant()) {
 			return boolOr((SimpleValueConst) val);
 		}
-		return super.addExpOr(val);
+		return super.addExpOr(pool, val);
 	}
 	
 	private SimpleValue boolOr(SimpleValueConst val) {
@@ -106,11 +146,11 @@ public abstract class SimpleValueConst extends SimpleValueNoConst {
 	}
 	
 	@Override
-	public SimpleValue addExpXor(SimpleValue val) {
+	public SimpleValue addExpXor(SimplePool pool, SimpleValue val) {
 		if (val.isConstant()) {
 			return exclusiveOr((SimpleValueConst) val);
 		}
-		return super.addExpXor(val);
+		return super.addExpXor(pool, val);
 	}
 	
 	private SimpleValue exclusiveOr(SimpleValueConst val) {
@@ -121,11 +161,11 @@ public abstract class SimpleValueConst extends SimpleValueNoConst {
 	}
 	
 	@Override
-	public SimpleValue addExpAnd(SimpleValue val) {
+	public SimpleValue addExpAnd(SimplePool pool, SimpleValue val) {
 		if (val.isConstant()) {
 			return boolAnd((SimpleValueConst) val);
 		}
-		return super.addExpAnd(val);
+		return super.addExpAnd(pool, val);
 	}
 	
 	private SimpleValue boolAnd(SimpleValueConst val) {
@@ -136,11 +176,11 @@ public abstract class SimpleValueConst extends SimpleValueNoConst {
 	}
 	
 	@Override
-	public SimpleValue addExpEq(boolean equal, SimpleValue val) {
+	public SimpleValue addExpEq(SimplePool pool, boolean equal, SimpleValue val) {
 		if (val.isConstant()) {
 			return equal(equal, (SimpleValueConst) val);
 		}
-		return super.addExpEq(equal, val);
+		return super.addExpEq(pool, equal, val);
 	}
 	
 	private SimpleValue equal(boolean equal, SimpleValueConst val) {
@@ -153,11 +193,11 @@ public abstract class SimpleValueConst extends SimpleValueNoConst {
 	}
 	
 	@Override
-	public SimpleValue addExpRel(int type, SimpleValue val) {
+	public SimpleValue addExpRel(SimplePool pool, int type, SimpleValue val) {
 		if (val.isConstant()) {
 			return relativeCheck(type, (SimpleValueConst) val);
 		}
-		return super.addExpRel(type, val);
+		return super.addExpRel(pool, type, val);
 	}
 	
 	private SimpleValue relativeCheck(int type, SimpleValueConst val) {
@@ -184,11 +224,11 @@ public abstract class SimpleValueConst extends SimpleValueNoConst {
 	}
 	
 	@Override
-	public SimpleValue addExpShift(int type, SimpleValue val) {
+	public SimpleValue addExpShift(SimplePool pool, int type, SimpleValue val) {
 		if (val.isConstant()) {
 			return shift(type, (SimpleValueConst) val);
 		}
-		return super.addExpShift(type, val);
+		return super.addExpShift(pool, type, val);
 	}
 	
 	private SimpleValue shift(int type, SimpleValueConst val) {
@@ -208,11 +248,11 @@ public abstract class SimpleValueConst extends SimpleValueNoConst {
 	}
 	
 	@Override
-	public SimpleValue addExpAdd(boolean add, SimpleValue val) {
+	public SimpleValue addExpAdd(SimplePool pool, boolean add, SimpleValue val) {
 		if (val.isConstant()) {
 			return addOrSubtract(add, (SimpleValueConst) val);
 		}
-		return super.addExpAdd(add, val);
+		return super.addExpAdd(pool, add, val);
 	}
 	
 	private SimpleValue addOrSubtract(boolean add, SimpleValueConst val) {
@@ -238,11 +278,11 @@ public abstract class SimpleValueConst extends SimpleValueNoConst {
 	}
 	
 	@Override
-	public SimpleValue addExpMul(int type, SimpleValue val) {
+	public SimpleValue addExpMul(SimplePool pool, int type, SimpleValue val) {
 		if (val.isConstant()) {
 			return multiplyDivideOrModulo(type, (SimpleValueConst) val);
 		}
-		return super.addExpMul(type, val);
+		return super.addExpMul(pool, type, val);
 	}
 	
 	private SimpleValue multiplyDivideOrModulo(int type, SimpleValueConst val) {
@@ -284,9 +324,9 @@ public abstract class SimpleValueConst extends SimpleValueNoConst {
 	}
 	
 	@Override
-	public SimpleValue addExpArrayRef(SimpleValue val) {
-		if ( !isDataPointer() || !val.isConstant()) {
-			return super.addExpArrayRef(val);
+	public SimpleValue addExpArrayRef(SimplePool pool, SimpleValue val) {
+		if ( !isDataPointerOrArray() || !val.isConstant()) {
+			return super.addExpArrayRef(pool, val);
 		} else {
 			SimpleValueConst value = (SimpleValueConst) val;
 			if ( !value.implicitNumber()) {
@@ -294,9 +334,11 @@ public abstract class SimpleValueConst extends SimpleValueNoConst {
 			}
 			try {
 				return arrayDeref(value.getNumber());
-			} catch (IndexOutOfBoundsException e) {
-				System.err.println("[WARN]: constant array index out of bounds of a constant array! index: " + value + " array: " + this);
-				return super.addExpArrayRef(val);
+			} catch (IndexOutOfBoundsException | UnsupportedOperationException e) {
+				if (e instanceof IndexOutOfBoundsException) {
+					System.err.println("[WARN]: constant array index out of bounds of a constant array! index: " + value + " array: " + this);
+				}
+				return super.addExpArrayRef(pool, val);
 			}
 		}
 	}

@@ -52,24 +52,24 @@ public class SimpleNumberValue extends SimpleValueConst implements SimpleValue {
 	private static final int bits(SimpleType t) {
 		if (t.isPrimitive()) {
 			return ((SimpleTypePrimitive) t).bits();
-		} else if (t.isPointerOrArray()) {
+		} else if (t.isPointer()) {
 			return 64;
 		} else if (t.isStruct()) {
 			throw new IllegalStateException("struct type can not be represented by a number value");
 		} else {
-			throw new IllegalStateException("type is not primitive, no pointer/array and no struct! t: '" + t + "'");
+			throw new IllegalStateException("type is not primitive, no pointer and no struct! t: '" + t + "'");
 		}
 	}
 	
 	private static final boolean signed(SimpleType t) {
 		if (t.isPrimitive()) {
 			return ((SimpleTypePrimitive) t).signed();
-		} else if (t.isPointerOrArray()) {
+		} else if (t.isPointer()) {
 			return true;
 		} else if (t.isStruct()) {
 			throw new IllegalStateException("struct type can not be represented by a number value");
 		} else {
-			throw new IllegalStateException("type is not primitive, no pointer/array and no struct! t: '" + t + "'");
+			throw new IllegalStateException("type is not primitive, no pointer and no struct! t: '" + t + "'");
 		}
 	}
 	
@@ -106,10 +106,10 @@ public class SimpleNumberValue extends SimpleValueConst implements SimpleValue {
 	
 	@Override
 	public long loadValue(int targetRegister, boolean[] blockedRegisters, List <Command> commands, long pos) {
-		return loadValue(bits, value, targetRegister, blockedRegisters, commands, pos);
+		return loadValue(getNumber(), targetRegister, blockedRegisters, commands, pos);
 	}
 	
-	public static long loadValue(int bits, long value, int targetRegister, boolean[] blockedRegisters, List <Command> commands, long pos) throws InternalError {
+	public static long loadValue(long value, int targetRegister, boolean[] blockedRegisters, List <Command> commands, long pos) throws InternalError {
 		assert !blockedRegisters[targetRegister];
 		blockedRegisters[targetRegister] = true;
 		Param p1, p2;
@@ -120,24 +120,7 @@ public class SimpleNumberValue extends SimpleValueConst implements SimpleValue {
 		build.art = ParamBuilder.B_NUM;
 		build.v2 = value;
 		p2 = build.build();
-		Commands cmd;
-		switch (bits) {
-		case 64:
-			cmd = Commands.CMD_MOV;
-			break;
-		case 32:
-			cmd = Commands.CMD_MVDW;
-			break;
-		case 16:
-			cmd = Commands.CMD_MVW;
-			break;
-		case 8:
-			cmd = Commands.CMD_MVB;
-			break;
-		default:
-			throw new InternalError();
-		}
-		Command addCmd = new Command(cmd, p1, p2);
+		Command addCmd = new Command(Commands.CMD_MOV, p1, p2);
 		commands.add(addCmd);
 		return pos + addCmd.length();
 	}

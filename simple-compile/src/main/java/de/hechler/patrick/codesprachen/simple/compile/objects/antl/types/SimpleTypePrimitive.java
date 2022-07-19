@@ -1,5 +1,8 @@
 package de.hechler.patrick.codesprachen.simple.compile.objects.antl.types;
 
+import static de.hechler.patrick.codesprachen.simple.compile.interfaces.SimpleExportable.*;
+
+import java.util.Set;
 
 public enum SimpleTypePrimitive implements SimpleType {
 	
@@ -116,6 +119,43 @@ public enum SimpleTypePrimitive implements SimpleType {
 	@Override
 	public String toString() {
 		return name().substring(3);
+	}
+	
+	@Override
+	public void appendToExportStr(StringBuilder build, Set <String> exportedStructs) {
+		switch (this) {
+		case pt_fpnum:
+			build.append(E_T_FPNUM);
+			break;
+		case pt_unum:
+			build.append(E_T_UNUM);
+			break;
+		case pt_num:
+			build.append(E_T_NUM);
+			break;
+		case pt_udword:
+			build.append(E_T_UDWORD);
+			break;
+		case pt_dword:
+			build.append(E_T_DWORD);
+			break;
+		case pt_uword:
+			build.append(E_T_UWORD);
+			break;
+		case pt_word:
+			build.append(E_T_WORD);
+			break;
+		case pt_ubyte:
+			build.append(E_T_UBYTE);
+			break;
+		case pt_byte:
+			build.append(E_T_BYTE);
+			break;
+		case pt_inval:
+			throw new InternalError("the primitive type inval is only for intern use, thus it can not be exported!");
+		default:
+			throw new InternalError("unknown primitive type: " + name());
+		}
 	}
 	
 }

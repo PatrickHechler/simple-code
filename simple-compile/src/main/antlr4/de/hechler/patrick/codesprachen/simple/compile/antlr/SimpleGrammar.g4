@@ -64,35 +64,38 @@ import de.hechler.patrick.codesprachen.simple.compile.objects.antl.types.*;
 simpleFile [SimpleFile file]:
 	(
 		dependency
-		{file.addDependency($dependency.depend);}
+		{file.addDependency($dependency.name, $dependency.depend);}
 		|
-		variable
+		variable [file]
 		{file.addVariable($variable.vari);}
 		|
-		structure
+		structure [file]
 		{file.addStructure($structure.struct);}
 		|
-		function
+		function [file]
 		{file.addFunction($function.func);}
 	)*
 	EOF
 ;
 
-dependency returns [String depend]:
-	DEP STRING SEMI
-	{$depend = string($STRING.getText());}
+dependency returns [String name, String depend]:
+	DEP NAME STRING SEMI
+	{
+		$name = $NAME.getText();
+		$depend = string($STRING.getText());
+	}
 ;
-variable returns [SimpleVariable vari]:
-	VAR EXP? type NAME SEMI
+variable [SimplePool pool] returns [SimpleVariable vari]:
+	VAR EXP? type [pool] NAME SEMI
 	{$vari = new SimpleVariable($type.t, $NAME.getText());}
 ;
-structure returns [SimpleStructure struct]:
+structure [SimplePool pool] returns [SimpleStructType struct]:
 	STRUCT NAME OPEN_CODE_BLOCK
-		namedTypeList
+		namedTypeList [pool]
 	CLOSE_CODE_BLOCK
-	{$struct = new SimpleStructure($NAME.getText(), $namedTypeList.list);}
+	{$struct = new SimpleStructType($NAME.getText(), $namedTypeList.list);}
 ;
-function returns [SimpleFunction func]:
+function [SimpleFile file] returns [SimpleFunction func]:
 	{
 		List<SimpleVariable> results = null;
 		boolean export = false;
@@ -108,84 +111,87 @@ function returns [SimpleFunction func]:
 		{main = true;}
 	)?
 	NAME
-	OPEN_SMALL_BLOCK args = namedTypeList CLOSE_SMALL_BLOCK
+	OPEN_SMALL_BLOCK args = namedTypeList [file] CLOSE_SMALL_BLOCK
 	(
-		ARROW_RIGTH SMALLER res = namedTypeList GREATHER
-		{results = $res.list;}
+		ARROW_RIGTH SMALLER res = namedTypeList [file] GREATHER
+		{
+			results = $res.list;
+		}
 	)?
-	commandBlock
+	{SimplePool pool = file.newFuncPool($args.list, results);}
+	commandBlock [pool]
 	{$func = new SimpleFunction(export, main, $NAME.getText(), $args.list, results, $commandBlock.cmd);}
 ;
 
-value returns [SimpleValue val]:
-	expCond
+value [SimplePool pool] returns [SimpleValue val]:
+	expCond [pool]
 	{$val = $expCond.val;}
 ;
-expCond returns [SimpleValue val]:
-	f = expLOr
+expCond [SimplePool pool] returns [SimpleValue val]:
+	f = expLOr [pool]
 	{$val = $f.val;}
 	(
-		QUESTION_MARK p = value COLON n = expCond
-		{$val = $val.addExpCond($p.val, $n.val);}
+		QUESTION_MARK p = value [pool] COLON n = expCond [pool]
+		{$val = $val.addExpCond(pool, $p.val, $n.val);}
 	)?
 ;
-expLOr returns [SimpleValue val]:
-	f = expLAnd
+expLOr [SimplePool pool] returns [SimpleValue val]:
+	f = expLAnd [pool]
 	{$val = $f.val;}
 	(
 		(
 			SINGLE_OR
 		)
-		o = expLAnd
-		{$val = $val.addExpLOr($o.val);}
+		o = expLAnd [pool]
+		{$val = $val.addExpLOr(pool, $o.val);}
 	)*
 ;
-expLAnd returns [SimpleValue val]:
-	f = expOr
+expLAnd [SimplePool pool] returns [SimpleValue val]:
+	f = expOr [pool]
 	{$val = $f.val;}
 	(
 		(
 			SINGLE_AND
 		)
-		o = expOr
-		{$val = $val.addExpLAnd($o.val);}
+		o = expOr [pool]
+		{$val = $val.addExpLAnd(pool, $o.val);}
 	)*
 ;
-expOr returns [SimpleValue val]:
-	f = expXor
+expOr [SimplePool pool] returns [SimpleValue val]:
+	f = expXor [pool]
 	{$val = $f.val;}
 	(
 		(
 			DOUBLE_OR
 		)
-		o = expXor
-		{$val = $val.addExpOr($o.val);}
+		o = expXor [pool]
+		{$val = $val.addExpOr(pool, $o.val);}
 	)*
 ;
-expXor returns [SimpleValue val]:
-	f = expAnd
+expXor [SimplePool pool] returns [SimpleValue val]:
+	f = expAnd [pool]
 	{$val = $f.val;}
 	(
 		(
 			XOR
 		)
-		o = expAnd
-		{$val = $val.addExpXor($o.val);}
+		o = expAnd [pool]
+		{$val = $val.addExpXor(pool, $o.val);}
 	)*
 ;
-expAnd returns [SimpleValue val]:
-	f = expEq
+expAnd [SimplePool pool] returns [SimpleValue val]:
+	f = expEq [pool]
 	{$val = $f.val;}
 	(
 		(
 			DOUBLE_AND
 		)
-		o = expEq
-		{$val = $val.addExpAnd($o.val);}
+		o = expEq [pool]
+		{$val = $val.addExpAnd(pool, $o.val);}
 	)*
 ;
-expEq returns [SimpleValue val]:
-	f = expRel
+expEq [SimplePool pool] returns [SimpleValue val]:
+	f = expRel [pool]
 	{$val = $f.val;}
 	(
 		{boolean equal;}
@@ -196,12 +202,12 @@ expEq returns [SimpleValue val]:
 			NOT_EQUAL
 			{equal = false;}
 		)
-		o = expRel
-		{$val = $val.addExpEq(equal, $o.val);}
+		o = expRel [pool]
+		{$val = $val.addExpEq(pool, equal, $o.val);}
 	)*
 ;
-expRel returns [SimpleValue val]:
-	f = expShift
+expRel [SimplePool pool] returns [SimpleValue val]:
+	f = expShift [pool]
 	{$val = $f.val;}
 	(
 		{int type;}
@@ -218,12 +224,12 @@ expRel returns [SimpleValue val]:
 			SMALLER
 			{type = SimpleValue.EXP_SMALLER;}
 		)
-		o = expShift
-		{$val = $val.addExpRel(type, $o.val);}
+		o = expShift [pool]
+		{$val = $val.addExpRel(pool, type, $o.val);}
 	)*
 ;
-expShift returns [SimpleValue val]:
-	f = expAdd
+expShift [SimplePool pool] returns [SimpleValue val]:
+	f = expAdd [pool]
 	{$val = $f.val;}
 	(
 		{int type;}
@@ -237,12 +243,12 @@ expShift returns [SimpleValue val]:
 			SHIFT_ARITMETIC_RIGTH
 			{type = SimpleValue.EXP_SHIFT_ARITMETIC_RIGTH;}
 		)
-		o = expAdd
-		{$val = $val.addExpShift(type, $o.val);}
+		o = expAdd [pool]
+		{$val = $val.addExpShift(pool, type, $o.val);}
 	)*
 ;
-expAdd returns [SimpleValue val]:
-	f = expMul
+expAdd [SimplePool pool] returns [SimpleValue val]:
+	f = expMul [pool]
 	{$val = $f.val;}
 	(
 		{boolean add;}
@@ -253,12 +259,12 @@ expAdd returns [SimpleValue val]:
 			MINUS
 			{add = false;}
 		)
-		o = expMul
-		{$val = $val.addExpAdd(add, $o.val);}
+		o = expMul [pool]
+		{$val = $val.addExpAdd(pool, add, $o.val);}
 	)*
 ;
-expMul returns [SimpleValue val]:
-	f = expCast
+expMul [SimplePool pool] returns [SimpleValue val]:
+	f = expCast [pool]
 	{$val = $f.val;}
 	(
 		{int type;}
@@ -272,26 +278,26 @@ expMul returns [SimpleValue val]:
 			MODULO
 			{type = SimpleValue.EXP_MODULO;}
 		)
-		o = expCast
-		{$val = $val.addExpMul(type, $o.val);}
+		o = expCast [pool]
+		{$val = $val.addExpMul(pool, type, $o.val);}
 	)*
 ;
-expCast returns [SimpleValue val]:
+expCast [SimplePool pool] returns [SimpleValue val]:
 	{SimpleType t = null;}
 	(
-		OPEN_SMALL_BLOCK type CLOSE_SMALL_BLOCK
+		OPEN_SMALL_BLOCK type [pool] CLOSE_SMALL_BLOCK
 		{t = $type.t;}
 	)?
-	e = expUnary
+	e = expUnary [pool]
 	{
 		if (t != null) {
-			$val = $e.val.addExpCast(t);
+			$val = $e.val.addExpCast(pool, t);
 		} else {
 			$val = $e.val;
 		}
 	}
 ;
-expUnary returns [SimpleValue val]:
+expUnary [SimplePool pool] returns [SimpleValue val]:
 	{int type = SimpleValue.EXP_UNARY_NONE;}
 	(
 		PLUS
@@ -309,28 +315,32 @@ expUnary returns [SimpleValue val]:
 		BOOLEAN_NOT
 		{type = SimpleValue.EXP_UNARY_BOOLEAN_NOT;}
 	)?
-	e = expPostfix
-	{$val = $e.val.addExpUnary(type);}
+	e = expPostfix [pool]
+	{$val = $e.val.addExpUnary(pool, type);}
 ;
-expPostfix returns [SimpleValue val]:
-	f = expDirect
+expPostfix [SimplePool pool] returns [SimpleValue val]:
+	f = expDirect [pool]
 	{$val = $f.val;}
 	(
 		DIAMOND // dereference pointer
-		{$val = $val.addExpDerefPointer();}
+		{$val = $val.addExpDerefPointer(pool);}
 		|
-		OPEN_ARRAY_BLOCK o = value CLOSE_ARRAY_BLOCK
-		{$val = $val.addExpArrayRef($o.val);}
+		OPEN_ARRAY_BLOCK o = value [pool] CLOSE_ARRAY_BLOCK
+		{$val = $val.addExpArrayRef(pool, $o.val);}
 	)*
 ;
-expDirect returns [SimpleValue val]:
+expDirect [SimplePool pool] returns [SimpleValue val]:
 	(
 		{List<String> strs = new ArrayList<>();}
 		(
 			t = STRING
 			{strs.add(string($t.getText()));}
 		)+
-		{$val = new SimpleStringValue(strs);}
+		{
+			SimpleValueConstPointer dataVal = new SimpleStringValue(strs);
+			pool.registerDataValue(dataVal);
+			$val = dataVal;
+		}
 	)
 	|
 	t = CHARACTER
@@ -361,42 +371,44 @@ expDirect returns [SimpleValue val]:
 	{$val = new SimpleNumberValue(64, Long.parseLong($t.getText().substring(4), 7));}
 	|
 	t = NUMBER_FP
-	{$val = new SimpleFPNumberValue(64, Double.parseDouble($t.getText()));}
+	{$val = new SimpleFPNumberValue(Double.parseDouble($t.getText()));}
 	|
 	t = NAME
-	{$val = new SimpleVariableUseValue($t.getText());}
+	{
+		$val = pool.newNameUseValue($t.getText());
+	}
 	(
 		COLON t = NAME
-		{$val = $val.addExpNameRef($t.getText());}
+		{$val = $val.addExpNameRef(pool, $t.getText());}
 	)*
 	|
-	OPEN_SMALL_BLOCK v = value CLOSE_SMALL_BLOCK
+	OPEN_SMALL_BLOCK v = value [pool] CLOSE_SMALL_BLOCK
 	{$val = $v.val;}
 ;
 
-type returns [SimpleType t]:
+type [SimplePool pool] returns [SimpleType t]:
 	(
 		typePrim
 		{$t = $typePrim.t;}
 		|
-		typeStruct
+		typeStruct [pool]
 		{$t = $typeStruct.t;}
 		|
-		typeFunc
+		typeFunc [pool]
 		{$t = $typeFunc.t;}
 	)
 	(
 		DIAMOND // pointer
-		{$t = $t.pointer();}
+		{$t = new SimpleTypePointer($t);}
 		|
 		{SimpleValue val = null;}
 		OPEN_ARRAY_BLOCK
 		(
-			value
+			value [pool]
 			{val = $value.val;}
 		)?
 		CLOSE_ARRAY_BLOCK
-		{$t = $t.array(val);}
+		{$t = SimpleTypeArray.create($t, val);}
 	)*
 ;
 
@@ -417,99 +429,110 @@ typePrim returns [SimpleType t]:
 	{$t = SimpleType.BYTE;}
 ;
 
-typeStruct returns [SimpleStructType t]:
+typeStruct [SimplePool pool] returns [SimpleStructType t]:
 	STRUCT NAME
-	{return new SimpleStructType($NAME.getText());}
+	{$t = pool.getStructure($NAME.getText());}
 ;
 
-typeFunc returns [SimpleType t]:
+typeFunc [SimplePool pool] returns [SimpleType t]:
 	{List<SimpleVariable> results = null;}
-	OPEN_SMALL_BLOCK args = namedTypeList CLOSE_SMALL_BLOCK
+	OPEN_SMALL_BLOCK args = namedTypeList [pool] CLOSE_SMALL_BLOCK
 	(
-		ARROW_RIGTH SMALLER res = namedTypeList GREATHER
+		ARROW_RIGTH SMALLER res = namedTypeList [pool] GREATHER
 		{results = $res.list;}
 	)?
 	{$t = new SimpleFuncType($args.list, results);}
 ;
 
-namedTypeList returns [List<SimpleVariable> list]:
+namedTypeList [SimplePool pool] returns [List<SimpleVariable> list]:
 	{$list = new ArrayList<>();}
 	(
-		ft = type fn =  NAME
+		ft = type [pool] fn =  NAME
 		{$list.add(new SimpleVariable($ft.t, $fn.getText()));}
 		(
-			COMMA ots = type ons = NAME
+			COMMA ots = type [pool] ons = NAME
 			{$list.add(new SimpleVariable($ots.t, $ons.getText()));}
 		)*
 	)?
 ;
 
-command returns [SimpleCommand cmd]:
-	commandBlock
+command [SimplePool pool] returns [SimpleCommand cmd]:
+	commandBlock [pool]
 	{$cmd = $commandBlock.cmd;}
 	|
-	commandVarDecl
+	commandVarDecl [pool]
 	{$cmd = $commandVarDecl.cmd;}
 	|
-	commandAssign
+	commandAssign [pool]
 	{$cmd = $commandAssign.cmd;}
 	|
-	commandFuncCall
+	commandFuncCall [pool]
 	{$cmd = $commandFuncCall.cmd;}
 	|
-	commandWhile
+	commandWhile [pool]
 	{$cmd = $commandWhile.cmd;}
 	|
-	commandIf
+	commandIf [pool]
 	{$cmd = $commandIf.cmd;}
 ;
-commandBlock returns [SimpleCommandBlock cmd]:
-	{List<SimpleCommand> cmds = new ArrayList<>();}
+commandBlock [SimplePool pool] returns [SimpleCommandBlock cmd]:
+	{
+		List<SimpleCommand> cmds = new ArrayList<>();
+		pool = pool.newSubPool();
+	}
 	OPEN_CODE_BLOCK
 	(
-		command
+		command [pool]
 		{cmds.add($command.cmd);}
 	)*
 	CLOSE_CODE_BLOCK
-	{$cmd = SimpleCommandBlock.create(cmds);}
+	{$cmd = SimpleCommandBlock.create(pool, cmds);}
 ;
-commandVarDecl returns [SimpleCommandVarDecl cmd]:
-	VAR type NAME
-	{$cmd = SimpleCommandVarDecl.create($type.t, $NAME.getText());}
+commandVarDecl [SimplePool pool] returns [SimpleCommandVarDecl cmd]:
+	VAR type [pool] NAME
+	{$cmd = SimpleCommandVarDecl.create(pool, $type.t, $NAME.getText());}
 	(
-		ARROW_LEFT value
+		ARROW_LEFT value [pool]
 		{$cmd.initValue($value.val);}
 	)?
 	SEMI
 ;
-commandAssign returns [SimpleCommandAssign cmd]:
-	expPostfix ARROW_LEFT value SEMI
-	{$cmd = SimpleCommandAssign.create($expPostfix.val, $value.val);}
+commandAssign [SimplePool pool] returns [SimpleCommandAssign cmd]:
+	expPostfix [pool] ARROW_LEFT value [pool] SEMI
+	{$cmd = SimpleCommandAssign.create(pool, $expPostfix.val, $value.val);}
 ;
-commandFuncCall returns [SimpleCommandFuncCall cmd]:
-	CALL expPostfix SEMI
-	{$cmd = SimpleCommandFuncCall.create($expPostfix.val);}
+commandFuncCall [SimplePool pool] returns [SimpleCommandFuncCall cmd]:
+	CALL fn = NAME
+	{String sn = null;}
+	(
+		on = NAME
+		{sn = $on.getText();}
+	)?
+	expPostfix [pool] SEMI
+	{$cmd = SimpleCommandFuncCall.create(pool, $fn.getText(), sn, $expPostfix.val);}
 ;
-commandWhile returns [SimpleCommandWhile cmd]:
-	WHILE OPEN_SMALL_BLOCK value CLOSE_SMALL_BLOCK
+commandWhile [SimplePool pool] returns [SimpleCommandWhile cmd]:
+	WHILE OPEN_SMALL_BLOCK value [pool] CLOSE_SMALL_BLOCK
 	{SimpleCommand whileCmd;}
 	(
-		command
+		command [pool]
 		{whileCmd = $command.cmd;}
 		|
 		SEMI
 		{whileCmd = null;}
 	)
-	{$cmd = SimpleCommandWhile.create($value.val, whileCmd);}
+	{$cmd = SimpleCommandWhile.create(pool, $value.val, whileCmd);}
 ;
-commandIf returns [SimpleCommandIf cmd]:
-	IF OPEN_SMALL_BLOCK value CLOSE_SMALL_BLOCK ic = command
+commandIf [SimplePool pool] returns [SimpleCommandIf cmd]:
+	IF OPEN_SMALL_BLOCK value [pool] CLOSE_SMALL_BLOCK
+	ic = command [pool]
 	{SimpleCommand elseCmd = null;}
 	(
-		ELSE ec = command
+		ELSE
+		ec = command [pool]
 		{elseCmd = $ec.cmd;}
 	)?
-	{$cmd = SimpleCommandIf.create($value.val, $ic.cmd, elseCmd);}
+	{$cmd = SimpleCommandIf.create(pool, $value.val, $ic.cmd, elseCmd);}
 ;
 
 STRING :
@@ -622,4 +645,4 @@ COMMENT_2 :
 ;
 WS : [ \t\r\n]+ -> skip ;
 
-NAME : [a-zA-Z_]+ ;
+NAME : [a-zA-Z][a-zA-Z_0-9]* ;

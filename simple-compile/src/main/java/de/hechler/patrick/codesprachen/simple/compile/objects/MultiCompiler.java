@@ -13,7 +13,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
-import java.nio.file.OpenOption;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.function.Function;
@@ -29,7 +28,6 @@ public class MultiCompiler {
 	
 	private static final Charset DEFAULT_CHARSET       = StandardCharsets.UTF_8;
 	private static final boolean DEFAULT_FORCE         = false;
-	private static final boolean DEFAULT_FORCE_EXPORTS = true;
 	
 	private static final Function <Path, FileType> DEFAULT_FILE_MODES = p -> {
 		String name = p.getFileName().toString();
@@ -51,29 +49,27 @@ public class MultiCompiler {
 	private final PatrFolder                bin;
 	private final Function <Path, FileType> fileModes;
 	private final boolean                   force;
-	private final boolean                   forceExports;
 	private final Charset                   cs;
 	
 	private SimpleCompiler compiler;
 	private Path[]         lockups;
 	
 	public MultiCompiler(PatrFolder bin) {
-		this(bin, DEFAULT_FILE_MODES, DEFAULT_FORCE, DEFAULT_FORCE_EXPORTS, DEFAULT_CHARSET);
+		this(bin, DEFAULT_FILE_MODES, DEFAULT_FORCE, DEFAULT_CHARSET);
 	}
 	
-	public MultiCompiler(PatrFolder bin, boolean force, boolean forceExports) {
-		this(bin, DEFAULT_FILE_MODES, force, forceExports, DEFAULT_CHARSET);
+	public MultiCompiler(PatrFolder bin, boolean force) {
+		this(bin, DEFAULT_FILE_MODES, force, DEFAULT_CHARSET);
 	}
 	
 	public MultiCompiler(PatrFolder bin, Function <Path, FileType> fileModes) {
-		this(bin, fileModes, DEFAULT_FORCE, DEFAULT_FORCE_EXPORTS, DEFAULT_CHARSET);
+		this(bin, fileModes, DEFAULT_FORCE, DEFAULT_CHARSET);
 	}
 	
-	public MultiCompiler(PatrFolder bin, Function <Path, FileType> fileModes, boolean force, boolean forceExports, Charset cs) {
+	public MultiCompiler(PatrFolder bin, Function <Path, FileType> fileModes, boolean force, Charset cs) {
 		this.bin = bin;
 		this.fileModes = fileModes;
 		this.force = force;
-		this.forceExports = forceExports;
 		this.cs = cs;
 	}
 	

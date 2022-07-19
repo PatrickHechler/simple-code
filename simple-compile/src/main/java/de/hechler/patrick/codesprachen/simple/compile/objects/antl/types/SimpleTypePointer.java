@@ -1,5 +1,8 @@
 package de.hechler.patrick.codesprachen.simple.compile.objects.antl.types;
 
+import static de.hechler.patrick.codesprachen.simple.compile.interfaces.SimpleExportable.E_T_POINTER;
+
+import java.util.Set;
 
 public class SimpleTypePointer implements SimpleType {
 	
@@ -41,7 +44,13 @@ public class SimpleTypePointer implements SimpleType {
 	
 	@Override
 	public int byteCount() {
-		return 64;
+		return 8;
+	}
+	
+	@Override
+	public void appendToExportStr(StringBuilder build, Set <String> exportedStructs) {
+		build.append(E_T_POINTER);
+		target.appendToExportStr(build, exportedStructs);
 	}
 	
 }

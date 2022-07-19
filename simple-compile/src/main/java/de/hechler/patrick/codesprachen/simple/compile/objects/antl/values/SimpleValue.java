@@ -3,12 +3,14 @@ package de.hechler.patrick.codesprachen.simple.compile.objects.antl.values;
 import java.util.List;
 
 import de.hechler.patrick.codesprachen.primitive.assemble.objects.Command;
-import de.hechler.patrick.codesprachen.primitive.core.utils.PrimAsmConstants;
+import de.hechler.patrick.codesprachen.simple.compile.objects.SimpleCompiler;
+import de.hechler.patrick.codesprachen.simple.compile.objects.antl.SimplePool;
 import de.hechler.patrick.codesprachen.simple.compile.objects.antl.types.SimpleType;
 
 public interface SimpleValue {
 	
-	public static final int MIN_REGISTER = PrimAsmConstants.X_ADD;
+	// X00..X09 is reserved for the compiler
+	public static final int MIN_REGISTER = SimpleCompiler.MAX_COMPILER_REGISTER + 1;
 	
 	public static final int EXP_MULTIPLY              = 1;
 	public static final int EXP_DIVIDE                = 2;
@@ -55,40 +57,40 @@ public interface SimpleValue {
 	
 	boolean isConstant();
 	
-	boolean isConstNoDataPointer();
+	boolean isConstNoData();
 	
-	boolean isConstDataPointer();
+	boolean isConstData();
 	
-	SimpleValue addExpCond(SimpleValue val, SimpleValue val2);
+	SimpleValue addExpCond(SimplePool pool, SimpleValue val, SimpleValue val2);
 	
-	SimpleValue addExpLOr(SimpleValue val);
+	SimpleValue addExpLOr(SimplePool pool, SimpleValue val);
 	
-	SimpleValue addExpLAnd(SimpleValue val);
+	SimpleValue addExpLAnd(SimplePool pool, SimpleValue val);
 	
-	SimpleValue addExpOr(SimpleValue val);
+	SimpleValue addExpOr(SimplePool pool, SimpleValue val);
 	
-	SimpleValue addExpXor(SimpleValue val);
+	SimpleValue addExpXor(SimplePool pool, SimpleValue val);
 	
-	SimpleValue addExpAnd(SimpleValue val);
+	SimpleValue addExpAnd(SimplePool pool, SimpleValue val);
 	
-	SimpleValue addExpEq(boolean equal, SimpleValue val);
+	SimpleValue addExpEq(SimplePool pool, boolean equal, SimpleValue val);
 	
-	SimpleValue addExpRel(int type, SimpleValue val);
+	SimpleValue addExpRel(SimplePool pool, int type, SimpleValue val);
 	
-	SimpleValue addExpShift(int type, SimpleValue val);
+	SimpleValue addExpShift(SimplePool pool, int type, SimpleValue val);
 	
-	SimpleValue addExpAdd(boolean add, SimpleValue val);
+	SimpleValue addExpAdd(SimplePool pool, boolean add, SimpleValue val);
 	
-	SimpleValue addExpMul(int type, SimpleValue val);
+	SimpleValue addExpMul(SimplePool pool, int type, SimpleValue val);
 	
-	SimpleValue addExpCast(SimpleType t);
+	SimpleValue addExpCast(SimplePool pool, SimpleType t);
 	
-	SimpleValue addExpUnary(int type);
+	SimpleValue addExpUnary(SimplePool pool, int type);
 	
-	SimpleValue addExpDerefPointer();
+	SimpleValue addExpDerefPointer(SimplePool pool);
 	
-	SimpleValue addExpArrayRef(SimpleValue val);
+	SimpleValue addExpArrayRef(SimplePool pool, SimpleValue val);
 	
-	SimpleValue addExpNameRef(String text);
+	SimpleValue addExpNameRef(SimplePool pool, String text);
 	
 }

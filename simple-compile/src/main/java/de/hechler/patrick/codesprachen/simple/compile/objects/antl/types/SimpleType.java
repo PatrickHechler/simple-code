@@ -1,5 +1,6 @@
 package de.hechler.patrick.codesprachen.simple.compile.objects.antl.types;
 
+import java.util.Set;
 
 public interface SimpleType {
 	
@@ -50,6 +51,8 @@ public interface SimpleType {
 	
 	/**
 	 * returns <code>true</code> if this type is a function call structure and <code>false</code> if not
+	 * <p>
+	 * note that a function call structure is also a structure, so {@link #isStruct()} will also return <code>true</code>
 	 * 
 	 * @return <code>true</code> if this type is a function call structure and <code>false</code> if not
 	 */
@@ -61,5 +64,7 @@ public interface SimpleType {
 	 * @return the number of bytes used to represent a member of this type
 	 */
 	int byteCount();
+	
+	void appendToExportStr(StringBuilder build, Set <String> exportedStructs);
 	
 }

@@ -13,7 +13,7 @@ public class SimpleStringValue extends SimpleValueConstPointer {
 	}
 	
 	public SimpleStringValue(byte[] data) {
-		super(type(data), data, 16);
+		super(type(data), data);
 	}
 	
 	private static final SimpleType type(byte[] data) {

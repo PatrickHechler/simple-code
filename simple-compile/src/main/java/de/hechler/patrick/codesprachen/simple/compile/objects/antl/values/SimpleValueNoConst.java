@@ -6,15 +6,16 @@ import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.P
 import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.B_REG;
 import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.B_SR;
 
-import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 
 import de.hechler.patrick.codesprachen.primitive.assemble.enums.Commands;
 import de.hechler.patrick.codesprachen.primitive.assemble.objects.Command;
 import de.hechler.patrick.codesprachen.primitive.assemble.objects.Param;
 import de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder;
+import de.hechler.patrick.codesprachen.simple.compile.objects.antl.SimplePool;
 import de.hechler.patrick.codesprachen.simple.compile.objects.antl.SimpleVariable;
-import de.hechler.patrick.codesprachen.simple.compile.objects.antl.types.SimpleStructure;
+import de.hechler.patrick.codesprachen.simple.compile.objects.antl.types.SimpleStructType;
 import de.hechler.patrick.codesprachen.simple.compile.objects.antl.types.SimpleType;
 import de.hechler.patrick.codesprachen.simple.compile.objects.antl.types.SimpleTypePointer;
 import de.hechler.patrick.codesprachen.simple.compile.objects.antl.types.SimpleTypePrimitive;
@@ -33,12 +34,12 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 	}
 	
 	@Override
-	public boolean isConstDataPointer() {
+	public boolean isConstData() {
 		return false;
 	}
 	
 	@Override
-	public boolean isConstNoDataPointer() {
+	public boolean isConstNoData() {
 		return false;
 	}
 	
@@ -48,43 +49,43 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 	}
 	
 	@Override
-	public SimpleValue addExpCond(SimpleValue val, SimpleValue val2) {
+	public SimpleValue addExpCond(SimplePool pool, SimpleValue val, SimpleValue val2) {
 		return new SimpleConditionalValue(findType(val, val2), this, val, val2);
 	}
 	
 	@Override
-	public SimpleValue addExpLOr(SimpleValue val) {
+	public SimpleValue addExpLOr(SimplePool pool, SimpleValue val) {
 		return new SimpleBiFunctionValue(findType(this, val), Commands.CMD_OR, this, val);
 	}
 	
 	@Override
-	public SimpleValue addExpLAnd(SimpleValue val) {
+	public SimpleValue addExpLAnd(SimplePool pool, SimpleValue val) {
 		return new SimpleBiFunctionValue(findType(this, val), Commands.CMD_AND, this, val);
 	}
 	
 	@Override
-	public SimpleValue addExpOr(SimpleValue val) {
-		return addExpOr_addExpAnd(val, false);
+	public SimpleValue addExpOr(SimplePool pool, SimpleValue val) {
+		return addExpOr_addExpAnd(pool, val, false);
 	}
 	
 	@Override
-	public SimpleValue addExpXor(SimpleValue val) {
+	public SimpleValue addExpXor(SimplePool pool, SimpleValue val) {
 		checkNumber(val);
 		return new SimpleBiFunctionValue(findType(this, val), Commands.CMD_XOR, this, val);
 	}
 	
 	@Override
-	public SimpleValue addExpAnd(SimpleValue val) {
-		return addExpOr_addExpAnd(val, true);
+	public SimpleValue addExpAnd(SimplePool pool, SimpleValue val) {
+		return addExpOr_addExpAnd(pool, val, true);
 	}
 	
-	private SimpleValue addExpOr_addExpAnd(SimpleValue val, boolean and) {
+	private SimpleValue addExpOr_addExpAnd(SimplePool pool, SimpleValue val, boolean and) {
 		checkNumber(val);
 		if (t == SimpleType.FPNUM ^ val.type() == SimpleType.FPNUM) {
 			if (t == SimpleType.FPNUM) {
-				return addExpAnd(val.addExpCast(SimpleType.FPNUM));
+				return addExpAnd(pool, val.addExpCast(pool, SimpleType.FPNUM));
 			} else {
-				return addExpCast(SimpleType.FPNUM).addExpAnd(val);
+				return addExpCast(pool, SimpleType.FPNUM).addExpAnd(pool, val);
 			}
 		}
 		SimpleType type =
@@ -168,7 +169,7 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 	}
 	
 	@Override
-	public SimpleValue addExpEq(boolean equal, SimpleValue val) {
+	public SimpleValue addExpEq(SimplePool pool, boolean equal, SimpleValue val) {
 		if (t.isStruct() || val.type().isStruct()) {
 			throw new IllegalStateException("structures can not be compared!");
 		}
@@ -177,16 +178,16 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		}
 		if (t == SimpleType.FPNUM ^ val.type() == SimpleType.FPNUM) {
 			if (t == SimpleType.FPNUM) {
-				return addExpEq(equal, val.addExpCast(SimpleType.FPNUM));
+				return addExpEq(pool, equal, val.addExpCast(pool, SimpleType.FPNUM));
 			} else {
-				return addExpCast(SimpleType.FPNUM).addExpEq(equal, val);
+				return addExpCast(pool, SimpleType.FPNUM).addExpEq(pool, equal, val);
 			}
 		}
 		return createCompareValue(equal ? Commands.CMD_JMPEQ : Commands.CMD_JMPNE, val);
 	}
 	
 	@Override
-	public SimpleValue addExpRel(int type, SimpleValue val) {
+	public SimpleValue addExpRel(SimplePool pool, int type, SimpleValue val) {
 		if (t.isStruct() || val.type().isStruct()) {
 			throw new IllegalStateException("structures can not be compared!");
 		}
@@ -195,9 +196,9 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		}
 		if (t == SimpleType.FPNUM ^ val.type() == SimpleType.FPNUM) {
 			if (t == SimpleType.FPNUM) {
-				return addExpCast(SimpleType.FPNUM).addExpRel(type, val);
+				return addExpCast(pool, SimpleType.FPNUM).addExpRel(pool, type, val);
 			} else {
-				return addExpRel(type, val.addExpCast(SimpleType.FPNUM));
+				return addExpRel(pool, type, val.addExpCast(pool, SimpleType.FPNUM));
 			}
 		}
 		switch (type) {
@@ -286,7 +287,7 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 	}
 	
 	@Override
-	public SimpleValue addExpShift(int type, SimpleValue val) {
+	public SimpleValue addExpShift(SimplePool pool, int type, SimpleValue val) {
 		switch (type) {
 		case EXP_SHIFT_LEFT:
 			return new SimpleBiFunctionValue(findType(this, val), Commands.CMD_LSH, this, val);
@@ -300,7 +301,7 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 	}
 	
 	@Override
-	public SimpleValue addExpAdd(boolean add, SimpleValue val) {
+	public SimpleValue addExpAdd(SimplePool pool, boolean add, SimpleValue val) {
 		if (add) {
 			return new SimpleBiFunctionValue(findType(this, val), Commands.CMD_ADD, this, val);
 		} else {
@@ -309,7 +310,7 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 	}
 	
 	@Override
-	public SimpleValue addExpMul(int type, SimpleValue val) {
+	public SimpleValue addExpMul(SimplePool pool, int type, SimpleValue val) {
 		switch (type) {
 		case EXP_MULTIPLY:
 			return new SimpleBiFunctionValue(findType(this, val), Commands.CMD_MUL, this, val);
@@ -323,7 +324,7 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 	}
 	
 	@Override
-	public SimpleValue addExpCast(SimpleType type) {
+	public SimpleValue addExpCast(SimplePool pool, SimpleType type) {
 		if (type == t) {
 			return this;
 		} else if (t.isStruct() ^ type.isStruct()) {
@@ -337,23 +338,25 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		} else if (type.isPointerOrArray() ^ t.isPointerOrArray()) {
 			if (t == SimpleType.FPNUM || type == SimpleType.FPNUM) {
 				throw new IllegalStateException("can not cast from '" + t + "' to '" + type + "'");
-			} else if (type.isPrimitive() && t.isPointer()) {
+			} else if (t.isPointerOrArray()) {
 				return createPointerNumberCast(type, true);
 			} else {
-				return castedValue(this, type);
+				return createPointerNumberCast(type, false);
 			}
 		} else if (type.isArray() /* && t.isArray() */) {
 			return castedValue(this, type);
 		} else if (type.isPointer() /* && t.isPointer() */) {
-			return createPointerNumberCast(type, false);
+			return castedValue(this, type);
 		} else if (t == SimpleType.FPNUM ^ type == SimpleType.FPNUM) {
 			if (t == SimpleType.FPNUM) {
-				return castedValueConvert(this, type, Commands.CMD_FPTN);
+				return new SimpleUnFunctionValue(type, Commands.CMD_FPTN, this);
 			} else {
-				return castedValueConvert(this, type, Commands.CMD_NTFP);
+				return new SimpleUnFunctionValue(type, Commands.CMD_NTFP, this);
 			}
-		} else {
+		} else if (t.isPrimitive() && type.isPrimitive()) {
 			return castedValue(this, type);
+		} else {
+			throw new InternalError("unknown cast!");
 		}
 	}
 	
@@ -405,31 +408,6 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		};
 	}
 	
-	private SimpleValue castedValueConvert(final SimpleValueNoConst value, SimpleType type, final Commands convertCmd) {
-		return new SimpleValueNoConst(type) {
-			
-			@Override
-			public long loadValue(int targetRegister, boolean[] blockedRegisters, List <Command> commands, long pos) {
-				pos = value.loadValue(targetRegister, blockedRegisters, commands, pos);
-				Param p1;
-				ParamBuilder build = new ParamBuilder();
-				build.art = A_SR;
-				build.v1 = targetRegister;
-				p1 = build.build();
-				Command addCmd = new Command(convertCmd, p1, null);
-				pos += addCmd.length();
-				commands.add(addCmd);
-				return pos;
-			}
-			
-			@Override
-			public String toString() {
-				return "(" + t + ") (" + value.toString() + ")";
-			}
-			
-		};
-	}
-	
 	private static SimpleValue castedValue(final SimpleValueNoConst value, SimpleType type) {
 		return new SimpleValueNoConst(type) {
 			
@@ -447,11 +425,12 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 	}
 	
 	@Override
-	public SimpleValue addExpUnary(int type) {
+	public SimpleValue addExpUnary(SimplePool pool, int type) {
 		boolean isNumber = t.isPrimitive() || t.isPointer();
 		boolean isNoFPNumber = isNumber && t != SimpleType.FPNUM;
 		switch (type) {
 		case EXP_UNARY_AND:
+			return mkPointer(pool);
 		case EXP_UNARY_BITWISE_NOT:
 			if (isNoFPNumber) {
 				return new SimpleUnFunctionValue(t, Commands.CMD_NOT, this);
@@ -484,6 +463,10 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		default:
 			throw new InternalError("unknown unary type: " + type);
 		}
+	}
+	
+	protected SimpleValue mkPointer(SimplePool pool) {
+		throw new IllegalStateException("can not make a pointer to this value (this: " + this + ")");
 	}
 	
 	private SimpleValueNoConst createUnaryBooleanNotValue() {
@@ -562,7 +545,7 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 	}
 	
 	@Override
-	public SimpleValue addExpDerefPointer() {
+	public SimpleValue addExpDerefPointer(SimplePool pool) {
 		if ( !t.isPointer()) {
 			throw new IllegalStateException("only a pointer can be dereferenced! (me: " + this + ")");
 		}
@@ -599,7 +582,7 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 	}
 	
 	@Override
-	public SimpleValue addExpArrayRef(final SimpleValue val) {
+	public SimpleValue addExpArrayRef(SimplePool pool, final SimpleValue val) {
 		if ( !t.isPointerOrArray()) {
 			throw new IllegalStateException("only a pointer and array can be indexed! (me: " + this + ")[" + val + "]");
 		}
@@ -628,7 +611,7 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 				build.art = A_SR;
 				build.v1 = targetRegister;
 				p1 = build.build();
-				if (val.isConstNoDataPointer()) {
+				if (val.isConstNoData()) {
 					build.art = A_SR | B_NUM;
 					build.v2 = ((SimpleValueConst) val).getNumber() * val.type().byteCount();
 					p2 = build.build();
@@ -655,7 +638,7 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		};
 	}
 	
-	private long addMovCmd(SimpleType type, List <Command> commands, long pos, Param param1, Param param2, int targetRegister) {
+	protected long addMovCmd(SimpleType type, List <Command> commands, long pos, Param param1, Param param2, int targetRegister) {
 		int bits = 64;
 		boolean signed = true;
 		Commands mov = Commands.CMD_MOV;
@@ -732,11 +715,11 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 	}
 	
 	@Override
-	public SimpleValue addExpNameRef(String text) {
+	public SimpleValue addExpNameRef(SimplePool pool, String text) {
 		if ( !t.isStruct()) {
 			throw new IllegalStateException("name referencing is only possible on files!");
 		}
-		SimpleStructure struct = (SimpleStructure) t;
+		SimpleStructType struct = (SimpleStructType) t;
 		int off = 0;
 		SimpleVariable target = null;
 		for (SimpleVariable sv : struct.members) {
@@ -887,12 +870,12 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		}
 		
 		@Override
-		public boolean isConstNoDataPointer() {
+		public boolean isConstNoData() {
 			return false;
 		}
 		
 		@Override
-		public boolean isConstDataPointer() {
+		public boolean isConstData() {
 			return false;
 		}
 		
@@ -904,7 +887,7 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 	}
 	
 	protected List <Command> newList() {
-		return new ArrayList <>();
+		return new LinkedList <>();
 	}
 	
 	private void checkNumber(SimpleValue val) {
@@ -997,12 +980,12 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		}
 		
 		@Override
-		public boolean isConstNoDataPointer() {
+		public boolean isConstNoData() {
 			return false;
 		}
 		
 		@Override
-		public boolean isConstDataPointer() {
+		public boolean isConstData() {
 			return false;
 		}
 		
@@ -1025,10 +1008,12 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 	}
 	
 	private static int fallbackRegister(int register) {
-		if (register + 1 >= 256) {
-			return register - 1;
-		} else {
+		if (register < MIN_REGISTER) {
+			return MIN_REGISTER;
+		} else if (register + 1 < 256) {
 			return register + 1;
+		} else {
+			return register - 1;
 		}
 	}
 	
