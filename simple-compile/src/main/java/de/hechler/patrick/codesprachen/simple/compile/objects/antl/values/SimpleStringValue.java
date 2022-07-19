@@ -6,7 +6,7 @@ import java.util.List;
 import de.hechler.patrick.codesprachen.simple.compile.objects.antl.types.SimpleType;
 import de.hechler.patrick.codesprachen.simple.compile.objects.antl.types.SimpleTypeArray;
 
-public class SimpleStringValue extends SimpleValueConstPointer {
+public class SimpleStringValue extends SimpleValueDataPointer {
 	
 	public SimpleStringValue(List <String> strs) {
 		this(data(strs));

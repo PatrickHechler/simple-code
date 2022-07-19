@@ -27,7 +27,6 @@ public class SimpleVariable implements SimpleExportable {
 	 */
 	public long    addr      = -1L;
 	public int     reg       = -1;
-	public boolean wantsAddr = false;
 	
 	public final SimpleType type;
 	public final String     name;

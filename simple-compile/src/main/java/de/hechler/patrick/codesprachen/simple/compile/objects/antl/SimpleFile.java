@@ -21,7 +21,7 @@ import de.hechler.patrick.codesprachen.simple.compile.objects.antl.types.SimpleF
 import de.hechler.patrick.codesprachen.simple.compile.objects.antl.types.SimpleStructType;
 import de.hechler.patrick.codesprachen.simple.compile.objects.antl.types.SimpleType;
 import de.hechler.patrick.codesprachen.simple.compile.objects.antl.values.SimpleValue;
-import de.hechler.patrick.codesprachen.simple.compile.objects.antl.values.SimpleValueConstPointer;
+import de.hechler.patrick.codesprachen.simple.compile.objects.antl.values.SimpleValueDataPointer;
 import de.hechler.patrick.codesprachen.simple.compile.objects.antl.values.SimpleVariableValue;
 
 public class SimpleFile implements SimplePool {
@@ -32,7 +32,7 @@ public class SimpleFile implements SimplePool {
 	private final Map <String, SimpleVariable>   vars         = new HashMap <>();
 	private final Map <String, SimpleStructType> structs      = new HashMap <>();
 	private final Map <String, SimpleFunction>   funcs        = new HashMap <>();
-	private final List <SimpleValueConstPointer> datas        = new ArrayList <>();
+	private final List <SimpleValueDataPointer> datas        = new ArrayList <>();
 	private final List <SimpleExportable>        exports      = new ArrayList <>();
 	private SimpleFunction                       main         = null;
 	
@@ -100,6 +100,7 @@ public class SimpleFile implements SimplePool {
 	}
 	
 	public void addStructure(SimpleStructType struct) {
+		checkName(struct.name);
 		SimpleStructType old = structs.put(struct.name, struct);
 		if (old != null) {
 			throw new IllegalStateException("structure already exist: name: " + struct.name);
@@ -131,7 +132,7 @@ public class SimpleFile implements SimplePool {
 		return this.main;
 	}
 	
-	public Collection <SimpleValueConstPointer> dataValues() {
+	public Collection <SimpleValueDataPointer> dataValues() {
 		return datas;
 	}
 	
@@ -150,7 +151,7 @@ public class SimpleFile implements SimplePool {
 	}
 	
 	@Override
-	public void registerDataValue(SimpleValueConstPointer dataVal) {
+	public void registerDataValue(SimpleValueDataPointer dataVal) {
 		this.datas.add(dataVal);
 	}
 	
@@ -201,7 +202,7 @@ public class SimpleFile implements SimplePool {
 		}
 		
 		@Override
-		public void registerDataValue(SimpleValueConstPointer dataVal) {
+		public void registerDataValue(SimpleValueDataPointer dataVal) {
 			SimpleFile.this.registerDataValue(dataVal);
 		}
 		
@@ -241,7 +242,7 @@ public class SimpleFile implements SimplePool {
 		}
 		
 		@Override
-		public void registerDataValue(SimpleValueConstPointer dataVal) {
+		public void registerDataValue(SimpleValueDataPointer dataVal) {
 			parent.registerDataValue(dataVal);
 		}
 		

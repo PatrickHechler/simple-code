@@ -34,11 +34,13 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 	}
 	
 	@Override
+	@Deprecated(forRemoval = true)
 	public boolean isConstData() {
 		return false;
 	}
 	
 	@Override
+	@Deprecated(forRemoval = true)
 	public boolean isConstNoData() {
 		return false;
 	}
@@ -330,7 +332,7 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		} else if (t.isStruct() ^ type.isStruct()) {
 			throw new IllegalStateException("can not cast from '" + t + "' to '" + type + "'");
 		} else if (type.isStruct() /* && t.isStruct() */) {
-			if (t.equals(type)) {
+			if (t.byteCount() == type.byteCount()) {
 				return castedValue(this, type);
 			} else {
 				throw new IllegalStateException("can not cast from '" + t + "' to '" + type + "'");
@@ -967,10 +969,10 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 			} else {
 				param1.loadValue(targetRegister, blockedRegisters, commands, pos);
 				param2.loadValue(rdp2.reg, blockedRegisters, commands, pos);
-				build.v1 = targetRegister;
-				p2 = build.build();
 				build.v1 = rdp2.reg;
 				p1 = build.build();
+				build.v1 = targetRegister;
+				p2 = build.build();
 			}
 			Command addCmd = new Command(cmd, p1, p2);
 			pos += addCmd.length();

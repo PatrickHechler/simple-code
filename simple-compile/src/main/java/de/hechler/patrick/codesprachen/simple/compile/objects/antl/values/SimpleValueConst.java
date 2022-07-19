@@ -9,23 +9,19 @@ public abstract class SimpleValueConst extends SimpleValueNoConst {
 		super(type);
 	}
 	
-	/**
-	 * used when this constant is built of data and not a number (for example a string)
-	 * <p>
-	 * a constant number casted to a pointer type will still return <code>false</code>, since the number value is known at compile time
-	 * 
-	 * @return <code>true</code> when this value is a data pointer/array value and has not a constant number
-	 */
+	@Deprecated(forRemoval = true)
 	protected boolean isDataPointerOrArray() {
 		return false;
 	}
 	
 	@Override
+	@Deprecated(forRemoval = true)
 	public boolean isConstData() {
 		return isDataPointerOrArray();
 	}
 	
 	@Override
+	@Deprecated(forRemoval = true)
 	public boolean isConstNoData() {
 		return !isDataPointerOrArray();
 	}

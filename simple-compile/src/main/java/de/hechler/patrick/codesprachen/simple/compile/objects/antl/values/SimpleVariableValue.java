@@ -23,6 +23,8 @@ public class SimpleVariableValue extends SimpleValueNoConst {
 	
 	@Override
 	public long loadValue(int targetRegister, boolean[] blockedRegisters, List <Command> commands, long pos) {
+		assert !blockedRegisters[targetRegister];
+		blockedRegisters[targetRegister] = true;
 		if (sv.reg == -1) {
 			throw new InternalError("not yet initlized");
 		}
@@ -59,44 +61,46 @@ public class SimpleVariableValue extends SimpleValueNoConst {
 	}
 	
 	@Override
-	protected SimpleValue mkPointer(SimplePool pool) {
-		if (sv.reg != -1) {
-			throw new IllegalStateException("this should be done before the init of the variables!");
-		}
-		sv.wantsAddr = true;
-		return new SimpleValueNoConst(new SimpleTypePointer(t)) {
-			
-			@Override
-			public long loadValue(int targetRegister, boolean[] blockedRegisters, List <Command> commands, long pos) {
-				assert !blockedRegisters[targetRegister];
-				blockedRegisters[targetRegister] = true;
-				Param p1, p2, p3;
-				ParamBuilder build = new ParamBuilder();
-				build.art = A_SR;
-				build.v1 = targetRegister;
-				p1 = build.build();
-				build.v1 = sv.reg;
-				p2 = build.build();
-				build.art = A_NUM;
-				build.v1 = sv.addr;
-				p3 = build.build();
-				Command addCmd = new Command(Commands.CMD_MVAD, p1, p2, p3);
-				pos += addCmd.length();
-				commands.add(addCmd);
-				return pos;
-			}
-			
-			@Override
-			public String toString() {
-				return "&" + sv.name;
-			}
-			
-		};
+	public SimpleValue mkPointer(SimplePool pool) {
+		return new SimpleVariablePointerValue();
 	}
 	
 	@Override
 	public String toString() {
 		return sv.name;
+	}
+	
+	public class SimpleVariablePointerValue extends SimpleValueNoConst {
+		
+		public SimpleVariablePointerValue() {
+			super(new SimpleTypePointer(SimpleVariableValue.this.t));
+		}
+		
+		@Override
+		public long loadValue(int targetRegister, boolean[] blockedRegisters, List <Command> commands, long pos) {
+			assert !blockedRegisters[targetRegister];
+			blockedRegisters[targetRegister] = true;
+			Param p1, p2, p3;
+			ParamBuilder build = new ParamBuilder();
+			build.art = A_SR;
+			build.v1 = targetRegister;
+			p1 = build.build();
+			build.v1 = sv.reg;
+			p2 = build.build();
+			build.art = A_NUM;
+			build.v1 = sv.addr;
+			p3 = build.build();
+			Command addCmd = new Command(Commands.CMD_MVAD, p1, p2, p3);
+			pos += addCmd.length();
+			commands.add(addCmd);
+			return pos;
+		}
+		
+		@Override
+		public String toString() {
+			return "&" + sv.name;
+		}
+		
 	}
 	
 }

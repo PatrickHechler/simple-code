@@ -3,6 +3,7 @@ package de.hechler.patrick.codesprachen.simple.compile.objects.antl.commands;
 import de.hechler.patrick.codesprachen.simple.compile.objects.antl.SimplePool;
 import de.hechler.patrick.codesprachen.simple.compile.objects.antl.types.SimpleType;
 import de.hechler.patrick.codesprachen.simple.compile.objects.antl.values.SimpleValue;
+import de.hechler.patrick.codesprachen.simple.compile.objects.antl.values.SimpleVariableValue;
 
 public class SimpleCommandAssign implements SimpleCommand {
 	
@@ -22,7 +23,10 @@ public class SimpleCommandAssign implements SimpleCommand {
 		if (vt.isArray() || tt.isArray() || vt.isStruct() || tt.isStruct()) {
 			throw new IllegalStateException("can not assign with array/structure values! (target: " + tt + " value: " + vt + ")");
 		}
-		return new SimpleCommandAssign(pool, target.addExpUnary(pool, SimpleValue.EXP_UNARY_AND), value);
+		if (! (target instanceof SimpleVariableValue)) {
+			target = target.addExpUnary(pool, SimpleValue.EXP_UNARY_AND);
+		}
+		return new SimpleCommandAssign(pool, target, value);
 	}
 	
 	@Override
