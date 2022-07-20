@@ -4,7 +4,6 @@ import static de.hechler.patrick.codesprachen.simple.compile.interfaces.SimpleEx
 import static de.hechler.patrick.codesprachen.simple.compile.interfaces.SimpleExportable.E_T_FUNC_END;
 import static de.hechler.patrick.codesprachen.simple.compile.interfaces.SimpleExportable.E_T_FUNC_START;
 
-import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 

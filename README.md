@@ -26,10 +26,10 @@ a function is a block of commands used to do something for example convert the a
         * the `main` function has to have specific argument and return parameters:
             * argument params:
                 1. `num argc`: this will be set to the number of arguments passed to the program
-                2. `char** argv`: this will point the arguments passed to the programm
-                    * the first argument will be the programm itsef
+                2. `char** argv`: this will point the arguments passed to the program
+                    * the first argument will be the program itself
             * return param:
-                1. `num enum`: the return number of the main function will be the exit number of the process
+                1. `num exitnum`: the return number of the main function will be the exit number of the process
 
 ### variable
 

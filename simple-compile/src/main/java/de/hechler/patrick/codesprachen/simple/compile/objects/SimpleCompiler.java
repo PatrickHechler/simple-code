@@ -1,19 +1,29 @@
 package de.hechler.patrick.codesprachen.simple.compile.objects;
 
-import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.*;
+import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.A_NUM;
+import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.A_SR;
+import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.B_NUM;
+import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.B_REG;
+import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.build;
+import static de.hechler.patrick.codesprachen.primitive.core.utils.PrimAsmPreDefines.INT_EXIT;
+import static de.hechler.patrick.codesprachen.primitive.core.utils.PrimAsmPreDefines.INT_GET_FILE;
+import static de.hechler.patrick.codesprachen.primitive.core.utils.PrimAsmPreDefines.INT_MEMORY_ALLOC;
+import static de.hechler.patrick.codesprachen.primitive.core.utils.PrimAsmPreDefines.INT_MEMORY_FREE;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.Reader;
 import java.io.Writer;
-import java.nio.channels.IllegalSelectorException;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Scanner;
@@ -25,7 +35,6 @@ import org.antlr.v4.runtime.CommonTokenStream;
 import de.hechler.patrick.codesprachen.primitive.assemble.enums.Commands;
 import de.hechler.patrick.codesprachen.primitive.assemble.objects.Command;
 import de.hechler.patrick.codesprachen.primitive.assemble.objects.Param;
-import de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder;
 import de.hechler.patrick.codesprachen.primitive.assemble.objects.PrimitiveAssembler;
 import de.hechler.patrick.codesprachen.primitive.core.objects.PrimitiveConstant;
 import de.hechler.patrick.codesprachen.primitive.core.utils.Convert;
@@ -45,8 +54,6 @@ import de.hechler.patrick.codesprachen.simple.compile.objects.antl.commands.Simp
 import de.hechler.patrick.codesprachen.simple.compile.objects.antl.commands.SimpleCommandIf;
 import de.hechler.patrick.codesprachen.simple.compile.objects.antl.commands.SimpleCommandVarDecl;
 import de.hechler.patrick.codesprachen.simple.compile.objects.antl.commands.SimpleCommandWhile;
-import de.hechler.patrick.codesprachen.simple.compile.objects.antl.types.SimpleTypeArray;
-import de.hechler.patrick.codesprachen.simple.compile.objects.antl.types.SimpleTypePrimitive;
 import de.hechler.patrick.codesprachen.simple.compile.objects.antl.values.SimpleValue;
 import de.hechler.patrick.codesprachen.simple.compile.objects.antl.values.SimpleValueDataPointer;
 import de.hechler.patrick.codesprachen.simple.compile.objects.antl.values.SimpleVariableValue;
@@ -164,11 +171,18 @@ public class SimpleCompiler {
 		}
 	}
 	
+	private static final long MY_INT_OUT_OF_MEM_ERROR = PrimAsmPreDefines.INTERRUPT_COUNT;
+	private static final long MY_INT_DEP_LOAD_ERROR   = MY_INT_OUT_OF_MEM_ERROR + 1L;
+	private static final long MY_INT_CNT              = MY_INT_DEP_LOAD_ERROR + 1L;
+	
 	// TODO make these files
 	private static final String MY_EXPORT_FILE                      = "/de/hechler/patrick/codesprachen/simple/compile/mySymbols.psf";
 	private static final String EXECUTABLE_START_FILE               = "/de/hechler/patrick/codesprachen/simple/compile/executableStart.pmc";
 	private static final String MAIN_ADDRESS_EXPORT_SYMBOL          = "MAIN_ADDRESS";
 	private static final String MAIN_ADDRESS_RELATIVE_EXPORT_SYMBOL = "MAIN_ADDRESS_REL_POS";
+	private static final String INTERRUPT_COUNT_SYMBOL              = "INTERRUPT_COUNT";
+	private static final String INT_OUT_OF_MEM_ERR_SYMBOL           = "INT_OUT_OF_MEM_ERR";
+	private static final String INT_DEP_LOAD_ERR_SYMBOL             = "INT_DEP_LOAD_ERR";
 	private static final long   MAIN_ADDRESS;
 	private static final long   MAIN_ADDRESS_RELATIVE_POSITION;
 	
@@ -181,6 +195,18 @@ public class SimpleCompiler {
 				MAIN_ADDRESS = pc.value;
 				pc = map.get(MAIN_ADDRESS_RELATIVE_EXPORT_SYMBOL);
 				MAIN_ADDRESS_RELATIVE_POSITION = pc.value;
+				pc = map.get(INTERRUPT_COUNT_SYMBOL);
+				if (pc.value != MY_INT_CNT) {
+					throw new AssertionError();
+				}
+				pc = map.get(INT_OUT_OF_MEM_ERR_SYMBOL);
+				if (pc.value != MY_INT_OUT_OF_MEM_ERROR) {
+					throw new AssertionError();
+				}
+				pc = map.get(INT_DEP_LOAD_ERR_SYMBOL);
+				if (pc.value != MY_INT_DEP_LOAD_ERROR) {
+					throw new AssertionError();
+				}
 			}
 		} catch (IOException e) {
 			throw new RuntimeException(e.toString(), e);
@@ -194,6 +220,20 @@ public class SimpleCompiler {
 	}
 	
 	private void fillData(CompileTarget target) throws IOException {
+		assert target.pos == target.binary.length(NO_LOCK);
+		target.outOfMemErrorAddr = target.pos;
+		try (OutputStream out = target.binary.openOutput(true, NO_LOCK)) {
+			PrimitiveAssembler asm = new PrimitiveAssembler(out, null, new Path[0], true, false);
+			Command outOfMem = new Command(Commands.CMD_INT, build(A_NUM, MY_INT_OUT_OF_MEM_ERROR), null);
+			Command mov1 = new Command(Commands.CMD_MOV, build(A_SR, X00), build(A_NUM, 1L));
+			Command iex = new Command(Commands.CMD_INT, build(A_NUM, INT_EXIT), null);
+			Command depLoad = new Command(Commands.CMD_INT, build(A_NUM, MY_INT_DEP_LOAD_ERROR), null);
+			long exitLen = mov1.length() + iex.length();
+			target.pos += outOfMem.length() + exitLen;
+			target.dependencyLoadErrorAddr = target.pos;
+			target.pos += depLoad.length() + exitLen;
+			asm.assemble(Arrays.asList(outOfMem, mov1, iex, depLoad, mov1, iex), Collections.emptyMap());
+		}
 		for (SimpleValueDataPointer dataVal : target.file.dataValues()) {
 			dataVal.addr = target.pos;
 			target.binary.appendContent(dataVal.data, 0, dataVal.data.length, NO_LOCK);
@@ -221,21 +261,19 @@ public class SimpleCompiler {
 		}
 	}
 	
-	private static final long MY_INT_ERROR = PrimAsmPreDefines.INTERRUPT_COUNT;
-	
-	private static final int X00                   = PrimAsmConstants.X_ADD;
-	private static final int X01                   = PrimAsmConstants.X_ADD + 1;
-	private static final int X02                   = PrimAsmConstants.X_ADD + 2;
-	private static final int X03                   = PrimAsmConstants.X_ADD + 3;
-	private static final int MAX_INT_REG           = X03;
-	private static final int METHOD_STRUCT_REG     = X00 + 4;
-	private static final int VARIABLE_POINTER_REG  = X00 + 5;
-	private static final int MIN_REG_VARIABLE_REG  = X00 + 6;
-	private static final int MAX_REG_VARIABLE_REG  = X00 + 0x9F;
+	private static final int X00 = PrimAsmConstants.X_ADD;
+	// private static final int X01 = PrimAsmConstants.X_ADD + 1;
+	// private static final int X02 = PrimAsmConstants.X_ADD + 2;
+	// private static final int X03 = PrimAsmConstants.X_ADD + 3;
+	// private static final int REG_MAX_INT = X03;
+	private static final int REG_METHOD_STRUCT     = X00 + 4;
+	private static final int REG_VARIABLE_POINTER  = X00 + 5;
+	private static final int REG_MIN_VARIABLE      = X00 + 6;
+	private static final int REG_MAX_VARIABLE      = X00 + 0x9F;
 	/**
 	 * the compiler won't use any registers above this value for critical stuff
 	 */
-	public static final int  MAX_COMPILER_REGISTER = MAX_REG_VARIABLE_REG;
+	public static final int  MAX_COMPILER_REGISTER = REG_MAX_VARIABLE;
 	
 	private static class UsedData {
 		
@@ -253,11 +291,6 @@ public class SimpleCompiler {
 		}
 		sf.cmds = new LinkedList <>();
 		boolean[] regs = new boolean[256];
-		// X00..X03 is for interrupts
-		// X04 is current method struct
-		// X05 is the backup pointer for variables if there is nowhere else place
-		// X06..X9F is for variables
-		// XA0..XF9 is used by expressions and similar
 		UsedData used = new UsedData();
 		count(used, regs, sf.body);
 		for (int i = 0; i < used.regs; i ++ ) {
@@ -275,10 +308,7 @@ public class SimpleCompiler {
 		}
 		if (used.maxaddr > 0L) {
 			Param p1;
-			ParamBuilder b = new ParamBuilder();
-			b.art = A_NUM;
-			b.v1 = PrimAsmPreDefines.INT_MEMORY_FREE;
-			p1 = b.build();
+			p1 = build(A_NUM, INT_MEMORY_FREE);
 			Command c = new Command(Commands.CMD_INT, p1, null);
 			target.pos += c.length();
 			sf.cmds.add(c);
@@ -289,44 +319,35 @@ public class SimpleCompiler {
 	}
 	
 	private void initVariableMemory(CompileTarget target, SimpleFunction sf) {
+		assert target.outOfMemErrorAddr != -1L;
 		Param p1, p2;
-		ParamBuilder b = new ParamBuilder();
-		b.art = A_NUM;
-		b.v1 = PrimAsmPreDefines.INT_MEMORY_ALLOC;
-		p1 = b.build();
+		p1 = build(A_NUM, INT_MEMORY_ALLOC);
 		Command c = new Command(Commands.CMD_INT, p1, null);
 		target.pos += c.length();
 		sf.cmds.add(c);
-		b.v1 = -1L;
-		p2 = b.build();
-		b.art = A_SR;
-		b.v1 = X00;
-		p1 = b.build();
+		p1 = build(A_SR, X00);
+		p2 = build(A_NUM, -1L);
 		c = new Command(Commands.CMD_CMP, p1, p2);
 		target.pos += c.length();
 		sf.cmds.add(c);
-		b.art = A_NUM;
-		assert target.outOfMemAddr != -1L;
-		b.v1 = target.pos - target.outOfMemAddr;
-		p1 = b.build();
-		c = new Command(Commands.CMD_JMP, p1, null);
+		p1 = build(A_NUM, target.pos - target.outOfMemErrorAddr);
+		c = new Command(Commands.CMD_JMPEQ, p1, null);
 		target.pos += c.length();
 		sf.cmds.add(c);
-		b.art = A_SR;
-		b.v1 = VARIABLE_POINTER_REG;
-		p1 = b.build();
-		b.v1 = X00;
+		p1 = build(A_SR, REG_VARIABLE_POINTER);
+		p2 = build(A_SR, X00);
+		c = new Command(Commands.CMD_MOV, p1, p2);
+		target.pos += c.length();
+		sf.cmds.add(c);
 	}
 	
 	private void compileCommand(CompileTarget target, SimpleFunction sf, boolean[] regs, SimpleCommand cmd) throws InternalError {
 		if (cmd instanceof SimpleCommandIf) {
 			SimpleCommandIf ifCmd = (SimpleCommandIf) cmd;
-			
-			// TODO
+			compileIf(target, sf, regs, ifCmd);
 		} else if (cmd instanceof SimpleCommandWhile) {
 			SimpleCommandWhile whileCmd = (SimpleCommandWhile) cmd;
-			
-			// TODO
+			compileWhile(target, sf, regs, whileCmd);
 		} else if (cmd instanceof SimpleCommandFuncCall) {
 			SimpleCommandFuncCall funcCallCmd = (SimpleCommandFuncCall) cmd;
 			compileFuncCall(target, sf, regs, funcCallCmd);
@@ -349,6 +370,88 @@ public class SimpleCompiler {
 		}
 	}
 	
+	private static final int JMP_LEN   = 16;
+	private static final int JMPEQ_LEN = JMP_LEN;
+	
+	static {
+		if (new Command(Commands.CMD_JMP, build(A_NUM, -1L), null).length() != JMP_LEN) {
+			throw new AssertionError();
+		}
+		if (new Command(Commands.CMD_JMPEQ, build(A_NUM, -1L), null).length() != JMPEQ_LEN) {
+			throw new AssertionError();
+		}
+	}
+	
+	private void compileIf(CompileTarget target, SimpleFunction sf, boolean[] regs, SimpleCommandIf ifCmd) {
+		int reg = register(regs, MAX_COMPILER_REGISTER + 2);
+		boolean old = makeRegUsable(regs, reg, sf.cmds, target);
+		target.pos = ifCmd.condition.loadValue(reg, regs, sf.cmds, target.pos);
+		Param p1, p2;
+		p1 = build(A_SR, reg);
+		p2 = build(A_NUM, 0L);
+		Command c = new Command(Commands.CMD_CMP, p1, p2);
+		target.pos += c.length();
+		sf.cmds.add(c);
+		long startIfAddr = target.pos;
+		target.pos += JMPEQ_LEN;
+		List <Command> cmds = sf.cmds;
+		List <Command> sub = new LinkedList <>();
+		sf.cmds = sub;
+		compileCommand(target, sf, regs, ifCmd.ifCmd);
+		p1 = build(A_NUM, target.pos - startIfAddr);
+		assert sf.cmds == sub;
+		sf.cmds = cmds;
+		c = new Command(Commands.CMD_JMPEQ, p1, null);
+		sf.cmds.add(c);
+		sf.cmds.addAll(sub);
+		if (ifCmd.elseCmd != null) {
+			compileElse(target, sf, regs, ifCmd, cmds);
+		}
+		releseReg(regs, reg, old, sf.cmds, target);
+	}
+	
+	private void compileElse(CompileTarget target, SimpleFunction sf, boolean[] regs, SimpleCommandIf ifCmd, List <Command> cmds) throws InternalError {
+		Param p1;
+		Command c;
+		List <Command> sub;
+		long ifEndAddr = target.pos;
+		target.pos += JMP_LEN;
+		sub = new LinkedList <>();
+		sf.cmds = sub;
+		compileCommand(target, sf, regs, ifCmd.elseCmd);
+		assert sf.cmds == sub;
+		sf.cmds = cmds;
+		p1 = build(A_NUM, target.pos - ifEndAddr);
+		c = new Command(Commands.CMD_JMP, p1, null);
+		sf.cmds.add(c);
+		sf.cmds.addAll(sub);
+	}
+	
+	private void compileWhile(CompileTarget target, SimpleFunction sf, boolean[] regs, SimpleCommandWhile whileCmd) {
+		int reg = register(regs, MAX_COMPILER_REGISTER + 1);
+		boolean old = makeRegUsable(regs, reg, sf.cmds, target);
+		long loopStart = target.pos;
+		target.pos = whileCmd.condition.loadValue(reg, regs, sf.cmds, target.pos);
+		Param p1, p2;
+		p1 = build(A_SR, reg);
+		p2 = build(A_NUM, 0L);
+		Command c = new Command(Commands.CMD_CMP, p1, p2);
+		target.pos += c.length();
+		sf.cmds.add(c);
+		target.pos += JMPEQ_LEN;
+		List <Command> cmds = sf.cmds;
+		List <Command> sub = new LinkedList <>();
+		sf.cmds = sub;
+		compileCommand(target, sf, regs, whileCmd);
+		assert sub == sf.cmds;
+		sf.cmds = cmds;
+		p1 = build(A_NUM, loopStart - target.pos);
+		c = new Command(Commands.CMD_JMPEQ, p1, null);
+		sf.cmds.add(c);
+		sf.cmds.addAll(sub);
+		releseReg(regs, reg, old, sf.cmds, target);
+	}
+	
 	private void compileFuncCall(CompileTarget target, SimpleFunction sf, boolean[] regs, SimpleCommandFuncCall funcCallCmd) {
 		validateFuncCall(funcCallCmd);
 		push(target, sf);
@@ -364,52 +467,47 @@ public class SimpleCompiler {
 			SimpleDependency dep = funcCallCmd.pool.getDependency(funcCallCmd.firstName);
 			SimpleExportable se = dep.imps.get(funcCallCmd.secondName);
 			if (se == null || ! (se instanceof SimpleFunction)) {
-				throw new IllegalStateException("function call needs a function! dependency: " + dep.path + " > '" + dep.depend + "' (not) function name: " + funcCallCmd.secondName + " > " + se);
+				throw new IllegalStateException(
+					"function call needs a function! dependency: " + dep.path + " > '" + dep.depend + "' (not) function name: " + funcCallCmd.secondName + " > " + se);
 			}
 			func = (SimpleFunction) se;
 			assert dep.path.addr != -1L;
 			assert func.address != -1L;
 		}
 		if ( !func.type.equals(funcCallCmd.function.type())) {
-			throw new IllegalStateException(
-				"the function call structure is diffrent to the type needed by the called function! (function: " + (funcCallCmd.firstName) + (funcCallCmd.secondName == null ? "" : (":" + funcCallCmd.secondName))
-					+ " given func-struct type: '" + funcCallCmd.function.type() + "' needded func-struct type: '" + func.type + "' given func-struct: '" + funcCallCmd.function + "')");
+			throw new IllegalStateException("the function call structure is diffrent to the type needed by the called function! (function: " + (funcCallCmd.firstName)
+				+ (funcCallCmd.secondName == null ? "" : (":" + funcCallCmd.secondName)) + " given func-struct type: '" + funcCallCmd.function.type()
+				+ "' needded func-struct type: '" + func.type + "' given func-struct: '" + funcCallCmd.function + "')");
 		}
 	}
 	
 	private void compileAssignCommand(CompileTarget target, SimpleFunction sf, boolean[] regs, SimpleCommandAssign assignCmd) {
-		if (assignCmd.target.type().isPrimitive())
-			if (assignCmd.target instanceof SimpleVariableValue) {
-				assignVariable(target, sf, regs, ((SimpleVariableValue) assignCmd.target).sv, assignCmd.value);
-			} else {
-				int r1 = register(regs, MAX_COMPILER_REGISTER + 1);
-				boolean o1 = makeRegUsable(regs, r1);
-				SimpleValue nt = assignCmd.target.addExpUnary(assignCmd.pool, SimpleValue.EXP_UNARY_AND);
-				target.pos = nt.loadValue(r1, regs, sf.cmds, target.pos);
-				int r2 = register(regs, MAX_COMPILER_REGISTER + 2);
-				boolean o2 = makeRegUsable(regs, r2);
-				target.pos = assignCmd.value.loadValue(r2, regs, sf.cmds, target.pos);
-				Param p1, p2;
-				ParamBuilder b = new ParamBuilder();
-				b.art = A_SR | B_REG;
-				b.v1 = r1;
-				p1 = b.build();
-				b.art = A_SR;
-				b.v1 = r2;
-				p2 = b.build();
-				Command c = new Command(Commands.CMD_MOV, p1, p2);
-				target.pos += c.length();
-				sf.cmds.add(c);
-				regs[r2] = o2;
-				regs[r1] = o1;
-			}
+		if (assignCmd.target.type().isPrimitive()) if (assignCmd.target instanceof SimpleVariableValue) {
+			assignVariable(target, sf, regs, ((SimpleVariableValue) assignCmd.target).sv, assignCmd.value);
+		} else {
+			int r1 = register(regs, MAX_COMPILER_REGISTER + 1);
+			boolean o1 = makeRegUsable(regs, r1, sf.cmds, target);
+			SimpleValue nt = assignCmd.target.addExpUnary(assignCmd.pool, SimpleValue.EXP_UNARY_AND);
+			target.pos = nt.loadValue(r1, regs, sf.cmds, target.pos);
+			int r2 = register(regs, MAX_COMPILER_REGISTER + 2);
+			boolean o2 = makeRegUsable(regs, r2, sf.cmds, target);
+			target.pos = assignCmd.value.loadValue(r2, regs, sf.cmds, target.pos);
+			Param p1, p2;
+			p1 = build(A_SR | B_REG, r1);
+			p2 = build(A_SR, r2);
+			Command c = new Command(Commands.CMD_MOV, p1, p2);
+			target.pos += c.length();
+			sf.cmds.add(c);
+			releseReg(regs, r2, o2, sf.cmds, target);
+			releseReg(regs, r1, o1, sf.cmds, target);
+		}
 	}
 	
 	private void call(CompileTarget target, SimpleFunction sf, SimpleCommandFuncCall funcCallCmd, boolean[] regs) {
-		assert regs[METHOD_STRUCT_REG];
-		regs[METHOD_STRUCT_REG] = false;
-		target.pos = funcCallCmd.function.loadValue(METHOD_STRUCT_REG, regs, sf.cmds, target.pos);
-		regs[METHOD_STRUCT_REG] = true;
+		assert regs[REG_METHOD_STRUCT];
+		regs[REG_METHOD_STRUCT] = false;
+		target.pos = funcCallCmd.function.loadValue(REG_METHOD_STRUCT, regs, sf.cmds, target.pos);
+		regs[REG_METHOD_STRUCT] = true;
 		if (funcCallCmd.secondName == null) {
 			Param p1;
 			Command c;
@@ -418,49 +516,55 @@ public class SimpleCompiler {
 			target.pos += c.length();
 			sf.cmds.add(c);
 		} else {
-			SimpleDependency dep = funcCallCmd.pool.getDependency(funcCallCmd.firstName);
-			SimpleFunction func = (SimpleFunction) dep.imps.get(funcCallCmd.secondName);
-			Param p1, p2;
-			ParamBuilder b = new ParamBuilder();
-			b.art = A_SR;
-			b.v1 = X00;
-			p1 = b.build();
-			b.art = A_NUM;
-			b.v1 = dep.path.addr - target.pos;
-			p2 = b.build();
-			Command c = new Command(Commands.CMD_LEA, p1, p2);
-			target.pos += c.length();
-			sf.cmds.add(c);
-			b.v1 = PrimAsmPreDefines.INT_GET_FILE;
-			p1 = b.build();
-			c = new Command(Commands.CMD_INT, p1, null);
-			target.pos += c.length();
-			sf.cmds.add(c);
-			// TODO
+			dependencyCall(target, sf, funcCallCmd);
 		}
+	}
+	
+	private void dependencyCall(CompileTarget target, SimpleFunction sf, SimpleCommandFuncCall funcCallCmd) {
+		SimpleDependency dep = funcCallCmd.pool.getDependency(funcCallCmd.firstName);
+		SimpleFunction func = (SimpleFunction) dep.imps.get(funcCallCmd.secondName);
+		Param p1, p2;
+		p1 = build(A_SR, X00);
+		p2 = build(A_NUM, dep.path.addr - target.pos);
+		Command c = new Command(Commands.CMD_LEA, p1, p2);
+		target.pos += c.length();
+		sf.cmds.add(c);
+		p1 = build(A_NUM, INT_GET_FILE);
+		c = new Command(Commands.CMD_INT, p1, null);
+		target.pos += c.length();
+		sf.cmds.add(c);
+		p1 = build(A_SR, X00);
+		p2 = build(A_NUM, -1L);
+		c = new Command(Commands.CMD_CMP, p1, p2);
+		target.pos += c.length();
+		sf.cmds.add(c);
+		p1 = build(A_NUM, target.dependencyLoadErrorAddr - target.pos);
+		c = new Command(Commands.CMD_JMPEQ, p1, null);
+		target.pos += c.length();
+		sf.cmds.add(c);
+		p1 = build(A_SR, X00);
+		p2 = build(A_NUM, func.address);
+		c = new Command(Commands.CMD_CALO, p1, p2);
+		target.pos += c.length();
+		sf.cmds.add(c);
 	}
 	
 	private void pop(CompileTarget target, SimpleFunction sf) {
 		Param p1;
-		ParamBuilder b = new ParamBuilder();
-		b.art = A_SR;
 		Command c;
 		for (int i = sf.regVars - 1; i >= 0; i -- ) {
-			b.v1 = MIN_REG_VARIABLE_REG + i;
-			p1 = b.build();
+			p1 = build(A_SR, REG_MIN_VARIABLE + i);
 			c = new Command(Commands.CMD_PUSH, p1, null);
 			target.pos += c.length();
 			sf.cmds.add(c);
 		}
 		if (sf.addrVars) {
-			b.v1 = VARIABLE_POINTER_REG;
-			p1 = b.build();
+			p1 = build(A_SR, REG_VARIABLE_POINTER);
 			c = new Command(Commands.CMD_PUSH, p1, null);
 			target.pos += c.length();
 			sf.cmds.add(c);
 		}
-		b.v1 = METHOD_STRUCT_REG;
-		p1 = b.build();
+		p1 = build(A_SR, REG_METHOD_STRUCT);
 		c = new Command(Commands.CMD_PUSH, p1, null);
 		target.pos += c.length();
 		sf.cmds.add(c);
@@ -468,24 +572,19 @@ public class SimpleCompiler {
 	
 	private void push(CompileTarget target, SimpleFunction sf) {
 		Param p1;
-		ParamBuilder b = new ParamBuilder();
-		b.art = A_SR;
 		Command c;
-		b.v1 = METHOD_STRUCT_REG;
-		p1 = b.build();
+		p1 = build(A_SR, REG_METHOD_STRUCT);
 		c = new Command(Commands.CMD_PUSH, p1, null);
 		target.pos += c.length();
 		sf.cmds.add(c);
 		if (sf.addrVars) {
-			b.v1 = VARIABLE_POINTER_REG;
-			p1 = b.build();
+			p1 = build(A_SR, REG_VARIABLE_POINTER);
 			c = new Command(Commands.CMD_PUSH, p1, null);
 			target.pos += c.length();
 			sf.cmds.add(c);
 		}
 		for (int i = 0; i < sf.regVars; i ++ ) {
-			b.v1 = MIN_REG_VARIABLE_REG + i;
-			p1 = b.build();
+			p1 = build(A_SR, REG_MIN_VARIABLE + i);
 			c = new Command(Commands.CMD_PUSH, p1, null);
 			target.pos += c.length();
 			sf.cmds.add(c);
@@ -497,17 +596,11 @@ public class SimpleCompiler {
 		assert vari.type.isPrimitive() || vari.type.isPointer();
 		if (vari.addr != -1L) {
 			int reg = register(regs, MAX_COMPILER_REGISTER + 1);
-			boolean old = makeRegUsable(regs, reg);
+			boolean old = makeRegUsable(regs, reg, sf.cmds, target);
 			target.pos = value.loadValue(reg, regs, sf.cmds, target.pos);
 			Param p1, p2;
-			ParamBuilder b = new ParamBuilder();
-			b.art = A_SR;
-			b.v1 = reg;
-			p2 = b.build();
-			b.art = A_SR | B_NUM;
-			b.v1 = vari.reg;
-			b.v2 = vari.addr;
-			p1 = b.build();
+			p2 = build(A_SR, reg);
+			p1 = build(A_SR | B_NUM, vari.reg, vari.addr);
 			Commands mov;
 			switch (vari.type.byteCount()) {
 			case 8:
@@ -528,7 +621,7 @@ public class SimpleCompiler {
 			Command c = new Command(mov, p1, p2);
 			target.pos += c.length();
 			sf.cmds.add(c);
-			regs[reg] = old;
+			releseReg(regs, reg, old, sf.cmds, target);
 		} else {
 			regs[vari.reg] = false;
 			target.pos = value.loadValue(vari.reg, regs, sf.cmds, target.pos);
@@ -536,10 +629,26 @@ public class SimpleCompiler {
 		}
 	}
 	
-	private boolean makeRegUsable(boolean[] regs, int reg) {
+	private boolean makeRegUsable(boolean[] regs, int reg, List <Command> cmds, CompileTarget target) {
 		boolean old = regs[reg];
+		if (old) {
+			Param p1 = build(A_SR, reg);
+			Command c = new Command(Commands.CMD_PUSH, p1, null);
+			target.pos += c.length();
+			cmds.add(c);
+		}
 		regs[reg] = false;
 		return old;
+	}
+	
+	private void releseReg(boolean[] regs, int reg, boolean old, List <Command> cmds, CompileTarget target) {
+		if (old) {
+			Param p1 = build(A_SR, reg);
+			Command c = new Command(Commands.CMD_POP, p1, null);
+			target.pos += c.length();
+			cmds.add(c);
+		}
+		regs[reg] = old;
 	}
 	
 	private int register(boolean[] regs, int fallback) {
@@ -601,9 +710,11 @@ public class SimpleCompiler {
 		
 		private volatile SimpleFile file;
 		
-		private long   outOfMemAddr = -1L;
-		private long   pos          = -1L;
-		private Writer expout       = null;
+		// TODO make those two
+		private long   outOfMemErrorAddr       = -1L;
+		private long   dependencyLoadErrorAddr = -1L;
+		private long   pos                     = -1L;
+		private Writer expout                  = null;
 		
 		public CompileTarget(Path src, Path exp, PatrFile bin, boolean neverExe) {
 			this.source = src;
