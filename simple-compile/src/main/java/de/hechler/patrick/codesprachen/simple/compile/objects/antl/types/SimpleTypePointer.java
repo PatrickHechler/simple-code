@@ -53,4 +53,11 @@ public class SimpleTypePointer implements SimpleType {
 		target.appendToExportStr(build, exportedStructs);
 	}
 	
+	@Override
+	public String toString() {
+		StringBuilder b = new StringBuilder();
+		b.append(target).append('*');
+		return b.toString();
+	}
+	
 }

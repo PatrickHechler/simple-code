@@ -134,7 +134,12 @@ public class SimpleFile implements SimplePool {
 	}
 	
 	public Collection <SimpleValueDataPointer> dataValues() {
-		return datas;
+		List <SimpleValueDataPointer> result = new ArrayList <>();
+		for (SimpleDependency sd : dependencies.values()) {
+			result.add(sd.path);
+		}
+		result.addAll(datas);
+		return result;
 	}
 	
 	public SimplePool newFuncPool(List <SimpleVariable> args, List <SimpleVariable> results) {
@@ -317,24 +322,24 @@ public class SimpleFile implements SimplePool {
 		throw new InternalError("this method should be only called on sub pools not on the file pool!");
 	}
 	
-	private static final SimpleType DEPENDENCY_TYPE = new SimpleStructType("--DEPENDENCY--", Collections.emptyList());
+	public static final SimpleType DEPENDENCY_TYPE = new SimpleStructType("--DEPENDENCY--", Collections.emptyList());
 	
 	public static class SimpleDependency extends SimpleVariable {
 		
-		public final SimpleValueDataPointer         name;
+		public final SimpleValueDataPointer         path;
 		public final String                         depend;
 		public final Map <String, SimpleExportable> imps;
 		
 		public SimpleDependency(String depend) {
 			super(DEPENDENCY_TYPE, "");
-			this.name = null;
+			this.path = null;
 			this.depend = depend;
 			this.imps = null;
 		}
 		
 		public SimpleDependency(String name, String depend, Map <String, SimpleExportable> imps) {
 			super(DEPENDENCY_TYPE, name);
-			this.name = new SimpleStringValue(normalize(depend));
+			this.path = new SimpleStringValue(normalize(depend));
 			this.depend = depend;
 			this.imps = Collections.unmodifiableMap(imps);
 		}

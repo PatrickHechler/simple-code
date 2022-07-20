@@ -329,72 +329,10 @@ public class SimpleCompiler {
 			// TODO
 		} else if (cmd instanceof SimpleCommandFuncCall) {
 			SimpleCommandFuncCall funcCallCmd = (SimpleCommandFuncCall) cmd;
-			if (funcCallCmd.secondName == null) {
-				funcCallCmd.pool.getFunction(funcCallCmd.firstName);
-				Param p1;
-				ParamBuilder b = new ParamBuilder();
-				b.art = A_SR;
-				Command c;
-				b.v1 = METHOD_STRUCT_REG;
-				p1 = b.build();
-				c = new Command(Commands.CMD_PUSH, p1, null);
-				target.pos += c.length();
-				sf.cmds.add(c);
-				if (sf.addrVars) {
-					b.v1 = VARIABLE_POINTER_REG;
-					p1 = b.build();
-					c = new Command(Commands.CMD_PUSH, p1, null);
-					target.pos += c.length();
-					sf.cmds.add(c);
-				}
-				for (int i = 0; i < sf.regVars; i ++ ) {
-					b.v1 = MIN_REG_VARIABLE_REG + i;
-					p1 = b.build();
-					c = new Command(Commands.CMD_PUSH, p1, null);
-					target.pos += c.length();
-					sf.cmds.add(c);
-				}
-				b.v1 = VARIABLE_POINTER_REG;
-				p1 = Param.createLabel(funcCallCmd.firstName);
-				c = new Command(Commands.CMD_CALL, p1, null);
-				target.pos += c.length();
-				sf.cmds.add(c);
-			} else {
-				SimpleDependency dep = funcCallCmd.pool.getDependency(funcCallCmd.firstName);
-				SimpleExportable se = dep.imps.get(funcCallCmd.secondName);
-				if (se == null || ! (se instanceof SimpleFunction)) {
-					throw new IllegalStateException("function call needs a function! dependency: " + dep.name + " > '" + dep.depend + "' (not) function name: " + funcCallCmd.secondName + " > " + se);
-				}
-				SimpleFunction func = (SimpleFunction) se;
-				
-			}
+			compileFuncCall(target, sf, regs, funcCallCmd);
 		} else if (cmd instanceof SimpleCommandAssign) {
 			SimpleCommandAssign assignCmd = (SimpleCommandAssign) cmd;
-			if (assignCmd.target.type().isPrimitive())
-				if (assignCmd.target instanceof SimpleVariableValue) {
-					assignVariable(target, sf, regs, ((SimpleVariableValue) assignCmd.target).sv, assignCmd.value);
-				} else {
-					int r1 = register(regs, MAX_COMPILER_REGISTER + 1);
-					boolean o1 = makeRegUsable(regs, r1);
-					SimpleValue nt = assignCmd.target.addExpUnary(assignCmd.pool, SimpleValue.EXP_UNARY_AND);
-					target.pos = nt.loadValue(r1, regs, sf.cmds, target.pos);
-					int r2 = register(regs, MAX_COMPILER_REGISTER + 2);
-					boolean o2 = makeRegUsable(regs, r2);
-					target.pos = assignCmd.value.loadValue(r2, regs, sf.cmds, target.pos);
-					Param p1, p2;
-					ParamBuilder b = new ParamBuilder();
-					b.art = A_SR | B_REG;
-					b.v1 = r1;
-					p1 = b.build();
-					b.art = A_SR;
-					b.v1 = r2;
-					p2 = b.build();
-					Command c = new Command(Commands.CMD_MOV, p1, p2);
-					target.pos += c.length();
-					sf.cmds.add(c);
-					regs[r2] = o2;
-					regs[r1] = o1;
-				}
+			compileAssignCommand(target, sf, regs, assignCmd);
 		} else if (cmd instanceof SimpleCommandBlock) {
 			SimpleCommandBlock blockCmd = (SimpleCommandBlock) cmd;
 			for (SimpleCommand childCmd : blockCmd.cmds) {
@@ -408,6 +346,149 @@ public class SimpleCompiler {
 			assignVariable(target, sf, regs, varDeclCmd, varDeclCmd.init);
 		} else {
 			throw new InternalError("unknown command type: " + cmd.getClass().getName() + " (of command: '" + cmd + "')");
+		}
+	}
+	
+	private void compileFuncCall(CompileTarget target, SimpleFunction sf, boolean[] regs, SimpleCommandFuncCall funcCallCmd) {
+		validateFuncCall(funcCallCmd);
+		push(target, sf);
+		call(target, sf, funcCallCmd, regs);
+		pop(target, sf);
+	}
+	
+	private void validateFuncCall(SimpleCommandFuncCall funcCallCmd) {
+		SimpleFunction func;
+		if (funcCallCmd.secondName == null) {
+			func = funcCallCmd.pool.getFunction(funcCallCmd.firstName);
+		} else {
+			SimpleDependency dep = funcCallCmd.pool.getDependency(funcCallCmd.firstName);
+			SimpleExportable se = dep.imps.get(funcCallCmd.secondName);
+			if (se == null || ! (se instanceof SimpleFunction)) {
+				throw new IllegalStateException("function call needs a function! dependency: " + dep.path + " > '" + dep.depend + "' (not) function name: " + funcCallCmd.secondName + " > " + se);
+			}
+			func = (SimpleFunction) se;
+			assert dep.path.addr != -1L;
+			assert func.address != -1L;
+		}
+		if ( !func.type.equals(funcCallCmd.function.type())) {
+			throw new IllegalStateException(
+				"the function call structure is diffrent to the type needed by the called function! (function: " + (funcCallCmd.firstName) + (funcCallCmd.secondName == null ? "" : (":" + funcCallCmd.secondName))
+					+ " given func-struct type: '" + funcCallCmd.function.type() + "' needded func-struct type: '" + func.type + "' given func-struct: '" + funcCallCmd.function + "')");
+		}
+	}
+	
+	private void compileAssignCommand(CompileTarget target, SimpleFunction sf, boolean[] regs, SimpleCommandAssign assignCmd) {
+		if (assignCmd.target.type().isPrimitive())
+			if (assignCmd.target instanceof SimpleVariableValue) {
+				assignVariable(target, sf, regs, ((SimpleVariableValue) assignCmd.target).sv, assignCmd.value);
+			} else {
+				int r1 = register(regs, MAX_COMPILER_REGISTER + 1);
+				boolean o1 = makeRegUsable(regs, r1);
+				SimpleValue nt = assignCmd.target.addExpUnary(assignCmd.pool, SimpleValue.EXP_UNARY_AND);
+				target.pos = nt.loadValue(r1, regs, sf.cmds, target.pos);
+				int r2 = register(regs, MAX_COMPILER_REGISTER + 2);
+				boolean o2 = makeRegUsable(regs, r2);
+				target.pos = assignCmd.value.loadValue(r2, regs, sf.cmds, target.pos);
+				Param p1, p2;
+				ParamBuilder b = new ParamBuilder();
+				b.art = A_SR | B_REG;
+				b.v1 = r1;
+				p1 = b.build();
+				b.art = A_SR;
+				b.v1 = r2;
+				p2 = b.build();
+				Command c = new Command(Commands.CMD_MOV, p1, p2);
+				target.pos += c.length();
+				sf.cmds.add(c);
+				regs[r2] = o2;
+				regs[r1] = o1;
+			}
+	}
+	
+	private void call(CompileTarget target, SimpleFunction sf, SimpleCommandFuncCall funcCallCmd, boolean[] regs) {
+		assert regs[METHOD_STRUCT_REG];
+		regs[METHOD_STRUCT_REG] = false;
+		target.pos = funcCallCmd.function.loadValue(METHOD_STRUCT_REG, regs, sf.cmds, target.pos);
+		regs[METHOD_STRUCT_REG] = true;
+		if (funcCallCmd.secondName == null) {
+			Param p1;
+			Command c;
+			p1 = Param.createLabel(funcCallCmd.firstName);
+			c = new Command(Commands.CMD_CALL, p1, null);
+			target.pos += c.length();
+			sf.cmds.add(c);
+		} else {
+			SimpleDependency dep = funcCallCmd.pool.getDependency(funcCallCmd.firstName);
+			SimpleFunction func = (SimpleFunction) dep.imps.get(funcCallCmd.secondName);
+			Param p1, p2;
+			ParamBuilder b = new ParamBuilder();
+			b.art = A_SR;
+			b.v1 = X00;
+			p1 = b.build();
+			b.art = A_NUM;
+			b.v1 = dep.path.addr - target.pos;
+			p2 = b.build();
+			Command c = new Command(Commands.CMD_LEA, p1, p2);
+			target.pos += c.length();
+			sf.cmds.add(c);
+			b.v1 = PrimAsmPreDefines.INT_GET_FILE;
+			p1 = b.build();
+			c = new Command(Commands.CMD_INT, p1, null);
+			target.pos += c.length();
+			sf.cmds.add(c);
+			// TODO
+		}
+	}
+	
+	private void pop(CompileTarget target, SimpleFunction sf) {
+		Param p1;
+		ParamBuilder b = new ParamBuilder();
+		b.art = A_SR;
+		Command c;
+		for (int i = sf.regVars - 1; i >= 0; i -- ) {
+			b.v1 = MIN_REG_VARIABLE_REG + i;
+			p1 = b.build();
+			c = new Command(Commands.CMD_PUSH, p1, null);
+			target.pos += c.length();
+			sf.cmds.add(c);
+		}
+		if (sf.addrVars) {
+			b.v1 = VARIABLE_POINTER_REG;
+			p1 = b.build();
+			c = new Command(Commands.CMD_PUSH, p1, null);
+			target.pos += c.length();
+			sf.cmds.add(c);
+		}
+		b.v1 = METHOD_STRUCT_REG;
+		p1 = b.build();
+		c = new Command(Commands.CMD_PUSH, p1, null);
+		target.pos += c.length();
+		sf.cmds.add(c);
+	}
+	
+	private void push(CompileTarget target, SimpleFunction sf) {
+		Param p1;
+		ParamBuilder b = new ParamBuilder();
+		b.art = A_SR;
+		Command c;
+		b.v1 = METHOD_STRUCT_REG;
+		p1 = b.build();
+		c = new Command(Commands.CMD_PUSH, p1, null);
+		target.pos += c.length();
+		sf.cmds.add(c);
+		if (sf.addrVars) {
+			b.v1 = VARIABLE_POINTER_REG;
+			p1 = b.build();
+			c = new Command(Commands.CMD_PUSH, p1, null);
+			target.pos += c.length();
+			sf.cmds.add(c);
+		}
+		for (int i = 0; i < sf.regVars; i ++ ) {
+			b.v1 = MIN_REG_VARIABLE_REG + i;
+			p1 = b.build();
+			c = new Command(Commands.CMD_PUSH, p1, null);
+			target.pos += c.length();
+			sf.cmds.add(c);
 		}
 	}
 	

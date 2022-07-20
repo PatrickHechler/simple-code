@@ -18,7 +18,7 @@ public abstract class SimpleValueDataPointer extends SimpleValueNoConst {
 	 */
 	public final byte[] data;
 	/**
-	 * this value is only allowed to be set once (twice when the -1 at the start counts)!
+	 * this value is only allowed to be set once (twice when the -1 at the start counts) by the compiler!
 	 */
 	public long         addr = -1L;
 	

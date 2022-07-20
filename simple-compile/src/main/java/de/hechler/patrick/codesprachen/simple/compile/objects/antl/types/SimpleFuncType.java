@@ -4,6 +4,7 @@ import static de.hechler.patrick.codesprachen.simple.compile.interfaces.SimpleEx
 import static de.hechler.patrick.codesprachen.simple.compile.interfaces.SimpleExportable.E_T_FUNC_END;
 import static de.hechler.patrick.codesprachen.simple.compile.interfaces.SimpleExportable.E_T_FUNC_START;
 
+import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
@@ -110,6 +111,26 @@ public class SimpleFuncType implements SimpleType {
 			build.append(sv.type);
 		}
 		build.append(E_T_FUNC_END);
+	}
+	
+	@Override
+	public String toString() {
+		StringBuilder b = new StringBuilder();
+		b.append('(');
+		if (arguments.length > 0) {
+			b.append(arguments[0]);
+			for (int i = 1; i < arguments.length; i ++ ) {
+				b.append(", ").append(arguments[i]);
+			}
+		}
+		b.append(") --> <");
+		if (results.length > 0) {
+			b.append(results[0]);
+			for (int i = 1; i < results.length; i ++ ) {
+				b.append(", ").append(results[i]);
+			}
+		}
+		return b.append('>').toString();
 	}
 	
 }

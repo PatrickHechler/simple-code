@@ -25,8 +25,8 @@ public class SimpleVariable implements SimpleExportable {
 	 *       (note that if this is a array or struct only a pointer is in reg)
 	 * @formatter:on
 	 */
-	public long    addr      = -1L;
-	public int     reg       = -1;
+	public long addr = -1L;
+	public int  reg  = -1;
 	
 	public final SimpleType type;
 	public final String     name;
@@ -48,6 +48,13 @@ public class SimpleVariable implements SimpleExportable {
 		build.append(Long.toHexString(addr)).append(E_NAME_START).append(name).append(E_VAR_START_TYPE);
 		type.appendToExportStr(build, new HashSet <>());
 		return build.toString();
+	}
+	
+	@Override
+	public String toString() {
+		StringBuilder b = new StringBuilder();
+		b.append(type).append(' ').append(name);
+		return b.toString();
 	}
 	
 }

@@ -68,4 +68,14 @@ public class SimpleTypeArray extends SimpleTypePointer {
 		target.appendToExportStr(build, exportedStructs);
 	}
 	
+	@Override
+	public String toString() {
+		StringBuilder b = new StringBuilder();
+		b.append(target).append('[');
+		if (elementCount != -1) {
+			b.append(elementCount);
+		}
+		return b.append(']').toString();
+	}
+	
 }

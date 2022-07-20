@@ -18,9 +18,12 @@ public class SimpleCommandFuncCall implements SimpleCommand {
 	}
 	
 	public static SimpleCommandFuncCall create(SimplePool pool, String fn, String sn, SimpleValue val) {
+		if ( !val.type().isFunc()) {
+			throw new IllegalArgumentException("a function call needs a function structure as argument! (arg-type: " + val.type() + " arg: '" + val + "')");
+		}
 		return new SimpleCommandFuncCall(pool, fn, sn, val);
 	}
-
+	
 	@Override
 	public SimplePool pool() {
 		return pool;
