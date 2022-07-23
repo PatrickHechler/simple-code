@@ -6,8 +6,10 @@
 	#DEP_LOAD_ERR_MSG_POS -1
 	#OUT_OF_MEM_ERR_MSG_POS -1
 	#START_ERR_MSG_POS -1
+	#ILLEGAL_MEM_ERR_MSG_POS -1
+	#ILLEGAL_MEM_ERR_MSG_LEN -1
 ~ELSE
-	#READ_SYM "[THIS]" #ADD~ME >
+	~READ_SYM "[THIS]" #ADD~ME 1 >
 ~ENDIF
 	|> save X00, X01 in X10, X11
 		MOV X10, X00
@@ -23,15 +25,15 @@
 		MOV SP, X00
 	@skipStackInit
 	|> make stack grow-able
-		#OFF ( INT_ERROR_ILLEGAL_MEMORY * 8 )
+		#OFF ( INT_ERRORS_ILLEGAL_MEMORY * 8 )
 		#REL_POS ( ILLEGAL_MEM_POS - --POS-- )
 		LEA [INTP + OFF], REL_POS
 		#OFF ~DEL
 		#REL_POS ~DEL
-	|> resize interrupt table
 		#EXP~INT_OUT_OF_MEM_ERR ( INTERRUPT_COUNT )
 		#EXP~INT_DEP_LOAD_ERR ( INT_OUT_OF_MEM_ERR + 1 )
 		#EXP~INTERRUPT_COUNT ( INT_DEP_LOAD_ERR + 1 )
+	|> resize interrupt table
 		#LEN ( INTERRUPT_COUNT * 8 )
 		MOV X00, INTP
 		MOV X01, LEN
@@ -79,10 +81,13 @@
 		JMPEQ stackOverflow
 		CMP X00, CALL_CMD
 		JMPEQ stackOverflow
-		#OFF ( INT_ERROR_ILLEGAL_MEMORY * 8 )
-		MOV [INTP + OFF], -1
-		INT INT_ERROR_ILLEGAL_MEMORY
-		#OFF ~DEL
+	|> @illegalMemory
+		#REL_POS ( ILLEGAL_MEM_ERR_MSG_POS - --POS-- )
+		LEA X12, REL_POS
+		#REL_POS ~DEL
+		MOV X11, ILLEGAL_MEM_ERR_MSG_LEN
+		MOV X10, 9
+		JMP fail
 	@stackOverflow
 		MOV X00, SP
 		#REL_POS ( STACK_SIZE_POS - --POS-- )
@@ -103,32 +108,66 @@
 ~IF #~ME
 	#EXP~DEP_LOAD_ERR_POS --POS--
 ~ENDIF
-|> TODO: write error msg
-	MOV X00, 6
-	INT INT_EXIT
+	#REL_POS ( DEP_LOAD_ERR_MSG_POS - --POS-- )
+	LEA X12, REL_POS
+	#REL_POS ~DEL
+	MOV X11, DEP_LOAD_ERR_MSG_LEN
+	MOV X10, 9
+	JMP fail
 ~IF #~ME
 	#EXP~OUT_OF_MEM_ERR_POS --POS--
 ~ENDIF
 @outOfMem
-|> TODO: write error msg
-	MOV X00, 5
-	INT INT_EXIT
+	#REL_POS ( OUT_OF_MEM_ERR_MSG_POS - --POS-- )
+	LEA X12, REL_POS
+	#REL_POS ~DEL
+	MOV X11, OUT_OF_MEM_ERR_MSG_LEN
+	MOV X10, 8
+	JMP fail
 @startError
-|> TODO: write error msg
-	MOV X00, 4
+	#REL_POS ( OUT_OF_MEM_ERR_MSG_POS - --POS-- )
+	LEA X12, REL_POS
+	#REL_POS ~DEL
+	MOV X11, OUT_OF_MEM_ERR_MSG_LEN
+	MOV X10, 4
+|>	JMP fail
+@fail
+	MOV X00, STD_LOG
+	MOV X01, X11
+	MOV X02, X12
+	INT INT_STREAMS_WRITE
+	MOV X00, X10
 	INT INT_EXIT
 |> error messages:
 ~IF #~ME
 	#EXP~DEP_LOAD_ERR_MSG_POS --POS--
 ~ENDIF
-: 'UTF-16LE' "error while loading a dependency!\0" >
+: CHARS 'UTF-16LE' "[ERROR]: a dependency could not be loaded!" >
+~IF #~ME
+	#EXP~DEP_LOAD_ERR_MSG_LEN ( --POS-- - DEP_LOAD_ERR_MSG_POS )
+~ENDIF
 : > |> align
 ~IF #~ME
 	#EXP~OUT_OF_MEM_ERR_MSG_POS --POS--
 ~ENDIF
-: 'UTF-16LE' "I went out of memory (stack overflow?)!\0" >
+: CHARS 'UTF-16LE' "[ERROR]: I went out of memory (stack overflow?)!" >
+~IF #~ME
+	#EXP~OUT_OF_MEM_ERR_MSG_LEN ( --POS-- - OUT_OF_MEM_ERR_MSG_POS )
+~ENDIF
 : > |> align
 ~IF #~ME
 	#EXP~START_ERR_MSG_POS --POS--
 ~ENDIF
-: 'UTF-16LE' "failed to initialize the program!\0" >
+: CHARS 'UTF-16LE' "[ERROR]: failed to initialize the program!" >
+~IF #~ME
+	#EXP~START_ERR_MSG_LEN ( --POS-- - START_ERR_MSG_POS )
+~ENDIF
+: > |> align
+~IF #~ME
+	#EXP~ILLEGAL_MEM_ERR_MSG_POS --POS--
+~ENDIF
+: CHARS 'UTF-16LE' "[ERROR]: illegal memory access!" >
+~IF #~ME
+	#EXP~ILLEGAL_MEM_ERR_MSG_LEN ( --POS-- - ILLEGAL_MEM_ERR_MSG_POS )
+~ENDIF
+: > |> align at the end
