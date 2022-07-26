@@ -175,7 +175,6 @@ public class SimpleCompiler {
 	private static final long MY_INT_DEP_LOAD_ERROR   = MY_INT_OUT_OF_MEM_ERROR + 1L;
 	private static final long MY_INT_CNT              = MY_INT_DEP_LOAD_ERROR + 1L;
 	
-	// TODO make these files
 	private static final String MY_EXPORT_FILE                      = "/de/hechler/patrick/codesprachen/simple/compile/mySymbols.psf";
 	private static final String EXECUTABLE_START_FILE               = "/de/hechler/patrick/codesprachen/simple/compile/executableStart.pmc";
 	private static final String MAIN_ADDRESS_EXPORT_SYMBOL          = "MAIN_ADDRESS";
@@ -221,8 +220,8 @@ public class SimpleCompiler {
 	
 	private void fillData(CompileTarget target) throws IOException {
 		assert target.pos == target.binary.length(NO_LOCK);
-		target.outOfMemErrorAddr = target.pos;
 		try (OutputStream out = target.binary.openOutput(true, NO_LOCK)) {
+			target.outOfMemErrorAddr = target.pos;
 			PrimitiveAssembler asm = new PrimitiveAssembler(out, null, new Path[0], true, false);
 			Command outOfMem = new Command(Commands.CMD_INT, build(A_NUM, MY_INT_OUT_OF_MEM_ERROR), null);
 			Command mov1 = new Command(Commands.CMD_MOV, build(A_SR, X00), build(A_NUM, 1L));
@@ -710,7 +709,6 @@ public class SimpleCompiler {
 		
 		private volatile SimpleFile file;
 		
-		// TODO make those two
 		private long   outOfMemErrorAddr       = -1L;
 		private long   dependencyLoadErrorAddr = -1L;
 		private long   pos                     = -1L;

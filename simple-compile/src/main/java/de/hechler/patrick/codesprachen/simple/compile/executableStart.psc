@@ -1,5 +1,20 @@
-|> the start of an simple file with executable function
+|:
+|   the start of an simple file with executable function
+|   
+|   this file exports the following symbols:
+|       INT_OUT_OF_MEM_ERR
+|           the interrupt number of the out of memory error interrupt
+|       INT_DEP_LOAD_ERR
+|           the interrupt number of the dependency load error interrupt
+|       INTERRUPT_COUNT
+|           the interrupt count which includes the self defined interrupts by this start
+|       MAIN_ADDRESS
+|           the position where the (relative) main address should be written
+|       MAIN_ADDRESS_REL_POS
+|           the position from where the main address should be relativized
+|>
 ~IF #~ME
+    |> set the self import constants to any value
 	#ILLEGAL_MEM_POS -1
 	#DEP_LOAD_ERR_POS -1
 	#OUT_OF_MEM_ERR_POS -1
