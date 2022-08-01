@@ -26,18 +26,27 @@ import de.hechler.patrick.pfs.interfaces.PatrFolder;
 
 public class MultiCompiler {
 	
-	private static final Charset DEFAULT_CHARSET       = StandardCharsets.UTF_8;
-	private static final boolean DEFAULT_FORCE         = false;
+	public static final String SIMPLE_SOURCE_CODE_END    = "s";
+	public static final String PRIMITIVE_SOURCE_CODE_END = "psc";
+	public static final String SIMPLE_SYMBOL_FILE_END    = "sf";
+	public static final String PRIMITIVE_SYMBOL_FILE_END = "psf";
+	public static final String SIMPLE_SOURCE_CODE        = "." + SIMPLE_SOURCE_CODE_END;
+	public static final String PRIMITIVE_SOURCE_CODE     = "." + PRIMITIVE_SOURCE_CODE_END;
+	public static final String SIMPLE_SYMBOL_FILE        = "." + SIMPLE_SYMBOL_FILE_END;
+	public static final String PRIMITIVE_SYMBOL_FILE     = "." + PRIMITIVE_SYMBOL_FILE_END;
+	
+	private static final Charset DEFAULT_CHARSET = StandardCharsets.UTF_8;
+	private static final boolean DEFAULT_FORCE   = false;
 	
 	private static final Function <Path, FileType> DEFAULT_FILE_MODES = p -> {
 		String name = p.getFileName().toString();
 		switch (name.substring(name.lastIndexOf('.') + 1)) {
-		case "psc": // primitive source code
+		case PRIMITIVE_SOURCE_CODE_END:
 			return FileType.primitiveCode;
-		case "sc": // simple code
+		case SIMPLE_SOURCE_CODE_END:
 			return FileType.simpleCode;
-		case "psf": // primitive symbol file
-		case "ssf": // simple symbol file
+		case PRIMITIVE_SYMBOL_FILE_END:
+		case SIMPLE_SYMBOL_FILE_END:
 			return FileType.ignore;
 		default:
 			return FileType.copy;
@@ -161,10 +170,10 @@ public class MultiCompiler {
 		String name = currentFile.getFileName().toString();
 		int lastDot = name.lastIndexOf('.');
 		String end = name.substring(lastDot, name.length());
-		if (end.equals(simpleCode ? ".sc" : ".psc")) {
+		if (end.equals(simpleCode ? SIMPLE_SOURCE_CODE : PRIMITIVE_SOURCE_CODE)) {
 			name = name.substring(0, lastDot);
 		}
-		Path result = currentFile.resolveSibling(name + (simpleCode ? ".ssf" : ".psf"));
+		Path result = currentFile.resolveSibling(name + (simpleCode ? SIMPLE_SYMBOL_FILE : PRIMITIVE_SYMBOL_FILE));
 		if ( !force && Files.exists(result)) {
 			return null;
 		}

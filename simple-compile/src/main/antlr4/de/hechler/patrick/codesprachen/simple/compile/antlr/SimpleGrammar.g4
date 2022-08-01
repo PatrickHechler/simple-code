@@ -67,7 +67,7 @@ simpleFile [SimpleFile file]:
 		{file.addDependency($dependency.name, $dependency.depend);}
 		|
 		variable [file]
-		{file.addVariable($variable.vari, $variable.export);}
+		{file.addVariable($variable.vari);}
 		|
 		structure [file]
 		{file.addStructure($structure.struct);}
@@ -85,15 +85,15 @@ dependency returns [String name, String depend]:
 		$depend = string($STRING.getText());
 	}
 ;
-variable [SimplePool pool] returns [SimpleVariable vari, boolean export]:
-	{$export = false;}
+variable [SimplePool pool] returns [SimpleVariable vari]:
+	{boolean export = false;}
 	VAR
 	(
 		EXP
-		{$export = true;}
+		{export = true;}
 	)?
 	type [pool] NAME SEMI
-	{$vari = new SimpleVariable($type.t, $NAME.getText());}
+	{$vari = new SimpleVariable($type.t, $NAME.getText(), export);}
 ;
 structure [SimplePool pool] returns [SimpleStructType struct]:
 	STRUCT NAME OPEN_CODE_BLOCK
@@ -454,10 +454,10 @@ namedTypeList [SimplePool pool] returns [List<SimpleVariable> list]:
 	{$list = new ArrayList<>();}
 	(
 		ft = type [pool] fn =  NAME
-		{$list.add(new SimpleVariable($ft.t, $fn.getText()));}
+		{$list.add(new SimpleVariable($ft.t, $fn.getText(), false));}
 		(
 			COMMA ots = type [pool] ons = NAME
-			{$list.add(new SimpleVariable($ots.t, $ons.getText()));}
+			{$list.add(new SimpleVariable($ots.t, $ons.getText(), false));}
 		)*
 	)?
 ;

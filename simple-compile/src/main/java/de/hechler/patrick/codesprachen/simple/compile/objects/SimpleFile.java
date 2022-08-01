@@ -1,9 +1,5 @@
 package de.hechler.patrick.codesprachen.simple.compile.objects;
 
-import java.io.IOException;
-import java.nio.charset.Charset;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -13,6 +9,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.function.BiFunction;
 
 import de.hechler.patrick.codesprachen.simple.compile.interfaces.SimpleExportable;
 import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommand;
@@ -21,6 +18,7 @@ import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCom
 import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleFuncType;
 import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleStructType;
 import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleType;
+import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleTypePointer;
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleStringValue;
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleValue;
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleValueDataPointer;
@@ -28,19 +26,17 @@ import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleVaria
 
 public class SimpleFile implements SimplePool {
 	
-	private final Path[]                         lockups;
-	private final Charset                        cs;
-	private final Map <String, SimpleDependency> dependencies = new HashMap <>();
-	private final Map <String, SimpleVariable>   vars         = new LinkedHashMap <>();
-	private final Map <String, SimpleStructType> structs      = new HashMap <>();
-	private final Map <String, SimpleFunction>   funcs        = new LinkedHashMap <>();
-	private final List <SimpleValueDataPointer>  datas        = new ArrayList <>();
-	private final List <SimpleExportable>        exports      = new ArrayList <>();
-	private SimpleFunction                       main         = null;
+	private final BiFunction <String, String, SimpleDependency> dependencyProvider;
+	private final Map <String, SimpleDependency>                dependencies = new HashMap <>();
+	private final Map <String, SimpleVariable>                  vars         = new LinkedHashMap <>();
+	private final Map <String, SimpleStructType>                structs      = new HashMap <>();
+	private final Map <String, SimpleFunction>                  funcs        = new LinkedHashMap <>();
+	private final List <SimpleValueDataPointer>                 datas        = new ArrayList <>();
+	private final List <SimpleExportable>                       exports      = new ArrayList <>();
+	private SimpleFunction                                      main         = null;
 	
-	public SimpleFile(Path[] lockups, Charset cs) {
-		this.lockups = lockups;
-		this.cs = cs;
+	public SimpleFile(BiFunction <String, String, SimpleDependency> dependencyProvider) {
+		this.dependencyProvider = dependencyProvider;
 	}
 	
 	private void checkName(String name) {
@@ -54,49 +50,13 @@ public class SimpleFile implements SimplePool {
 	
 	public void addDependency(String name, String depend) {
 		checkName(name);
-		dependencies.put(name, new SimpleDependency(depend));
-		int index = depend.lastIndexOf('.');
-		if (index <= depend.lastIndexOf('/')) {
-			throw new IllegalStateException("illegal dependency! (dependency: '" + depend + "')");
-		}
-		for (Path p : lockups) {
-			Path resolved = p.resolve(depend);
-			if ( !Files.exists(resolved)) {
-				continue;
-			}
-			try {
-				List <String> lines = Files.readAllLines(resolved, cs);
-				Map <String, SimpleExportable> imps = readExports(lines);
-				dependencies.put(depend, new SimpleDependency(name, depend, imps));
-				return;
-			} catch (IOException e) {
-				throw new RuntimeException(e.toString(), e);
-			}
-		}
-		throw new IllegalArgumentException("dependency could not be found! (dependnecy: '" + depend + "', lockups: " + Arrays.toString(lockups) + ")");
+		dependencies.put(name, dependencyProvider.apply(name, depend));
 	}
 	
-	private Map <String, SimpleExportable> readExports(List <String> exps) {
-		Map <String, SimpleExportable> imports = new HashMap <>();
-		for (int i = 0; i < exps.size(); i ++ ) {
-			SimpleExportable imp = SimpleExportable.fromExport(exps.get(i));
-			if (imp instanceof SimpleFunction) {
-				SimpleFunction sf = (SimpleFunction) imp;
-				SimpleExportable old = imports.put(sf.name, sf);
-				if (old != null) {
-					throw new IllegalStateException("a export was doubled: old: " + old + " new: " + sf);
-				}
-			} else {
-				throw new InternalError("the SimpleExportable which has been read has an unkown type: " + imp.getClass().getName() + " ('" + imp + "')");
-			}
-		}
-		return imports;
-	}
-	
-	public void addVariable(SimpleVariable vari, boolean export) {
+	public void addVariable(SimpleVariable vari) {
 		checkName(vari.name);
 		vars.put(vari.name, vari);
-		if (export) {
+		if (vari.export) {
 			this.exports.add(vari);
 		}
 	}
@@ -109,17 +69,24 @@ public class SimpleFile implements SimplePool {
 		}
 	}
 	
+	private static final SimpleFuncType MAIN_TYPE = new SimpleFuncType(
+		Arrays.asList(new SimpleVariable(SimpleType.NUM, "argc", false), new SimpleVariable(new SimpleTypePointer(new SimpleTypePointer(SimpleType.UWORD)), "argv", false)),
+		Arrays.asList(new SimpleVariable(SimpleType.NUM, "exitnum", false)));
+	
 	public void addFunction(SimpleFunction func) {
 		checkName(func.name);
-		SimpleFunction old = funcs.put(func.name, func);
-		if (old != null) {
-			throw new IllegalStateException("function already exist: name: " + func.name);
-		}
 		if (func.main) {
 			if (this.main != null) {
 				throw new IllegalStateException("there is already a main function!");
 			}
+			if ( !MAIN_TYPE.equals(func.type)) {
+				throw new IllegalStateException("the main function needs to have a head like this: '" + MAIN_TYPE + "'! (main: '" + func + "')");
+			}
 			this.main = func;
+		}
+		SimpleFunction old = funcs.put(func.name, func);
+		if (old != null) {
+			throw new IllegalStateException("function already exist: name: " + func.name);
 		}
 		if (func.export) {
 			this.exports.add(func);
@@ -157,6 +124,10 @@ public class SimpleFile implements SimplePool {
 		}
 	}
 	
+	public Collection <SimpleVariable> vars() {
+		return vars.values();
+	}
+	
 	@Override
 	public void registerDataValue(SimpleValueDataPointer dataVal) {
 		this.datas.add(dataVal);
@@ -191,6 +162,20 @@ public class SimpleFile implements SimplePool {
 			throw new NoSuchElementException("there is no function with the name '" + name + "'");
 		}
 		return func;
+	}
+	
+	public SimpleExportable getExport(String name) {
+		SimpleExportable se = funcs.get(name);
+		if (se == null) {
+			se = vars.get(name);
+			if (se == null) {
+				throw new NoSuchElementException("there is no export with the name '" + name + "'");
+			}
+		}
+		if ( !se.isExport()) {
+			throw new NoSuchElementException("there is no export with the name '" + name + "' (the needed export is NOT declared as export)");
+		}
+		return se;
 	}
 	
 	public class SimpleFuncPool implements SimplePool {
@@ -323,33 +308,42 @@ public class SimpleFile implements SimplePool {
 		throw new InternalError("this method should be only called on sub pools not on the file pool!");
 	}
 	
-	public static final SimpleType DEPENDENCY_TYPE = new SimpleStructType("--DEPENDENCY--", Collections.emptyList());
-	
-	public static class SimpleDependency extends SimpleVariable {
+	public static final SimpleType DEPENDENCY_TYPE = new SimpleStructType("--DEPENDENCY--", Collections.emptyList()) {
 		
-		public final SimpleValueDataPointer         path;
-		public final String                         depend;
-		public final Map <String, SimpleExportable> imps;
+		public boolean isStruct() {
+			return false;
+		};
 		
-		public SimpleDependency(String depend) {
-			super(DEPENDENCY_TYPE, "");
-			this.path = null;
-			this.depend = depend;
-			this.imps = null;
+		@Override
+		public int hashCode() {
+			return "--DEPENDENCY--".hashCode();
 		}
 		
-		public SimpleDependency(String name, String depend, Map <String, SimpleExportable> imps) {
-			super(DEPENDENCY_TYPE, name);
+		@Override
+		public boolean equals(Object obj) {
+			return this == obj;
+		}
+		
+	};
+	
+	public static abstract class SimpleDependency extends SimpleVariable {
+		
+		public final SimpleValueDataPointer path;
+		public final String                 depend;
+		
+		public SimpleDependency(String name, String depend) {
+			super(DEPENDENCY_TYPE, name, false);
 			this.path = new SimpleStringValue(normalize(depend));
 			this.depend = depend;
-			this.imps = Collections.unmodifiableMap(imps);
 		}
+		
+		
+		public abstract SimpleExportable get(String name);
 		
 		private static final List <String> normalize(String depend) {
 			String[] segs = depend.replace('\\', '/').split("\\/");
 			int len, start, i;
-			for (start = 0; start < segs.length && segs[start].isEmpty(); start ++ )
-				;
+			for (start = 0; start < segs.length && segs[start].isEmpty(); start ++ );
 			for (i = start, len = segs.length; i < len;) {
 				switch (segs[i]) {
 				case ".":

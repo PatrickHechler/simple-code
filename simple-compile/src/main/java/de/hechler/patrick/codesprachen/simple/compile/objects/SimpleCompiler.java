@@ -27,11 +27,10 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.ListIterator;
 import java.util.Map;
-import java.util.Queue;
+import java.util.NoSuchElementException;
 import java.util.Scanner;
-import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.function.BiFunction;
 
 import org.antlr.v4.runtime.ANTLRInputStream;
 import org.antlr.v4.runtime.CommonTokenStream;
@@ -64,7 +63,7 @@ import de.hechler.patrick.pfs.exception.ElementLockedException;
 import de.hechler.patrick.pfs.interfaces.PatrFile;
 import de.hechler.patrick.pfs.utils.PatrFileSysConstants;
 
-public class SimpleCompiler {
+public class SimpleCompiler implements BiFunction <String, String, SimpleDependency> {
 	
 	private static final long NO_LOCK = PatrFileSysConstants.NO_LOCK;
 	
@@ -73,86 +72,36 @@ public class SimpleCompiler {
 	private final Charset cs;
 	
 	private final Map <String, CompileTarget> targets = new HashMap <>();
-	private final Queue <CompileTarget>       prework = new ConcurrentLinkedQueue <>();
-	
-	private volatile boolean working;
-	private volatile boolean stop;
 	
 	public SimpleCompiler(Path srcRoot, Path[] lockups, Charset cs) {
-		this.srcRoot = srcRoot.normalize();
+		this.srcRoot = srcRoot.toAbsolutePath().normalize();
 		this.lockups = new Path[lockups.length];
 		for (int i = 0; i < lockups.length; i ++ ) {
-			this.lockups[i] = lockups[i].normalize();
+			this.lockups[i] = lockups[i].toAbsolutePath().normalize();
 		}
 		this.cs = cs;
 	}
 	
 	public synchronized void addFile(PatrFile outFile, Path currentFile, Path exports, boolean neverExecutable) {
-		assert !stop;
 		CompileTarget target = new CompileTarget(currentFile, exports, outFile, neverExecutable);
-		String relPath = srcRoot.relativize(currentFile.normalize()).toString();
+		String relPath = srcRoot.relativize(currentFile.toAbsolutePath().normalize()).toString();
 		CompileTarget old = targets.put(relPath, target);
-		prework.add(target);
-		if ( !working) {
-			working = true;
-			Thread worker = new Thread(() -> {
-				try {
-					precompileQueue();
-				} finally {
-					working = false;
-					synchronized (SimpleCompiler.this) {
-						notify();
-					}
-				}
-			}, "simple precompiler");
-			worker.setPriority(Math.min(worker.getPriority() + 2, Thread.MAX_PRIORITY));
-			worker.start();
-		}
 		assert old == null;
 	}
 	
-	private void precompileQueue() {
-		while (true) {
-			CompileTarget pc = prework.poll();
-			if (pc == null)
-				return;
-			try {
-				try (Reader r = Files.newBufferedReader(pc.source, cs)) {
-					ANTLRInputStream in = new ANTLRInputStream();
-					in.load(r, 1024, 1024);
-					SimpleGrammarLexer lexer = new SimpleGrammarLexer(in);
-					CommonTokenStream toks = new CommonTokenStream(lexer);
-					SimpleGrammarParser parser = new SimpleGrammarParser(toks);
-					pc.file = new SimpleFile(lockups, cs);
-					parser.simpleFile(pc.file);
-				}
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-		}
-	}
-	
 	public void compile() {
-		synchronized (this) {
-			stop = true;
-			while (working) {
-				try {
-					wait(1000L);
-				} catch (InterruptedException e) {
-					System.err.println("unexpected interrupt!");
-					e.printStackTrace();
-				}
-			}
-		}
-		precompileQueue();
 		try {
 			targets.values().iterator().next().binary.withLock(() -> {
+				precompileQueue();
+				// ensures that all variables have an address (even those from source dependencies)
+				for (CompileTarget target : targets.values()) {
+					makeFileStart(target);
+				}
 				for (CompileTarget target : targets.values()) {
 					compile(target);
 				}
 				// compile all before link and assemble
 				for (CompileTarget target : targets.values()) {
-					link(target);
 					assemble(target);
 				}
 			});
@@ -161,9 +110,108 @@ public class SimpleCompiler {
 		}
 	}
 	
+	private void precompileQueue() {
+		for (CompileTarget pc : targets.values()) {
+			try {
+				try (Reader r = Files.newBufferedReader(pc.source, cs)) {
+					ANTLRInputStream in = new ANTLRInputStream();
+					in.load(r, 1024, 1024);
+					SimpleGrammarLexer lexer = new SimpleGrammarLexer(in);
+					CommonTokenStream toks = new CommonTokenStream(lexer);
+					SimpleGrammarParser parser = new SimpleGrammarParser(toks);
+					pc.file = new SimpleFile(this);
+					parser.simpleFile(pc.file);
+				}
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+	}
+	
+	public SimpleDependency apply(String name, String depend) {
+		switch (depend.substring(depend.lastIndexOf('.') + 1)) {
+		case MultiCompiler.SIMPLE_SOURCE_CODE_END:
+			CompileTarget dep = targets.get(depend);
+			if (dep == null) {
+				dep = targets.get(srcRoot.relativize(srcRoot.getFileSystem().getPath(depend).normalize()).toString());
+				if (dep == null) {
+					throw new IllegalArgumentException("dependency could not be found! (dependnecy: '" + depend + "'");
+				}
+			}
+			final SimpleFile file = dep.file;
+			return new SimpleDependency(name, depend) {
+				
+				@Override
+				public SimpleExportable get(String name) {
+					return file.getExport(name);
+				}
+				
+			};
+		case MultiCompiler.SIMPLE_SYMBOL_FILE_END:
+		default:
+			return exportedDependency(name, depend);
+		}
+	}
+	
+	private SimpleDependency exportedDependency(String name, String depend) {
+		for (Path p : lockups) {
+			Path resolved = p.resolve(depend);
+			if ( !Files.exists(resolved)) {
+				continue;
+			}
+			try {
+				List <String> lines = Files.readAllLines(resolved, cs);
+				Map <String, SimpleExportable> imps = readExports(lines);
+				return new SimpleDependency(name, depend) {
+					
+					@Override
+					public SimpleExportable get(String name) {
+						SimpleExportable se = imps.get(name);
+						if (se == null) {
+							throw new NoSuchElementException(name);
+						}
+						return se;
+					}
+					
+				};
+			} catch (IOException e) {
+				throw new RuntimeException(e.toString(), e);
+			}
+		}
+		throw new IllegalArgumentException("dependency could not be found! (dependnecy: '" + depend + "', lockups: " + Arrays.toString(lockups) + ")");
+	}
+	
+	private Map <String, SimpleExportable> readExports(List <String> exps) {
+		Map <String, SimpleExportable> imports = new HashMap <>();
+		for (int i = 0; i < exps.size(); i ++ ) {
+			SimpleExportable imp = SimpleExportable.fromExport(exps.get(i));
+			if (imp instanceof SimpleFunction) {
+				SimpleFunction sf = (SimpleFunction) imp;
+				SimpleExportable old = imports.put(sf.name, sf);
+				if (old != null) {
+					throw new IllegalStateException("a export was doubled: old: " + old + " new: " + sf);
+				}
+			} else {
+				throw new InternalError("the SimpleExportable which has been read has an unkown type: " + imp.getClass().getName() + " ('" + imp + "')");
+			}
+		}
+		return imports;
+	}
+	
 	private void assemble(CompileTarget target) throws IOException, ElementLockedException {
 		try (OutputStream out = target.binary.openOutput(true, NO_LOCK)) {
-			PrimitiveAssembler asm = new PrimitiveAssembler(out, null, lockups, true, false);
+			PrimitiveAssembler asm = new PrimitiveAssembler(out, null, lockups, true, false) {
+				
+				@Override
+				protected Command replaceUnknownCommand(Command cmd) throws InternalError {
+					if (cmd instanceof FuncCallCmd) {
+						return replaceDepCall(cmd);
+					} else {
+						return super.replaceUnknownCommand(cmd);
+					}
+				}
+				
+			};
 			Collection <SimpleFunction> funcs = target.file.functions();
 			Map <String, Long> funcAddrs = new HashMap <>();
 			for (SimpleFunction func : funcs) {
@@ -174,23 +222,7 @@ public class SimpleCompiler {
 		}
 	}
 	
-	private void link(CompileTarget target) {
-		for (SimpleFunction func : target.file.functions()) {
-			linkFunc(func);
-		}
-	}
-	
-	private void linkFunc(SimpleFunction func) {
-		for (ListIterator <Command> iter = func.cmds.listIterator(); iter.hasNext();) {
-			Command cmd = iter.next();
-			if (cmd instanceof FuncCallCmd) {
-				Command c = linkCALO(cmd);
-				iter.set(c);
-			}
-		}
-	}
-	
-	private Command linkCALO(Command cmd) {
+	private Command replaceDepCall(Command cmd) {
 		FuncCallCmd fcc = (FuncCallCmd) cmd;
 		assert fcc.func.address != -1L;
 		Param p1 = build(A_SR, REG_DEP_FUNC_DEPENDENCY_FILE_REGISTER);
@@ -199,21 +231,24 @@ public class SimpleCompiler {
 		return c;
 	}
 	
-	private void compile(CompileTarget target) throws IOException {
+	private void makeFileStart(CompileTarget target) throws IOException {
 		assert target.pos == -1L;
-		SimpleFunction main = null;
+		SimpleFunction main = target.file.mainFunction();
 		target.pos = 0L;
 		target.expout = Files.newBufferedWriter(target.exports, cs);
-		if ( !target.neverExe) {
-			main = target.file.mainFunction();
-			if (main != null) {
-				executableStart(target);
-				fillData(target);
-				correctMainAddress(target);
-				compileFunction(target, main);
-			}
+		if ( !target.neverExe && main != null) {
+			executableStart(target);
 		} else {
-			fillData(target);
+			main = null;
+		}
+		fillData(target);
+	}
+	
+	private void compile(CompileTarget target) throws IOException {
+		SimpleFunction main = target.file.mainFunction();
+		if (main != null) {
+			correctMainAddress(target);
+			compileFunction(target, main);
 		}
 		for (SimpleFunction sf : target.file.functions()) {
 			if (sf == main)
@@ -284,17 +319,33 @@ public class SimpleCompiler {
 			target.pos += depLoad.length() + exitLen;
 			asm.assemble(Arrays.asList(outOfMem, mov1, iex, depLoad, mov1, iex), Collections.emptyMap());
 		}
-		for (SimpleValueDataPointer dataVal : target.file.dataValues()) {
-			dataVal.addr = target.pos;
-			target.binary.appendContent(dataVal.data, 0, dataVal.data.length, NO_LOCK);
-			target.pos += dataVal.data.length;
-			if ( (target.pos & 7) != 0) {
-				byte[] bytes = new byte[(int) (8 - (target.pos & 7))];
-				target.binary.appendContent(bytes, 0, bytes.length, NO_LOCK);
-				target.pos += bytes.length;
+		assert (target.pos & 7) == 0;
+		byte[] zeros = new byte[8];
+		for (SimpleValueDataPointer dv : target.file.dataValues()) {
+			dv.addr = target.pos;
+			target.binary.appendContent(dv.data, 0, dv.data.length, NO_LOCK);
+			target.pos += dv.data.length;
+			align(target, zeros);
+		}
+		for (SimpleVariable sv : target.file.vars()) {
+			int len = sv.type.byteCount();
+			if (zeros.length < len) {
+				zeros = new byte[len];
 			}
+			sv.addr = target.pos;
+			target.binary.appendContent(zeros, 0, len, NO_LOCK);
+			target.pos += len;
+			align(target, zeros);
 		}
 		assert target.pos == target.binary.length(NO_LOCK);
+	}
+	
+	private void align(CompileTarget target, byte[] zeros) throws IOException, ElementLockedException {
+		if ( (target.pos & 7) != 0) {
+			int len = (int) (8 - (target.pos & 7));
+			target.binary.appendContent(zeros, 0, len, NO_LOCK);
+			target.pos += len;
+		}
 	}
 	
 	private void executableStart(CompileTarget target) throws IOException {
@@ -545,7 +596,7 @@ public class SimpleCompiler {
 			func = funcCallCmd.pool.getFunction(funcCallCmd.firstName);
 		} else {
 			SimpleDependency dep = funcCallCmd.pool.getDependency(funcCallCmd.firstName);
-			SimpleExportable se = dep.imps.get(funcCallCmd.secondName);
+			SimpleExportable se = dep.get(funcCallCmd.secondName);
 			if (se == null || ! (se instanceof SimpleFunction)) {
 				throw new IllegalStateException("function call needs a function! dependency: " + dep.path + " > '"
 					+ dep.depend + "' (not) function name: " + funcCallCmd.secondName + " > " + se);
@@ -583,7 +634,7 @@ public class SimpleCompiler {
 	
 	private void dependencyCall(CompileTarget target, SimpleFunction sf, SimpleCommandFuncCall funcCallCmd) {
 		SimpleDependency dep = funcCallCmd.pool.getDependency(funcCallCmd.firstName);
-		SimpleFunction func = (SimpleFunction) dep.imps.get(funcCallCmd.secondName);
+		SimpleFunction func = (SimpleFunction) dep.get(funcCallCmd.secondName);
 		Param p1, p2;
 		// load dependency
 		p1 = build(A_SR, REG_DEP_FUNC_DEPENDENCY_FILE_REGISTER);
@@ -756,8 +807,6 @@ public class SimpleCompiler {
 		return fallback;
 	}
 	
-	boolean alignMemory = true;
-	
 	private void count(UsedData used, boolean[] regs, SimpleCommandBlock body) {
 		final int startRegs = used.regs;
 		final long startAddr = used.currentaddr;
@@ -771,16 +820,7 @@ public class SimpleCompiler {
 					used.regs ++ ;
 				} else {
 					int bc = vd.type.byteCount();
-					if (alignMemory) {
-						int high = 8;
-						if (Integer.bitCount(bc) == 1) {
-							high = Math.max(8, bc);
-						}
-						int and = high - 1;
-						if ( (used.currentaddr & and) != 0) {
-							used.currentaddr += high - (used.currentaddr & and);
-						}
-					}
+					used.currentaddr = align(used.currentaddr, bc);
 					vd.addr = used.currentaddr;
 					used.currentaddr += bc;
 				}
@@ -794,6 +834,18 @@ public class SimpleCompiler {
 		}
 		used.regs = startRegs;
 		used.currentaddr = startAddr;
+	}
+	
+	private long align(long pos, int bc) {
+		int high = 8;
+		if (Integer.bitCount(bc) == 1 && bc < 8) {
+			high = bc;
+		}
+		int and = high - 1;
+		if ( (pos & and) != 0) {
+			pos += high - (pos & and);
+		}
+		return pos;
 	}
 	
 	private static class CompileTarget {

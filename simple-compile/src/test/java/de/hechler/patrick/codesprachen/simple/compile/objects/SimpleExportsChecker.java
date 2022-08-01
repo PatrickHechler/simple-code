@@ -4,14 +4,14 @@ import static de.hechler.patrick.zeugs.check.Assert.assertEquals;
 import static de.hechler.patrick.zeugs.check.Assert.assertInstanceOf;
 import static de.hechler.patrick.zeugs.check.Assert.assertNotNull;
 
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
+import java.util.function.BiFunction;
 
 import de.hechler.patrick.codesprachen.simple.compile.interfaces.SimpleExportable;
+import de.hechler.patrick.codesprachen.simple.compile.objects.SimpleFile.SimpleDependency;
 import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommandBlock;
 import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleFuncType;
 import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleStructType;
@@ -24,22 +24,24 @@ import de.hechler.patrick.zeugs.check.exceptions.CheckerException;
 
 @CheckClass
 public class SimpleExportsChecker {
-
+	
 	Random rnd;
-
+	
 	@Start
 	private void start() {
 		rnd = new Random(0x687A64L);
 	}
-
+	
 	@End
 	private void end() {
 		rnd = null;
 	}
-
+	
+	private static final BiFunction <String, String, SimpleDependency> NO_DEP_PROV = (n, d) -> { throw new UnsupportedOperationException(); };
+	
 	@Check
 	private void variable() {
-		SimpleFile file = new SimpleFile(new Path[0], StandardCharsets.UTF_8);
+		SimpleFile file = new SimpleFile(NO_DEP_PROV);
 		SimpleType t = SimpleType.NUM;
 		checkVar(file, t);
 		t = SimpleType.BYTE;
@@ -49,31 +51,31 @@ public class SimpleExportsChecker {
 		t = new SimpleStructType("struct_type2", Arrays.asList(sv(SimpleType.BYTE, "mem")));
 		checkVar(file, t);
 		t = new SimpleStructType("struct_type2",
-				Arrays.asList(sv(SimpleType.BYTE, "mem"), sv(SimpleType.DWORD, "mem2")));
+			Arrays.asList(sv(SimpleType.BYTE, "mem"), sv(SimpleType.DWORD, "mem2")));
 		checkVar(file, t);
 		t = new SimpleStructType("struct_type2", Arrays.asList(sv(SimpleType.BYTE, "mem"),
-				sv(new SimpleFuncType(Arrays.asList(), Arrays.asList()), "funcmem"), sv(SimpleType.DWORD, "mem2")));
+			sv(new SimpleFuncType(Arrays.asList(), Arrays.asList()), "funcmem"), sv(SimpleType.DWORD, "mem2")));
 		checkVar(file, t);
 		t = new SimpleStructType("struct_type2",
-				Arrays.asList(sv(SimpleType.BYTE, "mem"),
-						sv(new SimpleFuncType(Arrays.asList(sv(SimpleType.FPNUM, "fp")), Arrays.asList()), "funcmem"),
-						sv(SimpleType.DWORD, "mem2")));
+			Arrays.asList(sv(SimpleType.BYTE, "mem"),
+				sv(new SimpleFuncType(Arrays.asList(sv(SimpleType.FPNUM, "fp")), Arrays.asList()), "funcmem"),
+				sv(SimpleType.DWORD, "mem2")));
 		checkVar(file, t);
 		t = new SimpleStructType(
-				"struct_type2", Arrays
-						.asList(sv(SimpleType.BYTE, "mem"),
-								sv(new SimpleFuncType(Arrays.asList(sv(SimpleType.FPNUM, "fp")),
-										Arrays.asList(sv(SimpleType.DWORD, "dw"))), "funcmem"),
-								sv(SimpleType.DWORD, "mem2")));
+			"struct_type2", Arrays
+				.asList(sv(SimpleType.BYTE, "mem"),
+					sv(new SimpleFuncType(Arrays.asList(sv(SimpleType.FPNUM, "fp")),
+						Arrays.asList(sv(SimpleType.DWORD, "dw"))), "funcmem"),
+					sv(SimpleType.DWORD, "mem2")));
 		checkVar(file, t);
 		t = new SimpleStructType("struct_type2",
-				Arrays.asList(sv(SimpleType.BYTE, "mem"),
-						sv(new SimpleFuncType(Arrays.asList(sv(SimpleType.FPNUM, "fp"), sv(SimpleType.BYTE, "b")),
-								Arrays.asList(sv(SimpleType.DWORD, "dw"))), "funcmem"),
-						sv(SimpleType.DWORD, "mem2")));
+			Arrays.asList(sv(SimpleType.BYTE, "mem"),
+				sv(new SimpleFuncType(Arrays.asList(sv(SimpleType.FPNUM, "fp"), sv(SimpleType.BYTE, "b")),
+					Arrays.asList(sv(SimpleType.DWORD, "dw"))), "funcmem"),
+				sv(SimpleType.DWORD, "mem2")));
 		checkVar(file, t);
 	}
-
+	
 	private void checkVar(SimpleFile f, SimpleType t) {
 		SimpleVariable vari = sv(t, "var_name");
 		vari.addr = rnd.nextLong();
@@ -81,7 +83,7 @@ public class SimpleExportsChecker {
 		SimpleExportable impVar = SimpleExportable.fromExport(exportString);
 		assertVar(vari, impVar);
 	}
-
+	
 	private void assertVar(SimpleVariable sv, SimpleExportable impVar) {
 		assertInstanceOf(SimpleVariable.class, impVar);
 		SimpleVariable iv = (SimpleVariable) impVar;
@@ -89,12 +91,12 @@ public class SimpleExportsChecker {
 		assertEquals(sv.name, iv.name);
 		assertEquals(sv.type, iv.type);
 	}
-
+	
 	@Check
 	private void func() {
-		SimpleFile file = new SimpleFile(new Path[0], StandardCharsets.UTF_8);
-		List<SimpleVariable> l1 = Collections.emptyList();
-		List<SimpleVariable> l2 = Arrays.asList(sv(SimpleType.DWORD, "dword_arg"));
+		SimpleFile file = new SimpleFile(NO_DEP_PROV);
+		List <SimpleVariable> l1 = Collections.emptyList();
+		List <SimpleVariable> l2 = Arrays.asList(sv(SimpleType.DWORD, "dword_arg"));
 		checkFunction(file, l1, l2);
 		l1 = Collections.emptyList();
 		l2 = Arrays.asList(sv(SimpleType.DWORD, "dword_arg"), sv(SimpleType.FPNUM, "dword_arg2"));
@@ -104,36 +106,36 @@ public class SimpleExportsChecker {
 		checkFunction(file, l1, l2);
 		l1 = Arrays.asList(sv(SimpleType.BYTE, "byte_arg"), sv(SimpleType.WORD, "word_arg"));
 		l2 = Arrays.asList(sv(SimpleType.DWORD, "dword_arg"),
-				sv(new SimpleStructType("struct_name", Collections.emptyList()), "struct_arg"),
-				sv(SimpleType.FPNUM, "fpnum_arg2"));
+			sv(new SimpleStructType("struct_name", Collections.emptyList()), "struct_arg"),
+			sv(SimpleType.FPNUM, "fpnum_arg2"));
 		checkFunction(file, l1, l2);
 		l1 = Arrays.asList(sv(SimpleType.BYTE, "byte_arg"), sv(SimpleType.WORD, "word_arg"));
 		l2 = Arrays.asList(sv(SimpleType.DWORD, "dword_arg"),
-				sv(new SimpleStructType("struct_name", Arrays.asList(sv(SimpleType.BYTE, "byte_mem"))), "struct_arg2"),
-				sv(SimpleType.FPNUM, "fpnum_arg2"));
+			sv(new SimpleStructType("struct_name", Arrays.asList(sv(SimpleType.BYTE, "byte_mem"))), "struct_arg2"),
+			sv(SimpleType.FPNUM, "fpnum_arg2"));
 		checkFunction(file, l1, l2);
 		l1 = Arrays.asList(sv(SimpleType.BYTE, "byte_arg"), sv(SimpleType.WORD, "word_arg"));
 		l2 = Arrays.asList(sv(SimpleType.DWORD, "dword_arg"), sv(new SimpleStructType("struct_name", Arrays.asList(
-				sv(SimpleType.BYTE, "byte_mem"),
-				sv(new SimpleFuncType(Arrays.asList(sv(SimpleType.FPNUM, "fp_number")),
-						Arrays.asList(sv(SimpleType.NUM, "number"), sv(SimpleType.BYTE, "success"))), "func_mem"))),
-				"struct_arg2"), sv(SimpleType.FPNUM, "fpnum_arg2"));
+			sv(SimpleType.BYTE, "byte_mem"),
+			sv(new SimpleFuncType(Arrays.asList(sv(SimpleType.FPNUM, "fp_number")),
+				Arrays.asList(sv(SimpleType.NUM, "number"), sv(SimpleType.BYTE, "success"))), "func_mem"))),
+			"struct_arg2"), sv(SimpleType.FPNUM, "fpnum_arg2"));
 		checkFunction(file, l1, l2);
 		l1 = Arrays.asList(sv(SimpleType.BYTE, "byte_arg"), sv(SimpleType.WORD, "word_arg"));
 		l2 = Arrays.asList(sv(SimpleType.DWORD, "dword_arg"),
-				sv(new SimpleStructType("struct_name", Arrays.asList(sv(SimpleType.BYTE, "byte_mem"))), "struct_arg2"),
-				sv(new SimpleFuncType(Arrays.asList(sv(SimpleType.FPNUM, "fp_number")),
-						Arrays.asList(sv(SimpleType.NUM, "number"), sv(SimpleType.BYTE, "success"))), "func_mem"),
-				sv(SimpleType.FPNUM, "fpnum_arg2"));
+			sv(new SimpleStructType("struct_name", Arrays.asList(sv(SimpleType.BYTE, "byte_mem"))), "struct_arg2"),
+			sv(new SimpleFuncType(Arrays.asList(sv(SimpleType.FPNUM, "fp_number")),
+				Arrays.asList(sv(SimpleType.NUM, "number"), sv(SimpleType.BYTE, "success"))), "func_mem"),
+			sv(SimpleType.FPNUM, "fpnum_arg2"));
 		checkFunction(file, l1, l2);
 	}
-
+	
 	private SimpleVariable sv(SimpleType t, String n) {
-		return new SimpleVariable(t, n);
+		return new SimpleVariable(t, n, false);
 	}
-
-	private void checkFunction(SimpleFile file, List<SimpleVariable> l1, List<SimpleVariable> l2)
-			throws CheckerException {
+	
+	private void checkFunction(SimpleFile file, List <SimpleVariable> l1, List <SimpleVariable> l2)
+		throws CheckerException {
 		SimpleFunction f = new SimpleFunction(true, false, "func_name0", l1, l1, emptyBlock(file, l1, l1));
 		f.address = 0x9BA847F75C10D719L;
 		String exportString = f.toExportString();
@@ -156,7 +158,7 @@ public class SimpleExportsChecker {
 		impfunc = SimpleExportable.fromExport(exportString);
 		assertFunc(f, impfunc);
 	}
-
+	
 	private void assertFunc(SimpleFunction f, SimpleExportable impfunc) throws CheckerException {
 		assertInstanceOf(SimpleFunction.class, impfunc);
 		SimpleFunction impf = (SimpleFunction) impfunc;
@@ -167,9 +169,9 @@ public class SimpleExportsChecker {
 		assertNotNull(impf.type.arguments);
 		assertNotNull(impf.type.results);
 	}
-
-	private SimpleCommandBlock emptyBlock(SimpleFile file, List<SimpleVariable> args, List<SimpleVariable> res) {
+	
+	private SimpleCommandBlock emptyBlock(SimpleFile file, List <SimpleVariable> args, List <SimpleVariable> res) {
 		return new SimpleCommandBlock(file.newFuncPool(args, res), Collections.emptyList());
 	}
-
+	
 }

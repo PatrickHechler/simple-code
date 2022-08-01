@@ -40,6 +40,11 @@ public class SimpleFunction implements SimpleExportable {
 	}
 	
 	@Override
+	public boolean isExport() {
+		return export;
+	}
+	
+	@Override
 	public String toExportString() {
 		if (address == -1L) {
 			throw new IllegalStateException("address is not initilized!");

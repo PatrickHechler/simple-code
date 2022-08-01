@@ -45,6 +45,8 @@ public interface SimpleExportable {
 	static final char E_T_UBYTE  = 'B';
 	static final char E_T_BYTE   = 'b';
 	
+	boolean isExport();
+	
 	String toExportString();
 	
 	public static SimpleExportable fromExport(String str) {
@@ -128,7 +130,7 @@ public interface SimpleExportable {
 		for (int i = 0; i < vars.length; i ++ ) {
 			SimpleType finished = finish(vars[i].type, structures);
 			if (finished != vars[i].type) {
-				vars[i] = new SimpleVariable(finished, vars[i].name);
+				vars[i] = new SimpleVariable(finished, vars[i].name, false);
 			}
 		}
 	}
@@ -259,7 +261,7 @@ public interface SimpleExportable {
 		default:
 			throw new IllegalArgumentException("this is not an exported string! (str: '" + new String(chars) + "') unknown type char: '" + chars[i - 1] + "'");
 		}
-		list.add(new SimpleVariable(type, name));
+		list.add(new SimpleVariable(type, name, false));
 		return i;
 	}
 	

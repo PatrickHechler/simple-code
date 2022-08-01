@@ -11,7 +11,7 @@ public class SimpleCommandVarDecl extends SimpleVariable implements SimpleComman
 	public SimpleValue      init = null;
 	
 	public SimpleCommandVarDecl(SimplePool pool, SimpleType type, String name) {
-		super(type, name);
+		super(type, name, false);
 		this.pool = pool;
 	}
 	

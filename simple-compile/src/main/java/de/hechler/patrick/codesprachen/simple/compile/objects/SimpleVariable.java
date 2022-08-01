@@ -30,16 +30,24 @@ public class SimpleVariable implements SimpleExportable {
 	
 	public final SimpleType type;
 	public final String     name;
+	public final boolean    export;
 	
-	public SimpleVariable(SimpleType type, String name) {
+	public SimpleVariable(SimpleType type, String name, boolean export) {
 		this.type = type;
 		this.name = name;
+		this.export = export;
 	}
 	
 	public SimpleVariable(long addr, SimpleType type, String name) {
 		this.addr = addr;
 		this.type = type;
+		this.export = true;
 		this.name = name;
+	}
+	
+	@Override
+	public boolean isExport() {
+		return export;
 	}
 	
 	@Override

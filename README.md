@@ -9,10 +9,17 @@ simple-code is a simple programming language.
 
 ### dependency
 
-`dep [NAME] [STRING] ;`
-* the STRING is the path relative from a included source directory
+`dep [NAME] [STRING] ( [STRING] )? ;`
+* the first STRING is the path relative from a included source directory
+* the second optional STRING is the path of the binary used at runtime
+    * if not set it will be the same extracted from the first STRING
+        * if the first STRING ends with `.sf` or `.s` the end will be discarded
 * file type:
-    * the DEPENDENCY is always treated as simple-export-file
+    * the DEPENDENCY is treated as simple-source-code-file when it ends with `.s`
+        * note that if the dependnecy is a source file it is not allowed to be under a lockup directory
+        * a source dependency needs to be currently compiled
+    * the DEPENDENCY is treated as simple-export-file when it ends with `.sf`
+    * otherwise the DEPENDENCY is treated as simple-export-file
 * to use a import from a dependency use `dependency_name` `:` `import_name`
 
 ### function
