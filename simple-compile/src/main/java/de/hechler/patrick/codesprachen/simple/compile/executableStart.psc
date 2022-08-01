@@ -12,6 +12,8 @@
 |           the position where the (relative) main address should be written
 |       MAIN_ADDRESS_REL_POS
 |           the position from where the main address should be relativized
+|   
+|   I know that this file is not really needed as resource file, but I it doesn't hurt
 |>
 ~IF #~ME
     |> set the self import constants to any value

@@ -6,13 +6,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import de.hechler.patrick.codesprachen.simple.compile.objects.antl.SimpleFunction;
-import de.hechler.patrick.codesprachen.simple.compile.objects.antl.SimpleVariable;
-import de.hechler.patrick.codesprachen.simple.compile.objects.antl.types.SimpleFuncType;
-import de.hechler.patrick.codesprachen.simple.compile.objects.antl.types.SimpleStructType;
-import de.hechler.patrick.codesprachen.simple.compile.objects.antl.types.SimpleType;
-import de.hechler.patrick.codesprachen.simple.compile.objects.antl.types.SimpleTypeArray;
-import de.hechler.patrick.codesprachen.simple.compile.objects.antl.types.SimpleTypePointer;
+import de.hechler.patrick.codesprachen.simple.compile.objects.SimpleFunction;
+import de.hechler.patrick.codesprachen.simple.compile.objects.SimpleVariable;
+import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleFuncType;
+import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleStructType;
+import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleType;
+import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleTypeArray;
+import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleTypePointer;
 
 public interface SimpleExportable {
 	
@@ -50,74 +50,95 @@ public interface SimpleExportable {
 	public static SimpleExportable fromExport(String str) {
 		try {
 			Map <String, UnfinishedType> structures = new HashMap <>();
-			SimpleExportable export;
-			char[] chars = str.toCharArray();
-			int i = 0;
-			switch (chars[i ++ ]) {
-			case E_VAR_START: {
-				int len;
-				for (len = 0; chars[i + len] != E_NAME_START; len ++ );
-				String hexAddress = new String(chars, i, len);
-				i += len + 1;
-				for (len = 0; chars[i + len] != E_VAR_START_TYPE; len ++ );
-				String name = new String(chars, i, len);
-				i += len + 1;
-				List <SimpleVariable> varType = new ArrayList <>();
-				i = readType(chars, i, varType, name.concat("_"), structures);
-				if (i < chars.length) {
-					throw new IllegalArgumentException("this is not an exported string! (str: '" + str + "')");
+			SimpleExportable exported = readExported(str, structures);
+			if (exported instanceof SimpleFunction) {
+				SimpleFunction sf = (SimpleFunction) exported;
+				finishArray(sf.type.arguments, structures);
+				finishArray(sf.type.results, structures);
+			} else if (exported instanceof SimpleVariable) {
+				SimpleVariable st = (SimpleVariable) exported;
+				SimpleType t = finish(st.type, structures);
+				if (t != st.type) {
+					exported = new SimpleVariable(st.addr, t, st.name);
 				}
-				export = new SimpleVariable(Long.parseLong(hexAddress, 16), varType.get(0).type, name);
+			} else {
+				throw new InternalError("exported is of an unknown type: " + exported.getClass().getName());
 			}
-			case E_FUNC_START: {
-				int len;
-				for (len = 0; chars[i + len] != E_NAME_START; len ++ );
-				String hexAddress = new String(chars, i, len);
-				i += len + 1;
-				for (len = 0; chars[i + len] != E_T_FUNC_START; len ++ );
-				String name = new String(chars, i, len);
-				i += len + 1;
-				if (chars[i ++ ] != E_T_FUNC_START) {
-					throw new IllegalArgumentException("this is not an exported string! (str: '" + str + "')");
-				}
-				List <SimpleVariable> args = new ArrayList <>();
-				while (chars[i] != E_T_FUNC_ARGS_RESULTS_SEP) {
-					i = readType(chars, i, args, "arg", structures);
-				}
-				List <SimpleVariable> results = new ArrayList <>();
-				while (chars[i] != E_T_FUNC_END) {
-					i = readType(chars, i, results, "res", structures);
-				}
-				if (i < chars.length) {
-					throw new IllegalArgumentException("this is not an exported string! (str: '" + str + "')");
-				}
-				finishList(structures, args);
-				finishList(structures, results);
-				export = new SimpleFunction(Long.parseLong(hexAddress, 16), name, args, results);
-				break;
-			}
-			default:
-				throw new IllegalArgumentException("this is not an exported string! (str: '" + str + "')");
-			}
-			return export;
+			return exported;
 		} catch (IndexOutOfBoundsException ioobe) {
 			throw new IllegalArgumentException("this is not an exported string! (str: '" + str + "')", ioobe);
 		}
 	}
 	
-	private static void finishList(Map <String, UnfinishedType> structures, List <SimpleVariable> args) {
-		for (int i = 0; i < args.size(); i ++ ) {
-			SimpleVariable old = args.get(i);
-			SimpleType finish = finish(old.type, structures);
-			if (finish != old.type) {
-				args.set(i, new SimpleVariable(finish, old.name));
+	public static SimpleExportable readExported(String str, Map <String, UnfinishedType> structures) {
+		SimpleExportable export;
+		char[] chars = str.toCharArray();
+		int i = 0;
+		switch (chars[i ++ ]) {
+		case E_VAR_START: {
+			int len;
+			for (len = 0; chars[i + len] != E_NAME_START; len ++ );
+			String hexAddress = new String(chars, i, len);
+			i += len + 1;
+			for (len = 0; chars[i + len] != E_VAR_START_TYPE; len ++ );
+			String name = new String(chars, i, len);
+			i += len + 1;
+			List <SimpleVariable> varType = new ArrayList <>();
+			i = readType(chars, i, varType, name.concat("_"), structures);
+			if (i < chars.length) {
+				throw new IllegalArgumentException("this is not an exported string! (str: '" + str + "')");
+			}
+			export = new SimpleVariable(Long.parseUnsignedLong(hexAddress, 16), varType.get(0).type, name);
+			break;
+		}
+		case E_FUNC_START: {
+			int len;
+			for (len = 0; chars[i + len] != E_NAME_START; len ++ );
+			String hexAddress = new String(chars, i, len);
+			i += len + 1;
+			for (len = 0; chars[i + len] != E_T_FUNC_START; len ++ );
+			String name = new String(chars, i, len);
+			i += len;
+			if (chars[i ++ ] != E_T_FUNC_START) {
+				throw new IllegalArgumentException("this is not an exported string! (str: '" + str + "')");
+			}
+			List <SimpleVariable> args = new ArrayList <>();
+			while (chars[i] != E_T_FUNC_ARGS_RESULTS_SEP) {
+				i = readType(chars, i, args, "arg", structures);
+			}
+			i ++ ;
+			List <SimpleVariable> results = new ArrayList <>();
+			while (chars[i] != E_T_FUNC_END) {
+				i = readType(chars, i, results, "res", structures);
+			}
+			i ++ ;
+			if (i != chars.length) {
+				throw new IllegalArgumentException("this is not an exported string! (str: '" + str + "')");
+			}
+			export = new SimpleFunction(Long.parseUnsignedLong(hexAddress, 16), name, args, results);
+			break;
+		}
+		default:
+			throw new IllegalArgumentException("this is not an exported string! (str: '" + str + "')");
+		}
+		return export;
+	}
+	
+	private static void finishArray(SimpleVariable[] vars, Map <String, UnfinishedType> structures) {
+		for (int i = 0; i < vars.length; i ++ ) {
+			SimpleType finished = finish(vars[i].type, structures);
+			if (finished != vars[i].type) {
+				vars[i] = new SimpleVariable(finished, vars[i].name);
 			}
 		}
 	}
 	
 	@SuppressWarnings("unchecked")
 	private static <T extends SimpleType> T finish(T type, Map <String, UnfinishedType> structures) {
-		if ( !type.isPrimitive()) {
+		if (type instanceof UnfinishedType) {
+			type = (T) ((UnfinishedType) type).finishedType;
+			assert type != null;
+		} else if ( !type.isPrimitive()) {
 			if (type.isPointerOrArray()) {
 				SimpleType target = ((SimpleTypePointer) type).target;
 				SimpleType nt = finish(target, structures);
@@ -131,25 +152,16 @@ public interface SimpleExportable {
 				}
 			} else if (type.isFunc()) {
 				SimpleFuncType func = (SimpleFuncType) type;
-				finishArray(structures, func.arguments);
-				finishArray(structures, func.results);
+				finishArray(func.arguments, structures);
+				finishArray(func.results, structures);
 			} else if (type.isStruct()) {
 				SimpleStructType struct = (SimpleStructType) type;
-				finishArray(structures, struct.members);
+				finishArray(struct.members, structures);
 			} else {
 				throw new InternalError("unknown type (not primitive, no pointer/array, no function and no structure)! type: " + type);
 			}
 		}
 		return type;
-	}
-	
-	private static void finishArray(Map <String, UnfinishedType> structures, SimpleVariable[] vars) {
-		for (int i = 0; i < vars.length; i ++ ) {
-			SimpleType finished = finish(vars[i].type, structures);
-			if (finished != vars[i].type) {
-				vars[i] = new SimpleVariable(finished, vars[i].name);
-			}
-		}
 	}
 	
 	private static int readType(char[] chars, int i, List <SimpleVariable> list, String nameStart, Map <String, UnfinishedType> structures) {
@@ -162,11 +174,13 @@ public interface SimpleExportable {
 			while (chars[i] != E_T_FUNC_ARGS_RESULTS_SEP) {
 				i = readType(chars, i, args, subNameStart, structures);
 			}
+			i ++ ;
 			List <SimpleVariable> results = new ArrayList <>();
 			subNameStart = name.concat("_res");
 			while (chars[i] != E_T_FUNC_END) {
 				i = readType(chars, i, results, subNameStart, structures);
 			}
+			i ++ ;
 			type = new SimpleFuncType(args, results);
 			break;
 		}
@@ -177,12 +191,16 @@ public interface SimpleExportable {
 			i += len + 1;
 			UnfinishedType uf = structures.get(structname);
 			if (uf == null) {
+				uf = new UnfinishedType();
+				structures.put(structname, uf);
 				String subNameStart = structname.concat("_m");
 				List <SimpleVariable> sub = new ArrayList <>();
 				while (chars[i] != E_T_STRUCT_END) {
 					i = readType(chars, i, sub, subNameStart, structures);
 				}
+				i ++ ;
 				type = new SimpleStructType(structname, sub);
+				uf.finishedType = type;
 			} else if (uf.finishedType != null) {
 				type = uf.finishedType;
 			} else {
@@ -239,7 +257,7 @@ public interface SimpleExportable {
 			type = SimpleType.BYTE;
 			break;
 		default:
-			throw new IllegalArgumentException("this is not an exported string! (str: '" + new String(chars) + "')");
+			throw new IllegalArgumentException("this is not an exported string! (str: '" + new String(chars) + "') unknown type char: '" + chars[i - 1] + "'");
 		}
 		list.add(new SimpleVariable(type, name));
 		return i;
@@ -291,10 +309,9 @@ public interface SimpleExportable {
 			throw new UnsupportedOperationException();
 		}
 		
-		
 		@Override
 		public String toString() {
-			return "<some-unfinished-type>";
+			return "<some-unfinished-structure-type>";
 		}
 		
 	}

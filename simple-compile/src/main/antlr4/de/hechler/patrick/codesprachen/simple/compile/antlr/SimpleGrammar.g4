@@ -11,10 +11,10 @@ import java.util.function.*;
 import java.util.*;
 import java.io.*;
 import java.nio.file.*;
-import de.hechler.patrick.codesprachen.simple.compile.objects.antl.*;
-import de.hechler.patrick.codesprachen.simple.compile.objects.antl.values.*;
-import de.hechler.patrick.codesprachen.simple.compile.objects.antl.commands.*;
-import de.hechler.patrick.codesprachen.simple.compile.objects.antl.types.*;
+import de.hechler.patrick.codesprachen.simple.compile.objects.*;
+import de.hechler.patrick.codesprachen.simple.compile.objects.values.*;
+import de.hechler.patrick.codesprachen.simple.compile.objects.commands.*;
+import de.hechler.patrick.codesprachen.simple.compile.objects.types.*;
 }
 
 @parser::members {
