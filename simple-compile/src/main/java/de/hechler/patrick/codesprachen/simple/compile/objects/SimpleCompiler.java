@@ -30,7 +30,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Scanner;
-import java.util.function.BiFunction;
 
 import org.antlr.v4.runtime.ANTLRInputStream;
 import org.antlr.v4.runtime.CommonTokenStream;
@@ -48,6 +47,7 @@ import de.hechler.patrick.codesprachen.primitive.core.utils.PrimAsmPreDefines;
 import de.hechler.patrick.codesprachen.simple.compile.antlr.SimpleGrammarLexer;
 import de.hechler.patrick.codesprachen.simple.compile.antlr.SimpleGrammarParser;
 import de.hechler.patrick.codesprachen.simple.compile.interfaces.SimpleExportable;
+import de.hechler.patrick.codesprachen.simple.compile.interfaces.TriFunction;
 import de.hechler.patrick.codesprachen.simple.compile.objects.SimpleFile.SimpleDependency;
 import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommand;
 import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommandAssign;
@@ -63,7 +63,7 @@ import de.hechler.patrick.pfs.exception.ElementLockedException;
 import de.hechler.patrick.pfs.interfaces.PatrFile;
 import de.hechler.patrick.pfs.utils.PatrFileSysConstants;
 
-public class SimpleCompiler implements BiFunction <String, String, SimpleDependency> {
+public class SimpleCompiler implements TriFunction <String, String, String, SimpleDependency> {
 	
 	private static final long NO_LOCK = PatrFileSysConstants.NO_LOCK;
 	
@@ -128,32 +128,41 @@ public class SimpleCompiler implements BiFunction <String, String, SimpleDepende
 		}
 	}
 	
-	public SimpleDependency apply(String name, String depend) {
+	public SimpleDependency apply(String name, String depend, String runtime) {
 		switch (depend.substring(depend.lastIndexOf('.') + 1)) {
 		case MultiCompiler.SIMPLE_SOURCE_CODE_END:
-			CompileTarget dep = targets.get(depend);
-			if (dep == null) {
-				dep = targets.get(srcRoot.relativize(srcRoot.getFileSystem().getPath(depend).normalize()).toString());
-				if (dep == null) {
-					throw new IllegalArgumentException("dependency could not be found! (dependnecy: '" + depend + "'");
-				}
-			}
-			final SimpleFile file = dep.file;
-			return new SimpleDependency(name, depend) {
-				
-				@Override
-				public SimpleExportable get(String name) {
-					return file.getExport(name);
-				}
-				
-			};
+			return sourceDependency(name, depend);
 		case MultiCompiler.SIMPLE_SYMBOL_FILE_END:
 		default:
-			return exportedDependency(name, depend);
+			return exportedDependency(name, depend, runtime);
+		}
+	}
+
+	private SimpleDependency sourceDependency(String name, String depend) {
+		CompileTarget dep = targets.get(srcRoot.relativize(srcRoot.getFileSystem().getPath(depend).normalize()).toString());
+		if (dep == null) {
+			throw new IllegalArgumentException("dependency could not be found! (dependnecy: '" + depend + "'");
+		}
+		final SimpleFile file = dep.file;
+		return new SimpleDependency(name, depend) {
+			
+			@Override
+			public SimpleExportable get(String name) {
+				return file.getExport(name);
+			}
+			
+		};
+	}
+	
+	private static final int SSF_LEN = 3;
+	
+	static {
+		if (SSF_LEN != MultiCompiler.SIMPLE_SYMBOL_FILE.length()) {
+			throw new AssertionError();
 		}
 	}
 	
-	private SimpleDependency exportedDependency(String name, String depend) {
+	private SimpleDependency exportedDependency(String name, String depend, String runtime) {
 		for (Path p : lockups) {
 			Path resolved = p.resolve(depend);
 			if ( !Files.exists(resolved)) {
@@ -162,7 +171,14 @@ public class SimpleCompiler implements BiFunction <String, String, SimpleDepende
 			try {
 				List <String> lines = Files.readAllLines(resolved, cs);
 				Map <String, SimpleExportable> imps = readExports(lines);
-				return new SimpleDependency(name, depend) {
+				if (runtime == null) {
+					if (depend.endsWith(MultiCompiler.SIMPLE_SYMBOL_FILE)) {
+						runtime = depend.substring(0, depend.length() - SSF_LEN);
+					} else {
+						runtime = depend;
+					}
+				}
+				return new SimpleDependency(name, runtime) {
 					
 					@Override
 					public SimpleExportable get(String name) {

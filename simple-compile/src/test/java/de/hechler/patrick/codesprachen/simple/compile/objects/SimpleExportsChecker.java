@@ -8,9 +8,9 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
-import java.util.function.BiFunction;
 
 import de.hechler.patrick.codesprachen.simple.compile.interfaces.SimpleExportable;
+import de.hechler.patrick.codesprachen.simple.compile.interfaces.TriFunction;
 import de.hechler.patrick.codesprachen.simple.compile.objects.SimpleFile.SimpleDependency;
 import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommandBlock;
 import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleFuncType;
@@ -37,7 +37,7 @@ public class SimpleExportsChecker {
 		rnd = null;
 	}
 	
-	private static final BiFunction <String, String, SimpleDependency> NO_DEP_PROV = (n, d) -> { throw new UnsupportedOperationException(); };
+	private static final TriFunction <String, String, String, SimpleDependency> NO_DEP_PROV = (n, d, r) -> { throw new UnsupportedOperationException(); };
 	
 	@Check
 	private void variable() {

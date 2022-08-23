@@ -64,7 +64,7 @@ import de.hechler.patrick.codesprachen.simple.compile.objects.types.*;
 simpleFile [SimpleFile file]:
 	(
 		dependency
-		{file.addDependency($dependency.name, $dependency.depend);}
+		{file.addDependency($dependency.name, $dependency.depend, $dependency.runtime);}
 		|
 		variable [file]
 		{file.addVariable($variable.vari);}
@@ -78,12 +78,20 @@ simpleFile [SimpleFile file]:
 	EOF
 ;
 
-dependency returns [String name, String depend]:
-	DEP NAME STRING SEMI
+dependency returns [String name, String depend, String runtime]:
+	DEP NAME s = STRING
 	{
 		$name = $NAME.getText();
-		$depend = string($STRING.getText());
+		$depend = string($s.getText());
+		$runtime = null;
 	}
+	(
+		s = STRING
+		{
+			$runtime = string($s.getText());
+		}
+	)?
+	SEMI
 ;
 variable [SimplePool pool] returns [SimpleVariable vari]:
 	{boolean export = false;}

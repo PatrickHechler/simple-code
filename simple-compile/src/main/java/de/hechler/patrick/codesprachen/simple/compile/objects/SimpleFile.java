@@ -9,9 +9,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
-import java.util.function.BiFunction;
 
 import de.hechler.patrick.codesprachen.simple.compile.interfaces.SimpleExportable;
+import de.hechler.patrick.codesprachen.simple.compile.interfaces.TriFunction;
 import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommand;
 import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommandBlock;
 import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommandVarDecl;
@@ -26,16 +26,16 @@ import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleVaria
 
 public class SimpleFile implements SimplePool {
 	
-	private final BiFunction <String, String, SimpleDependency> dependencyProvider;
-	private final Map <String, SimpleDependency>                dependencies = new HashMap <>();
-	private final Map <String, SimpleVariable>                  vars         = new LinkedHashMap <>();
-	private final Map <String, SimpleStructType>                structs      = new HashMap <>();
-	private final Map <String, SimpleFunction>                  funcs        = new LinkedHashMap <>();
-	private final List <SimpleValueDataPointer>                 datas        = new ArrayList <>();
-	private final List <SimpleExportable>                       exports      = new ArrayList <>();
-	private SimpleFunction                                      main         = null;
+	private final TriFunction <String, String, String, SimpleDependency> dependencyProvider;
+	private final Map <String, SimpleDependency>                         dependencies = new HashMap <>();
+	private final Map <String, SimpleVariable>                           vars         = new LinkedHashMap <>();
+	private final Map <String, SimpleStructType>                         structs      = new HashMap <>();
+	private final Map <String, SimpleFunction>                           funcs        = new LinkedHashMap <>();
+	private final List <SimpleValueDataPointer>                          datas        = new ArrayList <>();
+	private final List <SimpleExportable>                                exports      = new ArrayList <>();
+	private SimpleFunction                                               main         = null;
 	
-	public SimpleFile(BiFunction <String, String, SimpleDependency> dependencyProvider) {
+	public SimpleFile(TriFunction <String, String, String, SimpleDependency> dependencyProvider) {
 		this.dependencyProvider = dependencyProvider;
 	}
 	
@@ -48,9 +48,9 @@ public class SimpleFile implements SimplePool {
 		}
 	}
 	
-	public void addDependency(String name, String depend) {
+	public void addDependency(String name, String depend, String runtime) {
 		checkName(name);
-		dependencies.put(name, dependencyProvider.apply(name, depend));
+		dependencies.put(name, dependencyProvider.apply(name, depend, runtime));
 	}
 	
 	public void addVariable(SimpleVariable vari) {

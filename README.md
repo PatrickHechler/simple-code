@@ -18,6 +18,7 @@ simple-code is a simple programming language.
     * the DEPENDENCY is treated as simple-source-code-file when it ends with `.s`
         * note that if the dependnecy is a source file it is not allowed to be under a lockup directory
         * a source dependency needs to be currently compiled
+        * note that a source code dependency is not allowed to have a runtime path set
     * the DEPENDENCY is treated as simple-export-file when it ends with `.sf`
     * otherwise the DEPENDENCY is treated as simple-export-file
 * to use a import from a dependency use `dependency_name` `:` `import_name`
@@ -89,6 +90,10 @@ a variable can be used by all functions
     * `while \( [VALUE] \) [COMMAND]`
 * IF
     * `if \( [VALUE] \) [COMMAND] ( else [COMMAND] )?`
+* ASSEMBLER
+    * `asm { [PRIM_CODE] } ( [XNN] <-- [VALUE] )* ( [VALUE] <-- [XNN] )* ;`
+    * `XNN`
+        * X[0-9A-E][0-9A-F] | XF[0-9]
 
 ### VALUE
 
@@ -155,13 +160,7 @@ comments are treated like whitespace, they are allowed everywhere exept in the m
 
 ### exit
 `func exp exit (num enum)`
-exits the program
-
-### fpToNum
-`func exp fpToNum (num n) --> <fpnum fpn>`
-
-### numToFp
-`func exp numToFp (fpnum fpn) --> <fpnum n>`
+* exits the program
 
 ## predefined  structures
 
@@ -182,3 +181,5 @@ struct file_stream {
     num pos
 }
 </pre></code>
+
+# TODOs
