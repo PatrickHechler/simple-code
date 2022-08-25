@@ -12,6 +12,8 @@ import de.hechler.patrick.codesprachen.simple.compile.objects.SimpleVariable;
 
 public class SimpleFuncType implements SimpleType {
 	
+	private static final SimpleVariable[] EMPTY_RESULTS = new SimpleVariable[0];
+	
 	/**
 	 * this array should not be modified
 	 */
@@ -23,7 +25,7 @@ public class SimpleFuncType implements SimpleType {
 	
 	public SimpleFuncType(List <SimpleVariable> args, List <SimpleVariable> results) {
 		this.arguments = args.toArray(new SimpleVariable[args.size()]);
-		this.results = results.toArray(new SimpleVariable[results.size()]);
+		this.results = results == null ? EMPTY_RESULTS : results.toArray(new SimpleVariable[results.size()]);
 		init(this.arguments);
 		init(this.results);
 	}

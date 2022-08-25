@@ -1,6 +1,7 @@
 package de.hechler.patrick.codesprachen.simple.compile;
 
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -47,6 +48,7 @@ public class SimpleCompilerMain {
 	private static void setup(String[] args) {
 		List <Path> lookupPaths = new ArrayList <>();
 		Path output = null;
+		boolean recreateOutput = false;
 		for (int i = 0; i < args.length; i ++ ) {
 			switch (args[i]) {
 			case "--help":
@@ -68,6 +70,12 @@ public class SimpleCompilerMain {
 				}
 				src = Paths.get(args[i]);
 				break;
+			case "--recreate-out":
+				if (recreateOutput) {
+					crash("doubled option", i, args);
+				}
+				recreateOutput = true;
+				break;
 			default:
 				crash("unknown argument: '" + args[i] + '\'', i, args);
 			}
@@ -83,6 +91,9 @@ public class SimpleCompilerMain {
 			output = Paths.get("./out.pfs");
 		}
 		try {
+			if (recreateOutput) {
+				Files.deleteIfExists(output);
+			}
 			BlockAccessor ba;
 			Bool formatt = new Bool();
 			ba = SeekablePathBlockAccessor.create(output, 1 << 14, false, formatt);
@@ -107,7 +118,9 @@ public class SimpleCompilerMain {
 				+ "        to add a lookup folder\n"
 				+ "    --src [FOLDER]\n"
 				+ "        to set the source folder\n"
-				+ "");
+				+ "    --recreate-out\n"
+				+ "        to delete the output file if it\n"
+				+ "        exist already at the start\n");
 	}
 	
 	private static void crash(String msg, int index, String[] args) {

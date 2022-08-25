@@ -171,7 +171,9 @@ public class SimpleExportsChecker {
 	}
 	
 	private SimpleCommandBlock emptyBlock(SimpleFile file, List <SimpleVariable> args, List <SimpleVariable> res) {
-		return new SimpleCommandBlock(file.newFuncPool(args, res), Collections.emptyList());
+		SimpleCommandBlock block = new SimpleCommandBlock(file.newFuncPool(args, res));
+		block.seal();
+		return block;
 	}
 	
 }

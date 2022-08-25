@@ -510,16 +510,15 @@ command [SimplePool pool] returns [SimpleCommand cmd]:
 ;
 commandBlock [SimplePool pool] returns [SimpleCommandBlock cmd]:
 	{
-		List<SimpleCommand> cmds = new ArrayList<>();
 		pool = pool.newSubPool();
 	}
 	OPEN_CODE_BLOCK
 	(
 		command [pool]
-		{cmds.add($command.cmd);}
+		{pool.addCmd($command.cmd);}
 	)*
 	CLOSE_CODE_BLOCK
-	{$cmd = SimpleCommandBlock.create(pool, cmds);}
+	{pool.seal();}
 ;
 commandVarDecl [SimplePool pool] returns [SimpleCommandVarDecl cmd]:
 	VAR type [pool] NAME

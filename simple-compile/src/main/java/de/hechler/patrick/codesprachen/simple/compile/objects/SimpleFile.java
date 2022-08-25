@@ -199,6 +199,16 @@ public class SimpleFile implements SimplePool {
 		return consts;
 	}
 	
+	@Override
+	public void addCmd(SimpleCommand add) {
+		throw new UnsupportedOperationException("only block pools can add commands (this is a file pool)!");
+	}
+	
+	@Override
+	public void seal() {
+		throw new UnsupportedOperationException("only block pools can be sealed (this is a file pool)!");
+	}
+	
 	public class SimpleFuncPool implements SimplePool {
 		
 		private final SimpleFuncType func;
@@ -215,11 +225,6 @@ public class SimpleFile implements SimplePool {
 		@Override
 		public SimplePool newSubPool() {
 			return new SimpleSubPool(SimpleFuncPool.this);
-		}
-		
-		@Override
-		public void initBlock(SimpleCommandBlock block) {
-			throw new InternalError("this method should be called only on sub pools!");
 		}
 		
 		@Override
@@ -257,15 +262,26 @@ public class SimpleFile implements SimplePool {
 			return SimpleFile.this.getConstants();
 		}
 		
+		@Override
+		public void addCmd(SimpleCommand add) {
+			throw new UnsupportedOperationException("only block pools can add commands (this is a function pool)!");
+		}
+		
+		@Override
+		public void seal() {
+			throw new UnsupportedOperationException("only block pools can be sealed (this is a function pool)!");
+		}
+		
 	}
 	
 	public static class SimpleSubPool implements SimplePool {
 		
-		public final SimplePool   parent;
-		public SimpleCommandBlock block;
+		public final SimplePool         parent;
+		public final SimpleCommandBlock block;
 		
 		public SimpleSubPool(SimplePool parent) {
 			this.parent = parent;
+			this.block = new SimpleCommandBlock(this);
 		}
 		
 		private SimplePool p() {
@@ -287,16 +303,8 @@ public class SimpleFile implements SimplePool {
 		}
 		
 		@Override
-		public void initBlock(SimpleCommandBlock block) {
-			if (block != null) {
-				throw new IllegalStateException("blockalready initilized!");
-			}
-			this.block = block;
-		}
-		
-		@Override
 		public SimpleValue newNameUseValue(String name) {
-			for (SimpleCommand cmd : block.cmds) {
+			for (SimpleCommand cmd : block.commands) {
 				if (cmd instanceof SimpleCommandVarDecl) {
 					SimpleCommandVarDecl vd = (SimpleCommandVarDecl) cmd;
 					if (vd.name.equals(name)) {
@@ -305,6 +313,16 @@ public class SimpleFile implements SimplePool {
 				}
 			}
 			return parent.newNameUseValue(name);
+		}
+		
+		@Override
+		public void addCmd(SimpleCommand add) {
+			block.addCmd(add);
+		}
+		
+		@Override
+		public void seal() {
+			block.seal();
 		}
 		
 		@Override
@@ -332,11 +350,6 @@ public class SimpleFile implements SimplePool {
 	@Override
 	public SimplePool newSubPool() {
 		throw new InternalError("this method should be only called on function and sub pools not on the file pool!");
-	}
-	
-	@Override
-	public void initBlock(SimpleCommandBlock block) {
-		throw new InternalError("this method should be only called on sub pools not on the file pool!");
 	}
 	
 	public static final SimpleType DEPENDENCY_TYPE = new SimpleStructType("--DEPENDENCY--", Collections.emptyList()) {

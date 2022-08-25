@@ -90,6 +90,7 @@ public class MultiCompiler {
 			throw new IllegalArgumentException("src Path does not exist!");
 		}
 		this.lockups = lockups;
+		this.compiler = new SimpleCompiler(src, lockups, cs);
 		if (Files.isRegularFile(src)) {
 			compileFile(null, src, bin);
 		} else if (Files.isDirectory(src)) {

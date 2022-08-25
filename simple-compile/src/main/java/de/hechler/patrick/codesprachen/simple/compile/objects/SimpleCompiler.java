@@ -482,7 +482,7 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 		used.currentaddr = used.maxaddr;
 		used.regs = used.maxregs;
 		UsedData funcArgs = used.clone();
-		count(used, regs, sf.body.cmds);
+		count(used, regs, sf.body.commands);
 		for (int i = 0; i < used.regs; i ++ ) {
 			regs[i] = true;
 		}
@@ -494,7 +494,7 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 		}
 		copyArgs(target, sf, funcArgs, myargs);
 		sf.regVars = used.maxregs;
-		for (SimpleCommand cmd : sf.body.cmds) {
+		for (SimpleCommand cmd : sf.body.commands) {
 			compileCommand(target, sf, regs, cmd);
 		}
 		if (used.maxaddr > 0L) {
@@ -582,7 +582,7 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 			compileAssignCommand(target, sf, regs, assignCmd);
 		} else if (cmd instanceof SimpleCommandBlock) {
 			SimpleCommandBlock blockCmd = (SimpleCommandBlock) cmd;
-			for (SimpleCommand childCmd : blockCmd.cmds) {
+			for (SimpleCommand childCmd : blockCmd.commands) {
 				compileCommand(target, sf, regs, childCmd);
 			}
 		} else if (cmd instanceof SimpleCommandVarDecl) {
@@ -1051,7 +1051,7 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 		final long startAddr = used.currentaddr;
 		for (Object obj : countTarget) {
 			if (obj instanceof SimpleCommandBlock) {
-				count(used, regs, ((SimpleCommandBlock) obj).cmds);
+				count(used, regs, ((SimpleCommandBlock) obj).commands);
 			} else if (obj instanceof SimpleVariable) {
 				SimpleVariable sv = (SimpleVariable) obj;
 				if ( (sv.type.isPrimitive() || sv.type.isPointer()) && used.regs < MAX_COMPILER_REGISTER) {
