@@ -1,5 +1,7 @@
 package de.hechler.patrick.codesprachen.simple.compile.objects;
 
+import java.util.Map;
+
 import de.hechler.patrick.codesprachen.simple.compile.objects.SimpleFile.SimpleDependency;
 import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommandBlock;
 import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleStructType;
@@ -21,5 +23,7 @@ public interface SimplePool {
 	SimpleFunction getFunction(String name);
 	
 	SimpleDependency getDependency(String name);
+	
+	Map <String, SimpleConstant> getConstants();
 	
 }

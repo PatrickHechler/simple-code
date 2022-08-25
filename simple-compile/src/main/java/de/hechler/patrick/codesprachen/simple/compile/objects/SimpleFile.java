@@ -19,6 +19,7 @@ import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleFuncTy
 import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleStructType;
 import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleType;
 import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleTypePointer;
+import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleNumberValue;
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleStringValue;
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleValue;
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleValueDataPointer;
@@ -31,6 +32,7 @@ public class SimpleFile implements SimplePool {
 	private final Map <String, SimpleVariable>                           vars         = new LinkedHashMap <>();
 	private final Map <String, SimpleStructType>                         structs      = new HashMap <>();
 	private final Map <String, SimpleFunction>                           funcs        = new LinkedHashMap <>();
+	private final Map <String, SimpleConstant>                           consts       = new HashMap <>();
 	private final List <SimpleValueDataPointer>                          datas        = new ArrayList <>();
 	private final List <SimpleExportable>                                exports      = new ArrayList <>();
 	private SimpleFunction                                               main         = null;
@@ -43,7 +45,9 @@ public class SimpleFile implements SimplePool {
 		if (dependencies.containsKey(name)
 			|| vars.containsKey(name)
 			|| structs.containsKey(name)
-			|| funcs.containsKey(name)) {
+			|| funcs.containsKey(name)
+			|| consts.containsKey(name)
+			|| SimpleCompiler.DEFAULT_CONSTANTS.containsKey(name)) {
 			throw new IllegalArgumentException("name already in use! name: '" + name + "'");
 		}
 	}
@@ -91,6 +95,11 @@ public class SimpleFile implements SimplePool {
 		if (func.export) {
 			this.exports.add(func);
 		}
+	}
+	
+	public void addConstant(SimpleConstant constant) {
+		checkName(constant.name);
+		consts.put(constant.name, constant);
 	}
 	
 	public Collection <SimpleFunction> functions() {
@@ -143,6 +152,10 @@ public class SimpleFile implements SimplePool {
 		if (dep != null) {
 			return new SimpleVariableValue(dep);
 		}
+		SimpleConstant constant = consts.get(name);
+		if (constant != null) {
+			return new SimpleNumberValue(SimpleType.NUM, constant.value);
+		}
 		throw new IllegalArgumentException("there is nothign with the given name!");
 	}
 	
@@ -169,13 +182,21 @@ public class SimpleFile implements SimplePool {
 		if (se == null) {
 			se = vars.get(name);
 			if (se == null) {
-				throw new NoSuchElementException("there is no export with the name '" + name + "'");
+				se = consts.get(name);
+				if (se == null) {
+					throw new NoSuchElementException("there is no export with the name '" + name + "'");
+				}
 			}
 		}
 		if ( !se.isExport()) {
 			throw new NoSuchElementException("there is no export with the name '" + name + "' (the needed export is NOT declared as export)");
 		}
 		return se;
+	}
+	
+	@Override
+	public Map <String, SimpleConstant> getConstants() {
+		return consts;
 	}
 	
 	public class SimpleFuncPool implements SimplePool {
@@ -229,6 +250,11 @@ public class SimpleFile implements SimplePool {
 		@Override
 		public SimpleFunction getFunction(String name) {
 			return SimpleFile.this.getFunction(name);
+		}
+		
+		@Override
+		public Map <String, SimpleConstant> getConstants() {
+			return SimpleFile.this.getConstants();
 		}
 		
 	}
@@ -294,6 +320,11 @@ public class SimpleFile implements SimplePool {
 		@Override
 		public SimpleFunction getFunction(String name) {
 			return p().getFunction(name);
+		}
+		
+		@Override
+		public Map <String, SimpleConstant> getConstants() {
+			return p().getConstants();
 		}
 		
 	}

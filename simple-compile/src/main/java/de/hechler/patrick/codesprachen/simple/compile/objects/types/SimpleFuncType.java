@@ -7,6 +7,7 @@ import static de.hechler.patrick.codesprachen.simple.compile.interfaces.SimpleEx
 import java.util.List;
 import java.util.Set;
 
+import de.hechler.patrick.codesprachen.simple.compile.objects.SimpleCompiler;
 import de.hechler.patrick.codesprachen.simple.compile.objects.SimpleVariable;
 
 public class SimpleFuncType implements SimpleType {
@@ -23,6 +24,20 @@ public class SimpleFuncType implements SimpleType {
 	public SimpleFuncType(List <SimpleVariable> args, List <SimpleVariable> results) {
 		this.arguments = args.toArray(new SimpleVariable[args.size()]);
 		this.results = results.toArray(new SimpleVariable[results.size()]);
+		init(this.arguments);
+		init(this.results);
+	}
+	
+	private final static void init(SimpleVariable[] svs) {
+		long addr = 0L;
+		for (int i = 0; i < svs.length; i ++ ) {
+			SimpleVariable sv = svs[i];
+			int bc = sv.type.byteCount();
+			addr = SimpleCompiler.align(addr, bc);
+			sv.addr = addr;
+			sv.reg = SimpleCompiler.REG_METHOD_STRUCT;
+			addr += bc;
+		}
 	}
 	
 	@Override

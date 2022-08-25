@@ -25,6 +25,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -38,6 +39,7 @@ import de.hechler.patrick.codesprachen.primitive.assemble.enums.Commands;
 import de.hechler.patrick.codesprachen.primitive.assemble.enums.CompilerCommand;
 import de.hechler.patrick.codesprachen.primitive.assemble.objects.Command;
 import de.hechler.patrick.codesprachen.primitive.assemble.objects.CompilerCommandCommand;
+import de.hechler.patrick.codesprachen.primitive.assemble.objects.ConstantPoolCommand;
 import de.hechler.patrick.codesprachen.primitive.assemble.objects.Param;
 import de.hechler.patrick.codesprachen.primitive.assemble.objects.PrimitiveAssembler;
 import de.hechler.patrick.codesprachen.primitive.core.objects.PrimitiveConstant;
@@ -50,6 +52,8 @@ import de.hechler.patrick.codesprachen.simple.compile.interfaces.SimpleExportabl
 import de.hechler.patrick.codesprachen.simple.compile.interfaces.TriFunction;
 import de.hechler.patrick.codesprachen.simple.compile.objects.SimpleFile.SimpleDependency;
 import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommand;
+import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommandAsm;
+import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommandAsm.AsmParam;
 import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommandAssign;
 import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommandBlock;
 import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommandFuncCall;
@@ -93,14 +97,15 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 		try {
 			targets.values().iterator().next().binary.withLock(() -> {
 				precompileQueue();
-				// ensures that all variables have an address (even those from source dependencies)
+				// ensures that all variables have an address (also those from source dependencies)
 				for (CompileTarget target : targets.values()) {
 					makeFileStart(target);
 				}
+				// compile all before (link) and assemble
 				for (CompileTarget target : targets.values()) {
 					compile(target);
 				}
-				// compile all before link and assemble
+				// (link) and assemble
 				for (CompileTarget target : targets.values()) {
 					assemble(target);
 				}
@@ -135,9 +140,37 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 		case MultiCompiler.SIMPLE_SYMBOL_FILE_END:
 		default:
 			return exportedDependency(name, depend, runtime);
+		case MultiCompiler.PRIMITIVE_SYMBOL_FILE_END:
+			return primitiveDependency(name, depend);
 		}
 	}
-
+	
+	private SimpleDependency primitiveDependency(String name, String depend) {
+		Path p = findDependencyFile(depend);
+		try (Scanner sc = new Scanner(Files.newBufferedReader(p))) {
+			Map <String, PrimitiveConstant> primConsts = new HashMap <>();
+			PrimitiveAssembler.readSymbols(null, primConsts, sc, p);
+			Map <String, SimpleConstant> consts = new HashMap <>();
+			for (PrimitiveConstant pc : primConsts.values()) {
+				consts.put(pc.name, new SimpleConstant(name, pc.value, true));
+			}
+			return new SimpleDependency(name, depend) {
+				
+				@Override
+				public SimpleExportable get(String name) {
+					SimpleConstant sc = consts.get(name);
+					if (sc == null) {
+						throw new NoSuchElementException("this dependency (" + name + " > '" + p + "') has no constant with the name: " + name);
+					}
+					return sc;
+				}
+				
+			};
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		}
+	}
+	
 	private SimpleDependency sourceDependency(String name, String depend) {
 		CompileTarget dep = targets.get(srcRoot.relativize(srcRoot.getFileSystem().getPath(depend).normalize()).toString());
 		if (dep == null) {
@@ -163,38 +196,43 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 	}
 	
 	private SimpleDependency exportedDependency(String name, String depend, String runtime) {
+		Path p = findDependencyFile(depend);
+		try {
+			List <String> lines = Files.readAllLines(p, cs);
+			Map <String, SimpleExportable> imps = readExports(lines);
+			if (runtime == null) {
+				if (depend.endsWith(MultiCompiler.SIMPLE_SYMBOL_FILE)) {
+					runtime = depend.substring(0, depend.length() - SSF_LEN);
+				} else {
+					runtime = depend;
+				}
+			}
+			return new SimpleDependency(name, runtime) {
+				
+				@Override
+				public SimpleExportable get(String name) {
+					SimpleExportable se = imps.get(name);
+					if (se == null) {
+						throw new NoSuchElementException(name);
+					}
+					return se;
+				}
+				
+			};
+		} catch (IOException e) {
+			throw new RuntimeException(e.toString(), e);
+		}
+	}
+	
+	private Path findDependencyFile(String depend) {
 		for (Path p : lockups) {
 			Path resolved = p.resolve(depend);
-			if ( !Files.exists(resolved)) {
-				continue;
-			}
-			try {
-				List <String> lines = Files.readAllLines(resolved, cs);
-				Map <String, SimpleExportable> imps = readExports(lines);
-				if (runtime == null) {
-					if (depend.endsWith(MultiCompiler.SIMPLE_SYMBOL_FILE)) {
-						runtime = depend.substring(0, depend.length() - SSF_LEN);
-					} else {
-						runtime = depend;
-					}
-				}
-				return new SimpleDependency(name, runtime) {
-					
-					@Override
-					public SimpleExportable get(String name) {
-						SimpleExportable se = imps.get(name);
-						if (se == null) {
-							throw new NoSuchElementException(name);
-						}
-						return se;
-					}
-					
-				};
-			} catch (IOException e) {
-				throw new RuntimeException(e.toString(), e);
+			if (Files.exists(resolved)) {
+				return resolved;
 			}
 		}
 		throw new IllegalArgumentException("dependency could not be found! (dependnecy: '" + depend + "', lockups: " + Arrays.toString(lockups) + ")");
+		
 	}
 	
 	private Map <String, SimpleExportable> readExports(List <String> exps) {
@@ -267,8 +305,7 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 			compileFunction(target, main);
 		}
 		for (SimpleFunction sf : target.file.functions()) {
-			if (sf == main)
-				continue;
+			if (sf == main) continue;
 			compileFunction(target, sf);
 		}
 	}
@@ -277,7 +314,20 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 	private static final long MY_INT_DEP_LOAD_ERROR   = MY_INT_OUT_OF_MEM_ERROR + 1L;
 	private static final long MY_INT_CNT              = MY_INT_DEP_LOAD_ERROR + 1L;
 	
-	private static final String MY_EXPORT_FILE                      = "/de/hechler/patrick/codesprachen/simple/compile/mySymbols.psf";
+	public static final Map <String, PrimitiveConstant> DEFAULT_CONSTANTS;
+	
+	static {
+		Map <String, PrimitiveConstant> defConsts = new LinkedHashMap <>();
+		defConsts.putAll(PrimAsmConstants.START_CONSTANTS);
+		defConsts.put("INT_OUT_OF_MEM_ERROR", new PrimitiveConstant("INT_OUT_OF_MEM_ERROR",
+			"|   used when the stack needs to grow, but has not enugh memory or the memory can not allocate enough memory for its variables", MY_INT_CNT, PrimAsmConstants.START_CONSTANTS_PATH, -1));
+		defConsts.put("INT_DEP_LOAD_ERROR",
+			new PrimitiveConstant("INT_DEP_LOAD_ERROR", "|   this interrupt is used to indicate an error when loading a dependency", MY_INT_DEP_LOAD_ERROR, PrimAsmConstants.START_CONSTANTS_PATH, -1));
+		defConsts.put("INTERRUPT_COUNT", new PrimitiveConstant("INTERRUPT_COUNT", "|   the number of interrupts", MY_INT_CNT, PrimAsmConstants.START_CONSTANTS_PATH, -1));
+		DEFAULT_CONSTANTS = Collections.unmodifiableMap(defConsts);
+	}
+	
+	private static final String MY_EXPORT_FILE                      = "/de/hechler/patrick/codesprachen/simple/compile/executableStart.psf";
 	private static final String EXECUTABLE_START_FILE               = "/de/hechler/patrick/codesprachen/simple/compile/executableStart.pmc";
 	private static final String MAIN_ADDRESS_EXPORT_SYMBOL          = "MAIN_ADDRESS";
 	private static final String MAIN_ADDRESS_RELATIVE_EXPORT_SYMBOL = "MAIN_ADDRESS_REL_POS";
@@ -298,15 +348,15 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 				MAIN_ADDRESS_RELATIVE_POSITION = pc.value;
 				pc = map.get(INTERRUPT_COUNT_SYMBOL);
 				if (pc.value != MY_INT_CNT) {
-					throw new AssertionError();
+					throw new AssertionError(pc + " expected: " + MY_INT_CNT);
 				}
 				pc = map.get(INT_OUT_OF_MEM_ERR_SYMBOL);
 				if (pc.value != MY_INT_OUT_OF_MEM_ERROR) {
-					throw new AssertionError();
+					throw new AssertionError(pc + " expected: " + MY_INT_OUT_OF_MEM_ERROR);
 				}
 				pc = map.get(INT_DEP_LOAD_ERR_SYMBOL);
 				if (pc.value != MY_INT_DEP_LOAD_ERROR) {
-					throw new AssertionError();
+					throw new AssertionError(pc + " expected: " + MY_INT_DEP_LOAD_ERROR);
 				}
 			}
 		} catch (IOException e) {
@@ -379,27 +429,43 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 		}
 	}
 	
-	private static final int X00                                   = PrimAsmConstants.X_ADD;
-	private static final int REG_DEP_FUNC_DEPENDENCY_FILE_REGISTER = X00;
-	// private static final int X01 = PrimAsmConstants.X_ADD + 1;
-	// private static final int X02 = PrimAsmConstants.X_ADD + 2;
-	// private static final int X03 = PrimAsmConstants.X_ADD + 3;
-	// private static final int REG_MAX_INT = X03;
-	private static final int REG_METHOD_STRUCT     = X00 + 4;
-	private static final int REG_VARIABLE_POINTER  = X00 + 5;
-	private static final int REG_MIN_VARIABLE      = X00 + 6;
-	private static final int REG_MAX_VARIABLE      = X00 + 0x9F;
+	public static final int X00                                   = PrimAsmConstants.X_ADD;
+	public static final int REG_DEP_FUNC_DEPENDENCY_FILE_REGISTER = X00;
+	// public static final int X01 = PrimAsmConstants.X_ADD + 1;
+	// public static final int X02 = PrimAsmConstants.X_ADD + 2;
+	// public static final int X03 = PrimAsmConstants.X_ADD + 3;
+	// public static final int REG_MAX_INT = X03;
+	/**
+	 * this register is used to store the current methods results
+	 */
+	public static final int REG_METHOD_STRUCT     = X00 + 4;
+	/**
+	 * this method is reserved for array and structure variables<br>
+	 * and also used by pointer/primitive variables when there are not enough registers)
+	 */
+	public static final int REG_VARIABLE_POINTER  = X00 + 5;
+	public static final int REG_MIN_VARIABLE      = X00 + 6;
+	public static final int REG_MAX_VARIABLE      = X00 + 0x9F;
 	/**
 	 * the compiler won't use any registers above this value for critical stuff
 	 */
-	public static final int  MAX_COMPILER_REGISTER = REG_MAX_VARIABLE;
+	public static final int MAX_COMPILER_REGISTER = REG_MAX_VARIABLE;
 	
-	private static class UsedData {
+	private static class UsedData implements Cloneable {
 		
-		int  regs        = X00 + 5;
+		int  regs        = REG_MIN_VARIABLE;
 		int  maxregs     = -1;
 		long currentaddr = 0L;
 		long maxaddr     = -1L;
+		
+		@Override
+		protected UsedData clone() {
+			try {
+				return (UsedData) super.clone();
+			} catch (CloneNotSupportedException e) {
+				throw new InternalError();
+			}
+		}
 		
 	}
 	
@@ -411,7 +477,12 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 		sf.cmds = new LinkedList <>();
 		boolean[] regs = new boolean[256];
 		UsedData used = new UsedData();
-		count(used, regs, sf.body);
+		SimpleVariable[] myargs = sf.type.arguments.clone();
+		count(used, regs, Arrays.asList(myargs));
+		used.currentaddr = used.maxaddr;
+		used.regs = used.maxregs;
+		UsedData funcArgs = used.clone();
+		count(used, regs, sf.body.cmds);
 		for (int i = 0; i < used.regs; i ++ ) {
 			regs[i] = true;
 		}
@@ -421,6 +492,7 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 		} else {
 			sf.addrVars = false;
 		}
+		copyArgs(target, sf, funcArgs, myargs);
 		sf.regVars = used.maxregs;
 		for (SimpleCommand cmd : sf.body.cmds) {
 			compileCommand(target, sf, regs, cmd);
@@ -435,6 +507,40 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 		Command c = new Command(Commands.CMD_RET, null, null);
 		target.pos += c.length();
 		sf.cmds.add(c);
+	}
+	
+	private void copyArgs(CompileTarget target, SimpleFunction sf, UsedData funcArgs, SimpleVariable[] myargs) {
+		for (int i = 0; i < sf.type.arguments.length; i ++ ) {
+			SimpleVariable myarg = myargs[i];
+			SimpleVariable arg = sf.type.arguments[i];
+			assert myarg.addr != -1L;
+			assert myarg.reg != -1;
+			assert arg.reg == REG_METHOD_STRUCT;
+			assert arg.reg != -1L;
+			Param p1, p2;
+			if (arg.addr == -1L) {
+				p1 = build(A_SR, myarg.reg);
+				funcArgs.regs -- ;
+			} else if (arg.addr == 0L) {
+				funcArgs.currentaddr -= 8L;
+				assert myarg.reg == REG_VARIABLE_POINTER;
+				p1 = build(A_SR | B_REG, REG_VARIABLE_POINTER);
+			} else {
+				funcArgs.currentaddr -= 8L;
+				assert myarg.reg == REG_VARIABLE_POINTER;
+				p1 = build(A_SR | B_NUM, REG_VARIABLE_POINTER, myarg.addr);
+			}
+			if (myarg.addr == 0L) {
+				p2 = build(A_SR | B_REG, REG_METHOD_STRUCT);
+			} else {
+				p2 = build(A_SR | B_NUM, REG_METHOD_STRUCT, myarg.addr);
+			}
+			Command c = new Command(Commands.CMD_MOV, p1, p2);
+			target.pos += c.length();
+			sf.cmds.add(c);
+		}
+		assert funcArgs.regs == REG_MIN_VARIABLE;
+		assert funcArgs.currentaddr == 0L;
 	}
 	
 	private void initVariableMemory(CompileTarget target, SimpleFunction sf) {
@@ -485,9 +591,11 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 				return;
 			}
 			assignVariable(target, sf, regs, varDeclCmd, varDeclCmd.init);
+		} else if (cmd instanceof SimpleCommandAsm) {
+			SimpleCommandAsm asm = (SimpleCommandAsm) cmd;
+			compileAsm(target, sf, regs, asm);
 		} else {
-			throw new InternalError(
-				"unknown command type: " + cmd.getClass().getName() + " (of command: '" + cmd + "')");
+			throw new InternalError("unknown command type: " + cmd.getClass().getName() + " (of command: '" + cmd + "')");
 		}
 	}
 	
@@ -501,6 +609,121 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 		if (new Command(Commands.CMD_JMPEQ, build(A_NUM, -1L), null).length() != JMPEQ_LEN) {
 			throw new AssertionError();
 		}
+	}
+	
+	private void compileAsm(CompileTarget target, SimpleFunction sf, boolean[] regs, SimpleCommandAsm asmCmd) {
+		final int arglen = asmCmd.asmArguments.length;
+		final int reslen = asmCmd.asmResults.length;
+		boolean[] argsolds = new boolean[arglen];
+		for (int i = 0; i < arglen; i ++ ) {
+			AsmParam arg = asmCmd.asmArguments[i];
+			freeAsmReg(target, sf, regs, argsolds, i, arg);
+			regs[arg.register] = true;
+			target.pos = arg.value.loadValue(arg.register, regs, sf.cmds, target.pos);
+		}
+		addAsmCommands(target, sf, asmCmd);
+		for (int i = 0; i < reslen; i ++ ) {
+			AsmParam res = asmCmd.asmResults[i];
+			SimpleValue val = res.value.addExpUnary(asmCmd.pool, SimpleValue.EXP_UNARY_AND);
+			int reg = register(regs, res.register + 1 >= 256 ? MAX_COMPILER_REGISTER + 1 : res.register + 1);
+			boolean old = makeRegUsable(regs, reg, sf.cmds, target);
+			val.loadValue(reg, regs, sf.cmds, reg);
+			Param p1, p2;
+			p1 = build(A_SR | B_REG, reg);
+			p2 = build(A_SR, res.register);
+			Commands mv = Commands.CMD_MOV;
+			if (val.type().isPrimitive()) {
+				switch (val.type().byteCount()) {
+				case 8:
+					break;
+				case 4:
+					mv = Commands.CMD_MVDW;
+					break;
+				case 2:
+					mv = Commands.CMD_MVW;
+					break;
+				case 1:
+					mv = Commands.CMD_MVB;
+					break;
+				default:
+					throw new InternalError("primitive type with unknown byte count: " + val.type().byteCount() + " (" + val.type() + ")");
+				}
+			}
+			Command mov = new Command(mv, p1, p2);
+			target.pos += mov.length();
+			sf.cmds.add(mov);
+			releseReg(regs, reg, old, sf.cmds, target);
+		}
+		for (int i = 0; i < arglen; i ++ ) {
+			AsmParam arg = asmCmd.asmArguments[i];
+			if (argsolds[i]) {
+				singlePushOrPop(target, sf, arg, Commands.CMD_POP);
+			} else {
+				regs[arg.register] = false;
+			}
+		}
+	}
+	
+	/*
+	 * private ParseContext parse(String asmCode, Map <String, SimpleConstant> consts) { asmCode = asmCode.substring(2, asmCode.length() - 2); PrimitiveAssembler asm = new
+	 * PrimitiveAssembler(OutputStream.nullOutputStream(), null, new Path[0], false, true); try {
+	 * 
+	 * @SuppressWarnings("unchecked") ParseContext context = return context; } catch (IOException | AssembleError e) { throw new RuntimeException(e); } }
+	 */
+	
+	@SuppressWarnings("unchecked")
+	private void addAsmCommands(CompileTarget target, SimpleFunction sf, SimpleCommandAsm asmCmd) {
+		try {
+			ConstantPoolCommand cpc = new ConstantPoolCommand();
+			PrimitiveAssembler asm = new PrimitiveAssembler(new OutputStream() {
+				
+				@Override
+				public void write(int b) throws IOException {
+					cpc.addBytes(new byte[] {(byte) b });
+					target.pos ++ ;
+				}
+				
+				@Override
+				public void write(byte[] b) throws IOException {
+					cpc.addBytes(b);
+					target.pos += b.length;
+				}
+				
+				@Override
+				public void write(byte[] b, int off, int len) throws IOException {
+					cpc.addBytes(Arrays.copyOfRange(b, off, off + len));
+					target.pos += len;
+				}
+				
+			}, null, lockups, false, true);
+			asm.assemble(Paths.get("[INVALID]"), new ANTLRInputStream(asmCmd.asmCode), (Map <String, PrimitiveConstant>) (Map <String, ? extends PrimitiveConstant>) asmCmd.pool.getConstants());
+			if ( (target.pos & 7) != 0) {
+				byte[] bytes = new byte[(int) (8 - (target.pos & 7))];
+				Param p1 = build(A_NUM, JMP_LEN + bytes.length);
+				Command jmp = new Command(Commands.CMD_JMP, p1, null);
+				target.pos += jmp.length() + bytes.length;
+				sf.cmds.add(jmp);
+				cpc.addBytes(bytes);
+			}
+			assert (cpc.length() & 7) == 0;
+			sf.cmds.add(cpc);
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		}
+	}
+	
+	private void freeAsmReg(CompileTarget target, SimpleFunction sf, boolean[] regs, boolean[] olds, int i, AsmParam arg) {
+		olds[i] = regs[arg.register];
+		if (olds[i]) {
+			singlePushOrPop(target, sf, arg, Commands.CMD_PUSH);
+		}
+	}
+	
+	private void singlePushOrPop(CompileTarget target, SimpleFunction sf, AsmParam arg, Commands pushOrPop) {
+		Param p1 = build(A_SR, arg.register);
+		Command push = new Command(pushOrPop, p1, null);
+		target.pos += push.length();
+		sf.cmds.add(push);
 	}
 	
 	private void compileIf(CompileTarget target, SimpleFunction sf, boolean[] regs, SimpleCommandIf ifCmd) {
@@ -823,23 +1046,28 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 		return fallback;
 	}
 	
-	private void count(UsedData used, boolean[] regs, SimpleCommandBlock body) {
+	private void count(UsedData used, boolean[] regs, Iterable <?> countTarget) {
 		final int startRegs = used.regs;
 		final long startAddr = used.currentaddr;
-		for (SimpleCommand cmd : body.cmds) {
-			if (cmd instanceof SimpleCommandBlock) {
-				count(used, regs, (SimpleCommandBlock) cmd);
-			} else if (cmd instanceof SimpleCommandVarDecl) {
-				SimpleCommandVarDecl vd = (SimpleCommandVarDecl) cmd;
-				if ( (vd.type.isPrimitive() || vd.type.isPointer()) && used.regs < MAX_COMPILER_REGISTER) {
-					vd.addr = -used.regs;
+		for (Object obj : countTarget) {
+			if (obj instanceof SimpleCommandBlock) {
+				count(used, regs, ((SimpleCommandBlock) obj).cmds);
+			} else if (obj instanceof SimpleVariable) {
+				SimpleVariable sv = (SimpleVariable) obj;
+				if ( (sv.type.isPrimitive() || sv.type.isPointer()) && used.regs < MAX_COMPILER_REGISTER) {
+					sv.reg = used.regs;
 					used.regs ++ ;
 				} else {
-					int bc = vd.type.byteCount();
+					int bc = sv.type.byteCount();
 					used.currentaddr = align(used.currentaddr, bc);
-					vd.addr = used.currentaddr;
+					sv.addr = used.currentaddr;
+					sv.reg = REG_VARIABLE_POINTER;
 					used.currentaddr += bc;
 				}
+			} else if (obj instanceof SimpleCommand) {
+				// do nothing
+			} else {
+				throw new InternalError("unknown class: '" + obj.getClass().getName() + "' of object: '" + obj + "'");
 			}
 		}
 		if (used.currentaddr > used.maxaddr) {
@@ -852,7 +1080,7 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 		used.currentaddr = startAddr;
 	}
 	
-	private long align(long pos, int bc) {
+	public static long align(long pos, int bc) {
 		int high = 8;
 		if (Integer.bitCount(bc) == 1 && bc < 8) {
 			high = bc;

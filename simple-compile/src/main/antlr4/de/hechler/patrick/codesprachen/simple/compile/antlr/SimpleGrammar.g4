@@ -14,6 +14,7 @@ import java.nio.file.*;
 import de.hechler.patrick.codesprachen.simple.compile.objects.*;
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.*;
 import de.hechler.patrick.codesprachen.simple.compile.objects.commands.*;
+import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommandAsm.*;
 import de.hechler.patrick.codesprachen.simple.compile.objects.types.*;
 }
 
@@ -74,6 +75,9 @@ simpleFile [SimpleFile file]:
 		|
 		function [file]
 		{file.addFunction($function.func);}
+		|
+		constant [file]
+		{file.addConstant($constant.c);}
 	)*
 	EOF
 ;
@@ -135,6 +139,18 @@ function [SimpleFile file] returns [SimpleFunction func]:
 	{SimplePool pool = file.newFuncPool($args.list, results);}
 	commandBlock [pool]
 	{$func = new SimpleFunction(export, main, $NAME.getText(), $args.list, results, $commandBlock.cmd);}
+;
+constant [SimpleFile file] returns [SimpleConstant c]:
+	{
+		boolean export = false;
+	}
+	CONST
+	(
+		EXP
+		{export = true;}
+	)?
+	NAME ARROW_LEFT value [file] SEMI
+	{$c = SimpleConstant.create($NAME.getText(), $value.val, export);}
 ;
 
 value [SimplePool pool] returns [SimpleValue val]:
@@ -488,6 +504,9 @@ command [SimplePool pool] returns [SimpleCommand cmd]:
 	|
 	commandIf [pool]
 	{$cmd = $commandIf.cmd;}
+	|
+	commandAsm [pool]
+	{$cmd = $commandAsm.cmd;}
 ;
 commandBlock [SimplePool pool] returns [SimpleCommandBlock cmd]:
 	{
@@ -531,9 +550,6 @@ commandWhile [SimplePool pool] returns [SimpleCommandWhile cmd]:
 	(
 		command [pool]
 		{whileCmd = $command.cmd;}
-		|
-		SEMI
-		{whileCmd = null;}
 	)
 	{$cmd = SimpleCommandWhile.create(pool, $value.val, whileCmd);}
 ;
@@ -547,6 +563,24 @@ commandIf [SimplePool pool] returns [SimpleCommandIf cmd]:
 		{elseCmd = $ec.cmd;}
 	)?
 	{$cmd = SimpleCommandIf.create(pool, $value.val, $ic.cmd, elseCmd);}
+;
+commandAsm [SimplePool pool] returns [SimpleCommandAsm cmd]:
+	{
+		List<AsmParam> args = new ArrayList<>();
+		List<AsmParam> res = new ArrayList<>();
+	}
+	ASM
+	(
+		XNN ARROW_LEFT value [pool]
+		{args.add(AsmParam.create($value.val, $XNN.getText()));}
+	)*
+	ASM_BLOCK
+	(
+		value [pool] ARROW_LEFT XNN
+		{res.add(AsmParam.create($value.val, $XNN.getText()));}
+	)*
+	SEMI
+	{$cmd = new SimpleCommandAsm(pool, args, $ASM_BLOCK.getText(), res);}
 ;
 
 STRING :
@@ -586,6 +620,63 @@ NUMBER_FP :
 	)
 ;
 
+XNN :
+	'X'
+	(
+		[0-9A-E] [0-9A-F] 
+		|
+		'F' [0-9]
+	)
+;
+ASM_BLOCK :
+	'::'
+	(
+		~ ( '>' | '"' | '\'' | '|' )
+		|
+		'>' ~'>'
+		|
+		'"'
+		(
+			~ ( '"' | '\\' )
+			|
+			'\\' .
+		)*
+		'"'
+		|
+		'\''
+		(
+			~ ( '\'' | '\\' )
+			|
+			'\\' .
+		)*
+		'\''
+		|
+		'|'
+		(
+			~ ( '>' | ':' )
+			|
+			'>'
+			(
+				~ ( '\r' | '\n' )
+			)*
+			[\r\n]
+			|
+			':'
+			(
+				~ ( '|' )
+				|
+				'|'
+				(
+					~ ( '>' )
+				)
+			)*
+			'|>'
+		) 
+	)*
+	'>>'
+;
+
+
 DEP : 'dep' ;
 STRUCT : 'struct' ;
 FUNC : 'func' ;
@@ -597,6 +688,7 @@ CALL : 'call' ;
 WHILE : 'while' ;
 IF : 'if' ;
 ELSE : 'else' ;
+ASM : 'asm' ;
 
 NUM : 'num' ;
 FPNUM : 'fpnum' ;

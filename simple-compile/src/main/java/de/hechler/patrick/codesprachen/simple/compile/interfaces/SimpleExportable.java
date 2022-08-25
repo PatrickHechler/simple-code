@@ -16,11 +16,15 @@ import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleTypePo
 
 public interface SimpleExportable {
 	
+	static final char E_CONST_START    = 'C';
+	static final char E_CONST_NAME_END = '=';
+	
 	static final char E_VAR_START  = 'V';
 	static final char E_FUNC_START = 'F';
 	static final char E_NAME_START = ':';
 	
 	static final char E_VAR_START_TYPE = '~';
+	
 	
 	static final char E_T_FUNC_START            = '(';
 	static final char E_T_FUNC_ARGS_RESULTS_SEP = '>';

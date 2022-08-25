@@ -12,14 +12,14 @@ public class SimpleVariable implements SimpleExportable {
 	 * ?
 	 *   reg == -1
 	 *   ?
-	 *     invalid
+	 *     not yet initialized
 	 *   :
 	 *     [reg + addr] is the value
 	 *       (note that if this is a array or struct ret + addr is only the start address)
 	 * :
 	 *   reg == -1
 	 *   ?
-	 *     not yet initialized
+	 *     invalid
 	 *   :
 	 *     reg holds the value
 	 *       (note that if this is a array or struct only a pointer is in reg)
