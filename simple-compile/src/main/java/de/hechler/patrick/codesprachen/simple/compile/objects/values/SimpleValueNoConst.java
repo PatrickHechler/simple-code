@@ -16,6 +16,7 @@ import de.hechler.patrick.codesprachen.primitive.assemble.objects.Param;
 import de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder;
 import de.hechler.patrick.codesprachen.simple.compile.objects.SimplePool;
 import de.hechler.patrick.codesprachen.simple.compile.objects.SimpleVariable;
+import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleFuncType;
 import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleStructType;
 import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleType;
 import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleTypePointer;
@@ -566,7 +567,7 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 				p1 = build.build();
 				build.art = A_SR | B_REG;
 				p2 = build.build();
-				addMovCmd(t, commands, pos, p1, p2, targetRegister);
+				addMovCmd(t, commands, pos, p1, p2);
 				return pos;
 			}
 			
@@ -620,7 +621,7 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 					build.v2 = rd.reg;
 					p2 = build.build();
 				}
-				pos = addMovCmd(t, commands, pos, p1, p2, targetRegister);
+				pos = addMovCmd(t, commands, pos, p1, p2);
 				if (rd != null) {
 					releaseRegister(commands, pos, rd, blockedRegisters);
 				}
@@ -635,7 +636,7 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		};
 	}
 	
-	protected long addMovCmd(SimpleType type, List <Command> commands, long pos, Param param1, Param param2, int targetRegister) {
+	public static long addMovCmd(SimpleType type, List <Command> commands, long pos, Param param1, Param param2) {
 		int bits = 64;
 		boolean signed = true;
 		Commands mov = Commands.CMD_MOV;
@@ -643,8 +644,8 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		// only cmpCmd and andCmd when not signed
 		if (type.isPrimitive()) {
 			bits = ((SimpleTypePrimitive) type).bits();
-			signed = ((SimpleTypePrimitive) type).signed();
 			if (bits != 64) {
+				signed = ((SimpleTypePrimitive) type).signed();
 				long andbits, cmpbits;
 				switch (bits) {
 				case 32:
@@ -666,47 +667,40 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 					throw new InternalError("unknown bit count: " + bits);
 				}
 				Param p1, p2;
-				ParamBuilder build = new ParamBuilder();
-				build.art = A_SR;
-				build.v1 = targetRegister;
-				p1 = build.build();
-				build.art = A_NUM;
-				build.v1 = cmpbits;
-				p2 = build.build();
-				bcpCmd = new Command(Commands.CMD_BCP, p1, p2);
-				pos += bcpCmd.length();
-				build.v1 = andbits;
-				p2 = build.build();
+				// make commands in revers order, so the jump length is known
+				p1 = param1;
+				p2 = build(A_NUM, andbits);
 				andCmd = new Command(Commands.CMD_AND, p1, p2);
-				long andLen = andCmd.length();
 				if (signed) {
-					long relative = andLen;
-					build.v1 = ~andbits;
-					p2 = build.build();
-					orCmd = new Command(Commands.CMD_OR, p1, p2);
-					build.v1 = relative;
-					p1 = build.build();
+					long relLen = andCmd.length();
+					p1 = build(A_NUM, relLen);
 					jmpCmd = new Command(Commands.CMD_JMP, p1, null);
-					relative += orCmd.length() + jmpCmd.length();
-					build.v1 = relative;
+					relLen += jmpCmd.length();
+					p1 = param1;
+					p2 = build(A_NUM, ~andbits);
+					orCmd = new Command(Commands.CMD_OR, p1, p2);
+					relLen += orCmd.length();
+					p1 = build(A_NUM, relLen);
 					jmpnbCmd = new Command(Commands.CMD_JMPNB, p1, null);
-					pos += relative;
-				} else {
-					pos += andLen;
+					p1 = param1;
+					p2 = build(A_NUM, cmpbits);
+					bcpCmd = new Command(Commands.CMD_BCP, p1, p2);
 				}
 			}
 		}
-		Command addCmd = new Command(mov, param1, param2);
-		pos += addCmd.length();
-		commands.add(addCmd);
-		if (bcpCmd != null) {
-			commands.add(bcpCmd);
+		Command c = new Command(mov, param1, param2);
+		pos += c.length();
+		commands.add(c);
+		if (andCmd != null) {
 			if (signed) {
+				commands.add(bcpCmd);
 				commands.add(jmpnbCmd);
 				commands.add(orCmd);
 				commands.add(jmpCmd);
+				pos += bcpCmd.length() + jmpnbCmd.length() + orCmd.length() + jmpCmd.length();
 			}
 			commands.add(andCmd);
+			pos += andCmd.length();
 		}
 		return pos;
 	}
@@ -716,18 +710,39 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		if ( !t.isStruct()) {
 			throw new IllegalStateException("name referencing is only possible on files!");
 		}
-		SimpleStructType struct = (SimpleStructType) t;
-		int off = 0;
 		SimpleVariable target = null;
-		for (SimpleVariable sv : struct.members) {
-			if (sv.name.equals(text)) {
-				target = sv;
-				break;
+		int off = 0;
+		if (t.isFunc()) {
+			SimpleFuncType func = (SimpleFuncType) t;
+			for (SimpleVariable sv : func.arguments) {
+				if (sv.name.equals(text)) {
+					target = sv;
+					break;
+				}
+				off += sv.type.byteCount();
 			}
-			off += sv.type.byteCount();
+			if (target == null) {
+				off = 0;
+				for (SimpleVariable sv : func.arguments) {
+					if (sv.name.equals(text)) {
+						target = sv;
+						break;
+					}
+					off += sv.type.byteCount();
+				}
+			}
+		} else {
+			SimpleStructType struct = (SimpleStructType) t;
+			for (SimpleVariable sv : struct.members) {
+				if (sv.name.equals(text)) {
+					target = sv;
+					break;
+				}
+				off += sv.type.byteCount();
+			}
 		}
 		if (target == null) {
-			throw new IllegalStateException("this structure does not has a member with the name '" + text + "' (struct: " + t + ") (me: " + this + ")");
+			throw new IllegalStateException("this structure does not has a member with the name '" + text + "' ((func-)struct: " + t + ") (me: " + this + ")");
 		}
 		final int offset = off;
 		final SimpleValueNoConst me = this;
@@ -752,7 +767,7 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 					build.art = A_SR | B_NUM;
 					build.v2 = offset;
 					p2 = build.build();
-					addMovCmd(t, commands, pos, p1, p2, targetRegister);
+					addMovCmd(t, commands, pos, p1, p2);
 				}
 				return pos;
 			}
@@ -996,11 +1011,9 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 	
 	private static long findRegister(boolean[] blockedRegisters, List <Command> commands, long pos, RegisterData rd, int fallback) {
 		int startRegister = rd.reg;
-		for (; rd.reg < 256 && blockedRegisters[rd.reg]; rd.reg ++ )
-			;
+		for (; rd.reg < 256 && blockedRegisters[rd.reg]; rd.reg ++ );
 		if (rd.reg >= 256) {
-			for (rd.reg = MIN_REGISTER; blockedRegisters[rd.reg] && rd.reg < startRegister; rd.reg ++ )
-				;
+			for (rd.reg = MIN_REGISTER; blockedRegisters[rd.reg] && rd.reg < startRegister; rd.reg ++ );
 			if (rd.reg >= startRegister) {
 				rd.pushPop = true;
 				blockedRegisters[fallback] = false;

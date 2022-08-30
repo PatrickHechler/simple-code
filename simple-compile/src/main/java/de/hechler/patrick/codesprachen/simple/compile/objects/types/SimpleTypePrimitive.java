@@ -1,8 +1,14 @@
 package de.hechler.patrick.codesprachen.simple.compile.objects.types;
 
-import static de.hechler.patrick.codesprachen.simple.compile.interfaces.SimpleExportable.*;
-
-import java.util.Set;
+import static de.hechler.patrick.codesprachen.simple.compile.interfaces.SimpleExportable.PRIM_BYTE;
+import static de.hechler.patrick.codesprachen.simple.compile.interfaces.SimpleExportable.PRIM_DWORD;
+import static de.hechler.patrick.codesprachen.simple.compile.interfaces.SimpleExportable.PRIM_FPNUM;
+import static de.hechler.patrick.codesprachen.simple.compile.interfaces.SimpleExportable.PRIM_NUM;
+import static de.hechler.patrick.codesprachen.simple.compile.interfaces.SimpleExportable.PRIM_UBYTE;
+import static de.hechler.patrick.codesprachen.simple.compile.interfaces.SimpleExportable.PRIM_UDWORD;
+import static de.hechler.patrick.codesprachen.simple.compile.interfaces.SimpleExportable.PRIM_UNUM;
+import static de.hechler.patrick.codesprachen.simple.compile.interfaces.SimpleExportable.PRIM_UWORD;
+import static de.hechler.patrick.codesprachen.simple.compile.interfaces.SimpleExportable.PRIM_WORD;
 
 public enum SimpleTypePrimitive implements SimpleType {
 	
@@ -122,34 +128,34 @@ public enum SimpleTypePrimitive implements SimpleType {
 	}
 	
 	@Override
-	public void appendToExportStr(StringBuilder build, Set <String> exportedStructs) {
+	public void appendToExportStr(StringBuilder build) {
 		switch (this) {
 		case pt_fpnum:
-			build.append(E_T_FPNUM);
+			build.append(PRIM_FPNUM);
 			break;
 		case pt_unum:
-			build.append(E_T_UNUM);
+			build.append(PRIM_UNUM);
 			break;
 		case pt_num:
-			build.append(E_T_NUM);
+			build.append(PRIM_NUM);
 			break;
 		case pt_udword:
-			build.append(E_T_UDWORD);
+			build.append(PRIM_UDWORD);
 			break;
 		case pt_dword:
-			build.append(E_T_DWORD);
+			build.append(PRIM_DWORD);
 			break;
 		case pt_uword:
-			build.append(E_T_UWORD);
+			build.append(PRIM_UWORD);
 			break;
 		case pt_word:
-			build.append(E_T_WORD);
+			build.append(PRIM_WORD);
 			break;
 		case pt_ubyte:
-			build.append(E_T_UBYTE);
+			build.append(PRIM_UBYTE);
 			break;
 		case pt_byte:
-			build.append(E_T_BYTE);
+			build.append(PRIM_BYTE);
 			break;
 		case pt_inval:
 			throw new InternalError("the primitive type inval is only for intern use, thus it can not be exported!");

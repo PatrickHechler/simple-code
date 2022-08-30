@@ -1,11 +1,9 @@
 package de.hechler.patrick.codesprachen.simple.compile.objects.types;
 
-import static de.hechler.patrick.codesprachen.simple.compile.interfaces.SimpleExportable.E_T_FUNC_ARGS_RESULTS_SEP;
-import static de.hechler.patrick.codesprachen.simple.compile.interfaces.SimpleExportable.E_T_FUNC_END;
-import static de.hechler.patrick.codesprachen.simple.compile.interfaces.SimpleExportable.E_T_FUNC_START;
+import static de.hechler.patrick.codesprachen.simple.compile.interfaces.SimpleExportable.FUNC;
+import static de.hechler.patrick.codesprachen.simple.compile.interfaces.SimpleExportable.exportVars;
 
 import java.util.List;
-import java.util.Set;
 
 import de.hechler.patrick.codesprachen.simple.compile.objects.SimpleCompiler;
 import de.hechler.patrick.codesprachen.simple.compile.objects.SimpleVariable;
@@ -117,16 +115,12 @@ public class SimpleFuncType implements SimpleType {
 	}
 	
 	@Override
-	public void appendToExportStr(StringBuilder build, Set <String> exportedStructs) {
-		build.append(E_T_FUNC_START);
-		for (SimpleVariable sv : arguments) {
-			sv.type.appendToExportStr(build, exportedStructs);
-		}
-		build.append(E_T_FUNC_ARGS_RESULTS_SEP);
-		for (SimpleVariable sv : results) {
-			sv.type.appendToExportStr(build, exportedStructs);
-		}
-		build.append(E_T_FUNC_END);
+	public void appendToExportStr(StringBuilder build) {
+		build.append(FUNC);
+		exportVars(build, arguments);
+		build.append(FUNC);
+		exportVars(build, results);
+		build.append(FUNC);
 	}
 	
 	@Override

@@ -636,3 +636,4 @@ struct file_stream {
 
 # TODOs
 * make compiler support for the predefined stuff
+    * also add compiler option for not using the predefined stuff (so it is easier to change the predefined stuff by just recompiling the file with the option)

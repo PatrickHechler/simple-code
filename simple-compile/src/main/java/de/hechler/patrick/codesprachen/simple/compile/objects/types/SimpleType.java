@@ -1,7 +1,5 @@
 package de.hechler.patrick.codesprachen.simple.compile.objects.types;
 
-import java.util.Set;
-
 public interface SimpleType {
 	
 	public static final SimpleTypePrimitive FPNUM  = SimpleTypePrimitive.pt_fpnum;
@@ -65,6 +63,6 @@ public interface SimpleType {
 	 */
 	int byteCount();
 	
-	void appendToExportStr(StringBuilder build, Set <String> exportedStructs);
+	void appendToExportStr(StringBuilder build);
 	
 }

@@ -12,6 +12,7 @@ import java.util.*;
 import java.io.*;
 import java.nio.file.*;
 import de.hechler.patrick.codesprachen.simple.compile.objects.*;
+import de.hechler.patrick.codesprachen.simple.compile.objects.SimpleFile.*;
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.*;
 import de.hechler.patrick.codesprachen.simple.compile.objects.commands.*;
 import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommandAsm.*;
@@ -108,10 +109,15 @@ variable [SimplePool pool] returns [SimpleVariable vari]:
 	{$vari = new SimpleVariable($type.t, $NAME.getText(), export);}
 ;
 structure [SimplePool pool] returns [SimpleStructType struct]:
-	STRUCT NAME OPEN_CODE_BLOCK
+	STRUCT
+	{boolean export = false;}
+	(
+		EXP
+	)?
+	NAME OPEN_CODE_BLOCK
 		namedTypeList [pool]
 	CLOSE_CODE_BLOCK
-	{$struct = new SimpleStructType($NAME.getText(), $namedTypeList.list);}
+	{$struct = new SimpleStructType($NAME.getText(), export, $namedTypeList.list);}
 ;
 function [SimpleFile file] returns [SimpleFunction func]:
 	{
@@ -138,7 +144,7 @@ function [SimpleFile file] returns [SimpleFunction func]:
 	)?
 	{SimplePool pool = file.newFuncPool($args.list, results);}
 	commandBlock [pool]
-	{$func = new SimpleFunction(export, main, $NAME.getText(), $args.list, results, $commandBlock.cmd);}
+	{$func = new SimpleFunction(export, main, $NAME.getText(), $args.list, results, $commandBlock.cmd, (SimpleFuncPool) pool);}
 ;
 constant [SimpleFile file] returns [SimpleConstant c]:
 	{
@@ -346,7 +352,13 @@ expUnary [SimplePool pool] returns [SimpleValue val]:
 		{type = SimpleValue.EXP_UNARY_BOOLEAN_NOT;}
 	)?
 	e = expPostfix [pool]
-	{$val = $e.val.addExpUnary(pool, type);}
+	{
+		if (type != SimpleValue.EXP_UNARY_NONE) {
+			$val = $e.val.addExpUnary(pool, type);
+		} else {
+			$val = $e.val;
+		}
+	}
 ;
 expPostfix [SimplePool pool] returns [SimpleValue val]:
 	f = expDirect [pool]
@@ -443,20 +455,32 @@ type [SimplePool pool] returns [SimpleType t]:
 ;
 
 typePrim returns [SimpleType t]:
-	NUM
-	{$t = SimpleType.NUM;}
-	|
 	FPNUM
 	{$t = SimpleType.FPNUM;}
+	|
+	UNUM
+	{$t = SimpleType.UNUM;}
+	|
+	NUM
+	{$t = SimpleType.NUM;}
 	|
 	DWORD
 	{$t = SimpleType.DWORD;}
 	|
+	UDWORD
+	{$t = SimpleType.UDWORD;}
+	|
 	WORD
 	{$t = SimpleType.WORD;}
 	|
+	UWORD
+	{$t = SimpleType.UWORD;}
+	|
 	BYTE
 	{$t = SimpleType.BYTE;}
+	|
+	UBYTE
+	{$t = SimpleType.UBYTE;}
 ;
 
 typeStruct [SimplePool pool] returns [SimpleStructType t]:
@@ -483,6 +507,7 @@ namedTypeList [SimplePool pool] returns [List<SimpleVariable> list]:
 			COMMA ots = type [pool] ons = NAME
 			{$list.add(new SimpleVariable($ots.t, $ons.getText(), false));}
 		)*
+		COMMA?
 	)?
 ;
 
@@ -511,6 +536,7 @@ command [SimplePool pool] returns [SimpleCommand cmd]:
 commandBlock [SimplePool pool] returns [SimpleCommandBlock cmd]:
 	{
 		pool = pool.newSubPool();
+		$cmd = ((SimpleSubPool)pool).block;
 	}
 	OPEN_CODE_BLOCK
 	(
@@ -570,12 +596,12 @@ commandAsm [SimplePool pool] returns [SimpleCommandAsm cmd]:
 	}
 	ASM
 	(
-		XNN ARROW_LEFT value [pool]
+		value [pool] ARROW_RIGTH XNN
 		{args.add(AsmParam.create($value.val, $XNN.getText()));}
 	)*
 	ASM_BLOCK
 	(
-		value [pool] ARROW_LEFT XNN
+		XNN ARROW_RIGTH value [pool]
 		{res.add(AsmParam.create($value.val, $XNN.getText()));}
 	)*
 	SEMI
@@ -680,6 +706,7 @@ DEP : 'dep' ;
 STRUCT : 'struct' ;
 FUNC : 'func' ;
 VAR : 'var' ;
+CONST : 'const' ;
 EXP : 'exp' ;
 MAIN : 'main' ;
 
@@ -689,11 +716,15 @@ IF : 'if' ;
 ELSE : 'else' ;
 ASM : 'asm' ;
 
-NUM : 'num' ;
 FPNUM : 'fpnum' ;
+NUM : 'num' ;
+UNUM : 'unum' ;
 DWORD : 'dword' ;
-WORD : 'word' | 'char' ;
+UDWORD : 'udword' ;
+WORD : 'word' ;
+UWORD : 'uword' | 'char' ;
 BYTE : 'byte' ;
+UBYTE : 'ubyte' ;
 
 OPEN_CODE_BLOCK   : '{' ;
 CLOSE_CODE_BLOCK  : '}' ;

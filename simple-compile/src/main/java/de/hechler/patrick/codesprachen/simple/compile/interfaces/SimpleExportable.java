@@ -1,11 +1,22 @@
 package de.hechler.patrick.codesprachen.simple.compile.interfaces;
 
-import java.util.ArrayList;
+import java.io.IOException;
+import java.io.Reader;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import java.util.NoSuchElementException;
 
+import org.antlr.v4.runtime.ANTLRInputStream;
+import org.antlr.v4.runtime.BailErrorStrategy;
+import org.antlr.v4.runtime.CommonTokenStream;
+import org.antlr.v4.runtime.Lexer;
+
+import de.hechler.patrick.codesprachen.simple.compile.antlr.SimpleExportGrammarLexer;
+import de.hechler.patrick.codesprachen.simple.compile.antlr.SimpleExportGrammarParser;
+import de.hechler.patrick.codesprachen.simple.compile.antlr.SimpleExportGrammarParser.SimpleExportsContext;
+import de.hechler.patrick.codesprachen.simple.compile.objects.SimpleConstant;
 import de.hechler.patrick.codesprachen.simple.compile.objects.SimpleFunction;
 import de.hechler.patrick.codesprachen.simple.compile.objects.SimpleVariable;
 import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleFuncType;
@@ -13,313 +24,168 @@ import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleStruct
 import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleType;
 import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleTypeArray;
 import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleTypePointer;
+import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleTypePrimitive;
 
 public interface SimpleExportable {
 	
-	static final char E_CONST_START    = 'C';
-	static final char E_CONST_NAME_END = '=';
+	static char UNKNOWN_SIZE_ARRAY = ']';
+	static char ARRAY              = '[';
+	static char POINTER            = '#';
 	
-	static final char E_VAR_START  = 'V';
-	static final char E_FUNC_START = 'F';
-	static final char E_NAME_START = ':';
+	static char PRIM_FPNUM  = '.';
+	static char PRIM_NUM    = '-';
+	static char PRIM_UNUM   = '+';
+	static char PRIM_DWORD  = '\\';
+	static char PRIM_UDWORD = '/';
+	static char PRIM_WORD   = '!';
+	static char PRIM_UWORD  = '&';
+	static char PRIM_BYTE   = '"';
+	static char PRIM_UBYTE  = '\'';
 	
-	static final char E_VAR_START_TYPE = '~';
+	static char FUNC   = '*';
+	static char VAR    = ';';
+	static char STRUCT = '~';
+	static char CONST  = '%';
 	
-	
-	static final char E_T_FUNC_START            = '(';
-	static final char E_T_FUNC_ARGS_RESULTS_SEP = '>';
-	static final char E_T_FUNC_END              = ')';
-	
-	
-	static final char E_T_STRUCT_START    = '{';
-	static final char E_T_STRUCT_NAME_END = ':';
-	static final char E_T_STRUCT_END      = '}';
-	
-	static final char E_T_POINTER     = '*';
-	static final char E_T_ARRAY       = '[';
-	static final char E_T_EMPTY_ARRAY = ']';
-	
-	static final char E_T_FPNUM  = 'f';
-	static final char E_T_UNUM   = 'N';
-	static final char E_T_NUM    = 'n';
-	static final char E_T_UDWORD = 'D';
-	static final char E_T_DWORD  = 'd';
-	static final char E_T_UWORD  = 'W';
-	static final char E_T_WORD   = 'w';
-	static final char E_T_UBYTE  = 'B';
-	static final char E_T_BYTE   = 'b';
+	static char NAME_TYPE_SEP = ':';
+	static char VAR_SEP       = ',';
 	
 	boolean isExport();
 	
 	String toExportString();
 	
-	public static SimpleExportable fromExport(String str) {
-		try {
-			Map <String, UnfinishedType> structures = new HashMap <>();
-			SimpleExportable exported = readExported(str, structures);
-			if (exported instanceof SimpleFunction) {
-				SimpleFunction sf = (SimpleFunction) exported;
-				finishArray(sf.type.arguments, structures);
-				finishArray(sf.type.results, structures);
-			} else if (exported instanceof SimpleVariable) {
-				SimpleVariable st = (SimpleVariable) exported;
-				SimpleType t = finish(st.type, structures);
-				if (t != st.type) {
-					exported = new SimpleVariable(st.addr, t, st.name);
+	String name();
+	
+	static SimpleExportable[] correctImports(Map <String, SimpleStructType> structs, List <SimpleExportable> imps) {
+		int impcnt = imps.size();
+		SimpleExportable[] result = new SimpleExportable[structs.size() + impcnt];
+		for (int i = 0; i < impcnt; i ++ ) {
+			SimpleExportable se = imps.get(i);
+			/* @formatter:off if (se instanceof SimpleStructType) {
+				// won't find the exported structures here
+			} else // */ // @formatter:on
+			if (se instanceof SimpleConstant) {
+				// nothing to do
+			} else if (se instanceof SimpleFunction) {
+				SimpleFunction sf = (SimpleFunction) se;
+				correctArray(structs, sf.type.arguments);
+				correctArray(structs, sf.type.results);
+			} else if (se instanceof SimpleVariable) {
+				SimpleVariable sv = (SimpleVariable) se;
+				SimpleType corrected = correctType(structs, sv.type);
+				if (corrected != sv.type) {
+					se = new SimpleVariable(sv.addr, corrected, sv.name);
 				}
 			} else {
-				throw new InternalError("exported is of an unknown type: " + exported.getClass().getName());
+				throw new InternalError("unknown exportable class: " + se.getClass().getName());
 			}
-			return exported;
-		} catch (IndexOutOfBoundsException ioobe) {
-			throw new IllegalArgumentException("this is not an exported string! (str: '" + str + "')", ioobe);
+			result[i] = se;
 		}
+		Iterator <SimpleStructType> iter = structs.values().iterator();
+		for (int i = impcnt; i < result.length; i ++ ) {
+			result[i] = iter.next();
+		}
+		assert !iter.hasNext();
+		return result;
 	}
 	
-	public static SimpleExportable readExported(String str, Map <String, UnfinishedType> structures) {
-		SimpleExportable export;
-		char[] chars = str.toCharArray();
-		int i = 0;
-		switch (chars[i ++ ]) {
-		case E_VAR_START: {
-			int len;
-			for (len = 0; chars[i + len] != E_NAME_START; len ++ );
-			String hexAddress = new String(chars, i, len);
-			i += len + 1;
-			for (len = 0; chars[i + len] != E_VAR_START_TYPE; len ++ );
-			String name = new String(chars, i, len);
-			i += len + 1;
-			List <SimpleVariable> varType = new ArrayList <>();
-			i = readType(chars, i, varType, name.concat("_"), structures);
-			if (i < chars.length) {
-				throw new IllegalArgumentException("this is not an exported string! (str: '" + str + "')");
-			}
-			export = new SimpleVariable(Long.parseUnsignedLong(hexAddress, 16), varType.get(0).type, name);
-			break;
-		}
-		case E_FUNC_START: {
-			int len;
-			for (len = 0; chars[i + len] != E_NAME_START; len ++ );
-			String hexAddress = new String(chars, i, len);
-			i += len + 1;
-			for (len = 0; chars[i + len] != E_T_FUNC_START; len ++ );
-			String name = new String(chars, i, len);
-			i += len;
-			if (chars[i ++ ] != E_T_FUNC_START) {
-				throw new IllegalArgumentException("this is not an exported string! (str: '" + str + "')");
-			}
-			List <SimpleVariable> args = new ArrayList <>();
-			while (chars[i] != E_T_FUNC_ARGS_RESULTS_SEP) {
-				i = readType(chars, i, args, "arg", structures);
-			}
-			i ++ ;
-			List <SimpleVariable> results = new ArrayList <>();
-			while (chars[i] != E_T_FUNC_END) {
-				i = readType(chars, i, results, "res", structures);
-			}
-			i ++ ;
-			if (i != chars.length) {
-				throw new IllegalArgumentException("this is not an exported string! (str: '" + str + "')");
-			}
-			export = new SimpleFunction(Long.parseUnsignedLong(hexAddress, 16), name, args, results);
-			break;
-		}
-		default:
-			throw new IllegalArgumentException("this is not an exported string! (str: '" + str + "')");
-		}
-		return export;
-	}
-	
-	private static void finishArray(SimpleVariable[] vars, Map <String, UnfinishedType> structures) {
-		for (int i = 0; i < vars.length; i ++ ) {
-			SimpleType finished = finish(vars[i].type, structures);
-			if (finished != vars[i].type) {
-				vars[i] = new SimpleVariable(finished, vars[i].name, false);
-			}
-		}
-	}
-	
-	@SuppressWarnings("unchecked")
-	private static <T extends SimpleType> T finish(T type, Map <String, UnfinishedType> structures) {
-		if (type instanceof UnfinishedType) {
-			type = (T) ((UnfinishedType) type).finishedType;
-			assert type != null;
-		} else if ( !type.isPrimitive()) {
-			if (type.isPointerOrArray()) {
-				SimpleType target = ((SimpleTypePointer) type).target;
-				SimpleType nt = finish(target, structures);
-				if (nt != target) {
-					if (type.isArray()) {
-						int ec = ((SimpleTypeArray) type).elementCount;
-						type = (T) new SimpleTypeArray(nt, ec);
-					} else {
-						type = (T) new SimpleTypePointer(nt);
-					}
+	static SimpleType correctType(Map <String, SimpleStructType> structs, SimpleType type) {
+		if (type instanceof SimpleFuncType) {
+			SimpleFuncType sft = (SimpleFuncType) type;
+			correctArray(structs, sft.arguments);
+			correctArray(structs, sft.results);
+		} else if (type instanceof SimpleTypePointer) {
+			SimpleTypePointer p = (SimpleTypePointer) type;
+			SimpleType corrected = correctType(structs, p.target);
+			if (corrected != p.target) {
+				if (p instanceof SimpleTypeArray) {
+					return new SimpleTypeArray(corrected, ((SimpleTypeArray) p).elementCount);
+				} else {
+					return new SimpleTypePointer(corrected);
 				}
-			} else if (type.isFunc()) {
-				SimpleFuncType func = (SimpleFuncType) type;
-				finishArray(func.arguments, structures);
-				finishArray(func.results, structures);
-			} else if (type.isStruct()) {
-				SimpleStructType struct = (SimpleStructType) type;
-				finishArray(struct.members, structures);
-			} else {
-				throw new InternalError("unknown type (not primitive, no pointer/array, no function and no structure)! type: " + type);
 			}
+		} else if (type instanceof SimpleFutureStructType) {
+			SimpleStructType res = structs.get( ((SimpleFutureStructType) type).name);
+			if (res == null) {
+				throw new NoSuchElementException("the needed structure was not exported! (name='" + ((SimpleFutureStructType) type).name + "') (exported structs: " + structs + ")");
+			}
+			return res;
+		} else if (type instanceof SimpleStructType) {
+			throw new InternalError("simple struct type is not allowed here (should possibly be a SimpleFutureStructType)");
+		} else if ( ! (type instanceof SimpleTypePrimitive)) {
+			throw new InternalError("unknown type class: " + type.getClass().getName());
 		}
 		return type;
 	}
 	
-	private static int readType(char[] chars, int i, List <SimpleVariable> list, String nameStart, Map <String, UnfinishedType> structures) {
-		String name = nameStart.concat(Integer.toString(list.size()));
-		SimpleType type;
-		switch (chars[i ++ ]) {
-		case E_T_FUNC_START: {
-			List <SimpleVariable> args = new ArrayList <>();
-			String subNameStart = name.concat("_arg");
-			while (chars[i] != E_T_FUNC_ARGS_RESULTS_SEP) {
-				i = readType(chars, i, args, subNameStart, structures);
+	static void correctArray(Map <String, SimpleStructType> structs, SimpleVariable[] results) {
+		for (int i = 0; i < results.length; i ++ ) {
+			SimpleVariable sv = results[i];
+			SimpleType corrected = correctType(structs, sv.type);
+			if (corrected != sv.type) {
+				results[i] = new SimpleVariable(sv.addr, corrected, sv.name);
 			}
-			i ++ ;
-			List <SimpleVariable> results = new ArrayList <>();
-			subNameStart = name.concat("_res");
-			while (chars[i] != E_T_FUNC_END) {
-				i = readType(chars, i, results, subNameStart, structures);
-			}
-			i ++ ;
-			type = new SimpleFuncType(args, results);
-			break;
 		}
-		case E_T_STRUCT_START: {
-			int len;
-			for (len = 0; chars[i + len] != E_T_STRUCT_NAME_END; len ++ );
-			String structname = new String(chars, i, len);
-			i += len + 1;
-			UnfinishedType uf = structures.get(structname);
-			if (uf == null) {
-				uf = new UnfinishedType();
-				structures.put(structname, uf);
-				String subNameStart = structname.concat("_m");
-				List <SimpleVariable> sub = new ArrayList <>();
-				while (chars[i] != E_T_STRUCT_END) {
-					i = readType(chars, i, sub, subNameStart, structures);
-				}
-				i ++ ;
-				type = new SimpleStructType(structname, sub);
-				uf.finishedType = type;
-			} else if (uf.finishedType != null) {
-				type = uf.finishedType;
-			} else {
-				type = uf;
-			}
-			break;
-		}
-		case E_T_POINTER: {
-			i = readType(chars, i, list, nameStart, structures);
-			int index = list.size() - 1;
-			type = new SimpleTypePointer(list.remove(index).type);
-			break;
-		}
-		case E_T_ARRAY: {
-			int len;
-			for (len = 0; chars[i + len] >= '0' && chars[i + len] <= '9'; len ++ );
-			int ec = Integer.parseInt(new String(chars, i, len - i));
-			i = readType(chars, i + len, list, nameStart, structures);
-			int index = list.size() - 1;
-			type = new SimpleTypeArray(list.remove(index).type, ec);
-			break;
-		}
-		case E_T_EMPTY_ARRAY: {
-			i = readType(chars, i, list, nameStart, structures);
-			int index = list.size() - 1;
-			type = new SimpleTypeArray(list.remove(index).type, -1);
-			break;
-		}
-		case E_T_FPNUM:
-			type = SimpleType.FPNUM;
-			break;
-		case E_T_UNUM:
-			type = SimpleType.UNUM;
-			break;
-		case E_T_NUM:
-			type = SimpleType.NUM;
-			break;
-		case E_T_UDWORD:
-			type = SimpleType.UDWORD;
-			break;
-		case E_T_DWORD:
-			type = SimpleType.DWORD;
-			break;
-		case E_T_UWORD:
-			type = SimpleType.UWORD;
-			break;
-		case E_T_WORD:
-			type = SimpleType.WORD;
-			break;
-		case E_T_UBYTE:
-			type = SimpleType.UBYTE;
-			break;
-		case E_T_BYTE:
-			type = SimpleType.BYTE;
-			break;
-		default:
-			throw new IllegalArgumentException("this is not an exported string! (str: '" + new String(chars) + "') unknown type char: '" + chars[i - 1] + "'");
-		}
-		list.add(new SimpleVariable(type, name, false));
-		return i;
 	}
 	
-	public static class UnfinishedType implements SimpleType {
+	class SimpleFutureStructType implements SimpleType {
 		
-		public SimpleType finishedType = null;
+		public final String name;
 		
-		public UnfinishedType() {}
-		
-		@Override
-		public boolean isPrimitive() {
-			throw new UnsupportedOperationException();
+		public SimpleFutureStructType(String name) {
+			this.name = name;
 		}
 		
-		@Override
-		public boolean isPointerOrArray() {
-			throw new UnsupportedOperationException();
-		}
-		
-		@Override
-		public boolean isPointer() {
-			throw new UnsupportedOperationException();
-		}
-		
-		@Override
-		public boolean isArray() {
-			throw new UnsupportedOperationException();
-		}
-		
-		@Override
-		public boolean isStruct() {
-			throw new UnsupportedOperationException();
-		}
-		
-		@Override
-		public boolean isFunc() {
-			throw new UnsupportedOperationException();
-		}
-		
-		@Override
-		public int byteCount() {
-			throw new UnsupportedOperationException();
-		}
-		
-		@Override
-		public void appendToExportStr(StringBuilder build, Set <String> exportedStructs) {
-			throw new UnsupportedOperationException();
-		}
+		//@formatter:off
+		@Override public boolean isPrimitive() { return false; }
+		@Override public boolean isPointerOrArray() { return false; }
+		@Override public boolean isPointer() { return false; }
+		@Override public boolean isArray() { return false; }
+		@Override public boolean isStruct() { return true; }
+		@Override public boolean isFunc() { return false; }
+		@Override public int byteCount() { throw new UnsupportedOperationException(); }
+		@Override public void appendToExportStr(StringBuilder build) { throw new UnsupportedOperationException(); }
+		//@formatter:on
 		
 		@Override
 		public String toString() {
-			return "<some-unfinished-structure-type>";
+			return "struct " + name;
 		}
 		
 	}
+	
+	static void exportVars(StringBuilder build, SimpleVariable[] arr) {
+		boolean first = true;
+		for (SimpleVariable sv : arr) {
+			if ( !first) {
+				build.append(VAR_SEP);
+			}
+			first = false;
+			build.append(sv.name);
+			build.append(NAME_TYPE_SEP);
+			sv.type.appendToExportStr(build);
+		}
+	}
+	
+	static Map <String, SimpleExportable> readExports(Reader r) {
+		try {
+			ANTLRInputStream in = new ANTLRInputStream();
+			in.load(r, 1024, 1024);
+			Lexer lexer = new SimpleExportGrammarLexer(in);
+			CommonTokenStream toks = new CommonTokenStream(lexer);
+			SimpleExportGrammarParser parser = new SimpleExportGrammarParser(toks);
+			parser.setErrorHandler(new BailErrorStrategy());
+			SimpleExportsContext sec = parser.simpleExports();
+			SimpleExportable[] se = sec.imported;
+			Map <String, SimpleExportable> result = new HashMap <>(se.length);
+			for (int i = 0; i < se.length; i ++ ) {
+				result.put(se[i].name(), se[i]);
+			}
+			return result;
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		}
+	}
+	
 	
 }

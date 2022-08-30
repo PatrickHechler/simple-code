@@ -3,6 +3,7 @@ package de.hechler.patrick.codesprachen.simple.compile.objects;
 import java.util.Map;
 
 import de.hechler.patrick.codesprachen.simple.compile.objects.SimpleFile.SimpleDependency;
+import de.hechler.patrick.codesprachen.simple.compile.objects.SimpleFile.SimpleSubPool;
 import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommand;
 import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleStructType;
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleValue;
@@ -12,7 +13,7 @@ public interface SimplePool {
 	
 	SimpleStructType getStructure(String name);
 	
-	SimplePool newSubPool();
+	SimpleSubPool newSubPool();
 	
 	void registerDataValue(SimpleValueDataPointer dataVal);
 	

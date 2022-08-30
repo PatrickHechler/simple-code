@@ -19,6 +19,7 @@ import java.util.function.Function;
 
 import de.hechler.patrick.codesprachen.primitive.assemble.objects.PrimitiveAssembler;
 import de.hechler.patrick.codesprachen.simple.compile.enums.FileType;
+import de.hechler.patrick.codesprachen.simple.compile.enums.LogMode;
 import de.hechler.patrick.pfs.exception.ElementLockedException;
 import de.hechler.patrick.pfs.interfaces.PatrFile;
 import de.hechler.patrick.pfs.interfaces.PatrFileSysElement;
@@ -59,27 +60,29 @@ public class MultiCompiler {
 	private final Function <Path, FileType> fileModes;
 	private final boolean                   force;
 	private final Charset                   cs;
+	private final LogMode                   lm;
 	
 	private SimpleCompiler compiler;
 	private Path[]         lockups;
 	
-	public MultiCompiler(PatrFolder bin) {
-		this(bin, DEFAULT_FILE_MODES, DEFAULT_FORCE, DEFAULT_CHARSET);
+	public MultiCompiler(PatrFolder bin, LogMode lm) {
+		this(bin, DEFAULT_FILE_MODES, DEFAULT_FORCE, DEFAULT_CHARSET, lm);
 	}
 	
-	public MultiCompiler(PatrFolder bin, boolean force) {
-		this(bin, DEFAULT_FILE_MODES, force, DEFAULT_CHARSET);
+	public MultiCompiler(PatrFolder bin, boolean force, LogMode lm) {
+		this(bin, DEFAULT_FILE_MODES, force, DEFAULT_CHARSET, lm);
 	}
 	
-	public MultiCompiler(PatrFolder bin, Function <Path, FileType> fileModes) {
-		this(bin, fileModes, DEFAULT_FORCE, DEFAULT_CHARSET);
+	public MultiCompiler(PatrFolder bin, Function <Path, FileType> fileModes, LogMode lm) {
+		this(bin, fileModes, DEFAULT_FORCE, DEFAULT_CHARSET, lm);
 	}
 	
-	public MultiCompiler(PatrFolder bin, Function <Path, FileType> fileModes, boolean force, Charset cs) {
+	public MultiCompiler(PatrFolder bin, Function <Path, FileType> fileModes, boolean force, Charset cs, LogMode lm) {
 		this.bin = bin;
 		this.fileModes = fileModes;
 		this.force = force;
 		this.cs = cs;
+		this.lm = lm;
 	}
 	
 	public synchronized void compile(Path src, Path... lockups) throws IOException {
@@ -90,7 +93,7 @@ public class MultiCompiler {
 			throw new IllegalArgumentException("src Path does not exist!");
 		}
 		this.lockups = lockups;
-		this.compiler = new SimpleCompiler(src, lockups, cs);
+		this.compiler = new SimpleCompiler(src, lockups, cs, lm);
 		if (Files.isRegularFile(src)) {
 			compileFile(null, src, bin);
 		} else if (Files.isDirectory(src)) {
@@ -98,6 +101,7 @@ public class MultiCompiler {
 		} else {
 			throw new IllegalStateException("src is no file and no folder!");
 		}
+		lm.log(LogMode.compileSteps, "", "every file", "has been registered");
 		compiler.compile();
 	}
 	
@@ -149,6 +153,7 @@ public class MultiCompiler {
 			copy(outFile, currentFile, false);
 			break;
 		case ignore:
+			lm.log(LogMode.files, "ignore ", currentFile.toString(), "");
 			break;
 		case primitiveCode:
 			assemble(outFile, currentFile, expOut(currentFile, false), false, lockups);
@@ -174,19 +179,16 @@ public class MultiCompiler {
 		if (end.equals(simpleCode ? SIMPLE_SOURCE_CODE : PRIMITIVE_SOURCE_CODE)) {
 			name = name.substring(0, lastDot);
 		}
-		Path result = currentFile.resolveSibling(name + (simpleCode ? SIMPLE_SYMBOL_FILE : PRIMITIVE_SYMBOL_FILE));
-		if ( !force && Files.exists(result)) {
-			return null;
-		}
-		return result;
+		return currentFile.resolveSibling(name + (simpleCode ? SIMPLE_SYMBOL_FILE : PRIMITIVE_SYMBOL_FILE));
 	}
 	
 	private void assemble(PatrFile outFile, Path currentFile, Path expout, boolean executable, Path[] lockups) throws IOException {
+		lm.log(LogMode.files, "assemble file: ", currentFile.toString(), "");
 		try (OutputStream out = outFile.openOutput(true, NO_LOCK)) {
 			try (BufferedReader reader = Files.newBufferedReader(currentFile, cs)) {
 				PrimitiveAssembler asm;
 				if (expout != null) {
-					try (OutputStream eo = Files.newOutputStream(expout, StandardOpenOption.APPEND, StandardOpenOption.CREATE)) {
+					try (OutputStream eo = Files.newOutputStream(expout, StandardOpenOption.WRITE, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
 						try (PrintStream eop = new PrintStream(eo, false, cs)) {
 							asm = new PrimitiveAssembler(out, eop, lockups, false, true);
 							asm.assemble(currentFile, reader);
@@ -203,13 +205,16 @@ public class MultiCompiler {
 				outFile.setExecutable(executable, NO_LOCK);
 			}
 		}
+		lm.log(LogMode.files, "assemble file: ", currentFile.toString(), "");
 	}
 	
 	private void copy(PatrFile outFile, Path currentFile, boolean executable) throws IOException {
+		lm.log(LogMode.files, "copy file: ", currentFile.toString(), "");
 		try (InputStream in = Files.newInputStream(currentFile)) {
 			byte[] buffer = new byte[(int) Math.min(Files.size(currentFile), MAX_BUFFER)];
 			outFile.withLock(() -> executeCopy(outFile, executable, in, buffer));
 		}
+		lm.log(LogMode.files, "copied file: ", currentFile.toString(), "");
 	}
 	
 	private void executeCopy(PatrFile outFile, boolean executable, InputStream in, byte[] buffer) throws IOException, ElementLockedException {

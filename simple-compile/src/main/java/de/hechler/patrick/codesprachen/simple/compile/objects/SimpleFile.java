@@ -3,7 +3,6 @@ package de.hechler.patrick.codesprachen.simple.compile.objects;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -12,6 +11,7 @@ import java.util.NoSuchElementException;
 
 import de.hechler.patrick.codesprachen.simple.compile.interfaces.SimpleExportable;
 import de.hechler.patrick.codesprachen.simple.compile.interfaces.TriFunction;
+import de.hechler.patrick.codesprachen.simple.compile.objects.SimpleCompiler.UsedData;
 import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommand;
 import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommandBlock;
 import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommandVarDecl;
@@ -32,7 +32,7 @@ public class SimpleFile implements SimplePool {
 	private final Map <String, SimpleVariable>                           vars         = new LinkedHashMap <>();
 	private final Map <String, SimpleStructType>                         structs      = new HashMap <>();
 	private final Map <String, SimpleFunction>                           funcs        = new LinkedHashMap <>();
-	private final Map <String, SimpleConstant>                           consts       = new HashMap <>();
+	private final Map <String, SimpleConstant>                           consts       = new HashMap <>(SimpleCompiler.DEFAULT_CONSTANTS);
 	private final List <SimpleValueDataPointer>                          datas        = new ArrayList <>();
 	private final List <SimpleExportable>                                exports      = new ArrayList <>();
 	private SimpleFunction                                               main         = null;
@@ -46,8 +46,7 @@ public class SimpleFile implements SimplePool {
 			|| vars.containsKey(name)
 			|| structs.containsKey(name)
 			|| funcs.containsKey(name)
-			|| consts.containsKey(name)
-			|| SimpleCompiler.DEFAULT_CONSTANTS.containsKey(name)) {
+			|| consts.containsKey(name)) {
 			throw new IllegalArgumentException("name already in use! name: '" + name + "'");
 		}
 	}
@@ -119,8 +118,15 @@ public class SimpleFile implements SimplePool {
 		return result;
 	}
 	
-	public SimplePool newFuncPool(List <SimpleVariable> args, List <SimpleVariable> results) {
-		return new SimpleFuncPool(new SimpleFuncType(args, results));
+	public SimpleFuncPool newFuncPool(List <SimpleVariable> args, List <SimpleVariable> results) {
+		SimpleFuncType type = new SimpleFuncType(args, results);
+		SimpleVariable[] funcargs = type.arguments.clone();
+		for (int i = 0; i < funcargs.length; i ++ ) {
+			funcargs[i] = new SimpleVariable(funcargs[i].type, funcargs[i].name, funcargs[i].export);
+		}
+		UsedData used = new UsedData();
+		SimpleCompiler.count(used, Arrays.asList(funcargs));
+		return new SimpleFuncPool(type, funcargs, used);
 	}
 	
 	@Override
@@ -156,7 +162,7 @@ public class SimpleFile implements SimplePool {
 		if (constant != null) {
 			return new SimpleNumberValue(SimpleType.NUM, constant.value);
 		}
-		throw new IllegalArgumentException("there is nothign with the given name!");
+		throw new IllegalArgumentException("there is nothign with the given name! (name='" + name + "')");
 	}
 	
 	@Override
@@ -211,10 +217,18 @@ public class SimpleFile implements SimplePool {
 	
 	public class SimpleFuncPool implements SimplePool {
 		
-		private final SimpleFuncType func;
+		private final SimpleFuncType  func;
+		public final SimpleVariable[] myargs;
+		private final UsedData        used;
 		
-		public SimpleFuncPool(SimpleFuncType func) {
+		public SimpleFuncPool(SimpleFuncType func, SimpleVariable[] myargs, UsedData used) {
 			this.func = func;
+			this.myargs = myargs;
+			this.used = used;
+		}
+		
+		public UsedData used() {
+			return this.used.clone();
 		}
 		
 		@Override
@@ -223,13 +237,13 @@ public class SimpleFile implements SimplePool {
 		}
 		
 		@Override
-		public SimplePool newSubPool() {
+		public SimpleSubPool newSubPool() {
 			return new SimpleSubPool(SimpleFuncPool.this);
 		}
 		
 		@Override
 		public SimpleValue newNameUseValue(String name) {
-			for (SimpleVariable sv : func.arguments) {
+			for (SimpleVariable sv : myargs) {
 				if (sv.name.equals(name)) {
 					return new SimpleVariableValue(sv);
 				}
@@ -298,7 +312,7 @@ public class SimpleFile implements SimplePool {
 		}
 		
 		@Override
-		public SimplePool newSubPool() {
+		public SimpleSubPool newSubPool() {
 			return new SimpleSubPool(this);
 		}
 		
@@ -348,27 +362,20 @@ public class SimpleFile implements SimplePool {
 	}
 	
 	@Override
-	public SimplePool newSubPool() {
+	public SimpleSubPool newSubPool() {
 		throw new InternalError("this method should be only called on function and sub pools not on the file pool!");
 	}
 	
-	public static final SimpleType DEPENDENCY_TYPE = new SimpleStructType("--DEPENDENCY--", Collections.emptyList()) {
-		
-		public boolean isStruct() {
-			return false;
-		};
-		
-		@Override
-		public int hashCode() {
-			return "--DEPENDENCY--".hashCode();
-		}
-		
-		@Override
-		public boolean equals(Object obj) {
-			return this == obj;
-		}
-		
-	};
+	public static final SimpleType DEPENDENCY_TYPE = new SimpleType() { // @formatter:off
+		@Override public boolean isStruct()                             { return false; }
+		@Override public boolean isPrimitive()                          { return false; }
+		@Override public boolean isPointerOrArray()                     { return false; }
+		@Override public boolean isPointer()                            { return false; }
+		@Override public boolean isArray()                              { return false; }
+		@Override public boolean isFunc()                               { return false; }
+		@Override public int     byteCount()                            { throw new UnsupportedOperationException(); }
+		@Override public void    appendToExportStr(StringBuilder build) { throw new UnsupportedOperationException(); }
+	}; // @formatter:on
 	
 	public static abstract class SimpleDependency extends SimpleVariable {
 		

@@ -81,8 +81,10 @@
         CMP X00, -1
         JMPEQ startError
         MOV X04, X00
-        MOV [X04], X10 |> main_func:argc <-- argument_count
-        MOV [X04 + 8], X11 |> main_func:argv <-- argument_values
+        |> main_func:argc <-- argument_count
+        MOV [X04], X10
+        |> main_func:argv <-- argument_values
+        MOV [X04 + 8], X11
     #EXP~MAIN_ADDRESS_REL_POS --POS--
     @main |> dummy main (later replaced by the real address)
         CALL main
@@ -90,7 +92,8 @@
     ~IF ( ( MAIN_ADDRESS - 8 ) != MAIN_ADDRESS_REL_POS )
         ~ERROR { "(MAIN_ADDRESS=" MAIN_ADDRESS " -  8 ) != MAIN_ADDRESS_REL_POS=" MAIN_ADDRESS_REL_POS }
     ~ENDIF
-        MOV X00, [X04] |> X00 <-- main_func:exitnum
+        |> X00 <-- main_func:exitnum
+        MOV X00, [X04]
         INT INT_EXIT
 #STACK_SIZE_POS --POS--
 : 1024 >

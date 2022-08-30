@@ -2,8 +2,8 @@
  * predefined_exports.s
  *
  * this file contains the predefined 
- * constants and an implementation of
- * all predefined functions declared and
+ * constants, structures and an implementation
+ * of all predefined functions declared and
  * implemented by the simple-compiler.
  * 
  * note that this file does not contain
@@ -15,6 +15,36 @@
  * some functions may not corectly
  * work with a diffrent compiler
  */
+
+/*
+ * this structure defines an file system
+ * element handle
+ * 
+ * fs_element:id contains the id of the
+ * element
+ * 
+ * fs_element:lock contains the lock which
+ * should be used when operations with the
+ * given fs-element handel are done
+ */
+struct exp fs_element {
+    num id,
+    num lock
+}
+
+/*
+ * this structure is used by file streams
+ * 
+ * the file_stream:file element points to
+ * the corresponding file element handel
+ * 
+ * the file_stream:pos saves the position
+ * of the file stream in the file
+ */
+struct exp file_stream {
+    struct fs_element# file,
+    num pos
+}
 
 /*
  * func exp exit(num exitnum)
@@ -154,19 +184,6 @@ const exp ERRNO_OUT_OF_MEMORY         <-- UHEX-4000000000000000 ;
 const exp ERRNO_ERROR                 <-- UHEX-8000000000000000 ;
 
 /*
- * this is the STREAM-ID of the stdin stream.
- */
-const exp STD_IN  <-- 0 ;
-/*
- * this is the STREAM-ID of the stdout stream.
- */
-const exp STD_OUT <-- 1 ;
-/*
- * this is the STREAM-ID of the stdlog/err stream.
- */
-const exp STD_LOG <-- 2 ;
-
-/* 
  * opens a new stream with the given mode
  * for the given file
  */
@@ -188,8 +205,7 @@ func exp stream_write(num stream, num size, byte# data) --> <num wrote, unum err
 		XOR STATUS, STATUS
 		INT INT_STREAMS_WRITE
 		CMP X01, -1
-		// MOV X02, STATUS
-		MOV [X04 + 8], STATUS // the X04 register points to the function structure
+		MOV [X04 + 8], STATUS
 	>> X01 --> wrote /* X02 --> errno /* instead move the STATUS register manually */ ;
 }
 
@@ -206,8 +222,7 @@ func exp stream_read(num stream, num size, byte# data) --> <num read, unum errno
 		XOR STATUS, STATUS
 		INT INT_STREAMS_READ
 		CMP X01, -1
-		// MOV X02, STATUS
-		MOV [X04 + 8], STATUS // the X04 register points to the function structure
+		MOV [X04 + 8], STATUS
 	>> X01 --> read /* X02 --> errno */ ;
 }
 
@@ -224,7 +239,7 @@ func exp stream_read(num stream, num size, byte# data) --> <num read, unum errno
  * will be set to ((struct fs_element#) -1)
  * and errno will have a non-zero value
  */
-func exp fs_get_file(char# file_path) --> (struct fs_element# file, unum errno) {
+func exp fs_get_file(char# file_path) --> <struct fs_element# file, unum errno> {
 	asm file_path --> X00 ::
 		XOR STATUS, STATUS
 		INT INT_FS_GET_FILE
@@ -245,7 +260,7 @@ func exp fs_get_file(char# file_path) --> (struct fs_element# file, unum errno) 
  * will be set to ((struct fs_element#) -1)
  * and errno will have a non-zero value
  */
-func exp fs_get_folder(char# folder_path) --> (struct fs_element# folder, unum errno) {
+func exp fs_get_folder(char# folder_path) --> <struct fs_element# folder, unum errno> {
 	asm folder_path --> X00 ::
 		XOR STATUS, STATUS
 		INT INT_FS_GET_FOLDER
@@ -263,7 +278,7 @@ func exp fs_get_folder(char# folder_path) --> (struct fs_element# folder, unum e
  * will be set to ((struct fs_element#) -1)
  * and errno will have a non-zero value
  */
-func exp fs_get_file(char# link_path) --> (struct fs_element# link, unum errno) {
+func exp fs_get_link(char# link_path) --> <struct fs_element# link, unum errno> {
 	asm link_path --> X00 ::
 		XOR STATUS, STATUS
 		INT INT_FS_GET_LINK
@@ -279,10 +294,10 @@ func exp fs_get_file(char# link_path) --> (struct fs_element# link, unum errno) 
  * will be set to ((struct fs_element#) -1)
  * and errno will have a non-zero value
  */
-func exp fs_get_file(char# path) --> (struct fs_element# element, unum errno) {
+func exp fs_get_element(char# path) --> <struct fs_element# element, unum errno> {
 	asm path --> X00 ::
 		XOR STATUS, STATUS
-		INT INT_FS_GET_LINK
+		INT INT_FS_GET_ELEMENT
 		MOV [X04 + 8], STATUS
 	>> X00 --> element /* STATUS --> errno */ ; // just manually set errno
 }
@@ -419,7 +434,7 @@ func exp fs_get_lock_data(struct fs_element# element) --> <unum lock_data, unum 
  * if an error occured the value of time is undefined
  * and errno will have a non zero value
  */
-func exp fs_get_lock_time(struct fs_element# elemnet) --> <num time, unum errno> {
+func exp fs_get_lock_time(struct fs_element# element) --> <num time, unum errno> {
 	asm element --> X00 ::
 		XOR STATUS, STATUS
 		INT INT_FS_ELEMENT_GET_LOCK_TIME
@@ -433,7 +448,7 @@ func exp fs_get_lock_time(struct fs_element# elemnet) --> <num time, unum errno>
  * the new lock will be saved in the given struct fs_element:lock value
  */
 func exp fs_lock_element(struct fs_element# element, unum lock_data) --> <unum errno> {
-	asm elemnet --> X00 lock_data --> X01 ::
+	asm element --> X00 lock_data --> X01 ::
 		XOR STATUS, STATUS
 		INT INT_FS_ELEMENT_LOCK
 		MOV [X04], STATUS
@@ -457,7 +472,7 @@ func exp fs_unlock_element(struct fs_element# element) --> <unum errno> {
  * on success this operation also frees the given element
  */
 func exp fs_delete_element(struct fs_element# element, unum parent_lock) --> <unum errno> {
-	asm elemnet --> X00 parent_lock --> X01 ::
+	asm element --> X00 parent_lock --> X01 ::
 		XOR STATUS, STATUS
 		INT INT_FS_ELEMENT_DELETE
 		MOV [X04], STATUS
@@ -485,7 +500,7 @@ func exp fs_move_element(struct fs_element# element, struct fs_element# new_pare
  * if this operation fails flags will be set to -1
  */
 func exp fs_get_flags(struct fs_element# element) --> <num flags, unum errno> {
-	asm element -> X00 ::
+	asm element --> X00 ::
 		XOR STATUS, STATUS
 		INT INT_FS_ELEMENT_GET_FLAGS
 		MOV [X04 + 8], STATUS
@@ -542,11 +557,11 @@ const exp FS_FLAG_FILE_ENCRYPTED <-- UHEX-0000080 ;
  */
 func exp fs_mod_flags(struct fs_element# element, udword add_flags, udword rem_falgs) --> <unum errno> {
 	asm element --> X00 ::
-		MVDW X01, X06 // skip the AND X0[12], UHEX-00000000FFFFFFFF
+		MVDW X01, X06 |> skip the AND X0[12], UHEX-00000000FFFFFFFF
 		MVDW X02, X07
 		XOR STATUS, STATUS
 		INT INT_FS_ELEMENT_MOD_FLAGS
-		MOV [X04], [STATUS]
+		MOV [X04], STATUS
 	>> ;
 }
 
@@ -567,10 +582,10 @@ func exp fs_folder_child_count(struct fs_element# folder) --> <num child_count, 
 /*
  * get the child of the given index from the given parent folder
  * 
- * this operation just replaces the struct fs_elemnet:id value with the di of the child elemnet
+ * this operation just replaces the struct fs_element:id value with the di of the child element
  */
 func exp fs_child_from_index(struct fs_element# folder, dword index) --> <unum errno> {
-	asm folder --> X00 ((udword) index) --> X01 :: // negative values will be to large anyway
+	asm folder --> X00 ((udword) index) --> X01 :: |> negative values will be to large anyway
 		XOR STATUS, STATUS
 		INT INT_FS_FOLDER_GET_CHILD_OF_INDEX
 		MOV [X04], STATUS
@@ -580,9 +595,9 @@ func exp fs_child_from_index(struct fs_element# folder, dword index) --> <unum e
 /*
  * get the child with the given name from the given parent folder
  * 
- * this operation just replaces the struct fs_elemnet:id value with the di of the child elemnet
+ * this operation just replaces the struct fs_element:id value with the di of the child element
  */
-func exp fs_child_from_name(struct fs_elemnet# folder, char# name) --> <unum errno> {
+func exp fs_child_from_name(struct fs_element# folder, char# name) --> <unum errno> {
 	asm folder --> X00 name --> X01 ::
 		XOR STATUS, STATUS
 		INT INT_FS_FOLDER_GET_CHILD_OF_NAME
@@ -592,14 +607,14 @@ func exp fs_child_from_name(struct fs_elemnet# folder, char# name) --> <unum err
 
 /*
  * creates a new folder and adds it to the given folder
- * as child elemnet
+ * as child element
  * 
  * this operation also replaces to struct fs_element:id
  * value with the id of the child element and sets the
  * struct fs_element:lock value to FS_NO_LOCK
  */
-func exp fs_create_folder(struct fs_elemnet# parent, char# name) --> <unum errno> {
-	asm folder --> X00 name --> X01 ::
+func exp fs_create_folder(struct fs_element# parent, char# name) --> <unum errno> {
+	asm parent --> X00 name --> X01 ::
 		XOR STATUS, STATUS
 		INT INT_FS_FOLDER_ADD_FOLDER
 		MOV [X04], STATUS
@@ -608,14 +623,14 @@ func exp fs_create_folder(struct fs_elemnet# parent, char# name) --> <unum errno
 
 /*
  * creates a new file and adds it to the given folder
- * as child elemnet
+ * as child element
  * 
  * this operation also replaces to struct fs_element:id
  * value with the id of the child element and sets the
  * struct fs_element:lock value to FS_NO_LOCK
  */
-func exp fs_create_folder(struct fs_elemnet# parent, char# name) --> <unum errno> {
-	asm folder --> X00 name --> X01 ::
+func exp fs_create_file(struct fs_element# parent, char# name) --> <unum errno> {
+	asm parent --> X00 name --> X01 ::
 		XOR STATUS, STATUS
 		INT INT_FS_FOLDER_ADD_FILE
 		MOV [X04], STATUS
@@ -624,14 +639,14 @@ func exp fs_create_folder(struct fs_elemnet# parent, char# name) --> <unum errno
 
 /*
  * creates a new link to the given target and adds it
- * to the given folder as child elemnet
+ * to the given folder as child element
  * 
  * this operation also replaces to struct fs_element:id
  * value with the id of the child element and sets the
  * struct fs_element:lock value to FS_NO_LOCK
  */
-func exp fs_create_folder(struct fs_elemnet# parent, char# name, struct fs_element# target) --> <unum errno> {
-	asm folder --> X00 name --> X01 target --> X02 ::
+func exp fs_create_link(struct fs_element# parent, char# name, struct fs_element# target) --> <unum errno> {
+	asm parent --> X00 name --> X01 target --> X02 ::
 		XOR STATUS, STATUS
 		INT INT_FS_FOLDER_ADD_LINK
 		MOV [X04], STATUS
@@ -668,7 +683,7 @@ func exp fs_file_hash(struct fs_element# file, byte# data) --> <unum errno> {
  * 
  * position and length are not allowed to be negative
  */
-func exp fs_file_read(struct fs_elemnet# file, num position, num length, byte# buffer) --> <unum errno> {
+func exp fs_file_read(struct fs_element# file, num position, num length, byte# buffer) --> <unum errno> {
 	asm file --> X00 position --> X01 length --> X02 buffer --> X03 ::
 		XOR STATUS, STATUS
 		INT INT_FS_FILE_READ
@@ -684,7 +699,7 @@ func exp fs_file_read(struct fs_elemnet# file, num position, num length, byte# b
  * 
  * position and length are not allowed to be negative
  */
-func exp fs_file_write(struct fs_elemnet# file, num position, num length, byte# buffer) --> <unum errno> {
+func exp fs_file_write(struct fs_element# file, num position, num length, byte# buffer) --> <unum errno> {
 	asm file --> X00 position --> X01 length --> X02 buffer --> X03 ::
 		XOR STATUS, STATUS
 		INT INT_FS_FILE_WRITE
@@ -697,7 +712,7 @@ func exp fs_file_write(struct fs_elemnet# file, num position, num length, byte# 
  * 
  * length is not allowed to be negative
  */
-func exp fs_file_append(struct fs_elemnet# file, num length, byte# buffer) --> <unum errno> {
+func exp fs_file_append(struct fs_element# file, num length, byte# buffer) --> <unum errno> {
 	asm file --> X00 length --> X01 buffer --> X02 ::
 		XOR STATUS, STATUS
 		INT INT_FS_FILE_APPEND
@@ -712,7 +727,7 @@ func exp fs_file_append(struct fs_elemnet# file, num length, byte# buffer) --> <
  * to the current length of the file or negative
  */
 func exp fs_file_truncate(struct fs_element# file, num new_length) --> <unum errno> {
-	asm file --> X00 new_length --> X01 >>
+	asm file --> X00 new_length --> X01 ::
 		XOR STATUS, STATUS
 		INT INT_FS_FILE_TRUNCATE
 		MOV [X04], STATUS
@@ -785,7 +800,7 @@ func exp fs_lock(unum lock_data) --> <unum errno> {
  * unlock the file system with the currently used lock
  */
 func exp fs_unlock() --> <unum errno> {
-	asm lock_data --> X00 ::
+	asm ::
 		XOR STATUS, STATUS
 		INT INT_FS_UNLOCK
 		MOV [X04], STATUS
@@ -976,7 +991,7 @@ func exp string_formatt(char# source, char# target, num target_size, num argumen
 		PUSH X07
 		PUSH X06
 		|> copy arguments
-		#X04_ADDRESS ( REGISTER_MEMORY_START + ( 8 * ( 6 + 3 ) ) )
+		#X03_ADDRESS ( REGISTER_MEMORY_START + ( 8 * ( 6 + 3 ) ) )
 		MOV X00, X03_ADDRESS
 		MOV X01, X0A
 		ADD X02, 8
@@ -999,9 +1014,9 @@ func exp string_formatt(char# source, char# target, num target_size, num argumen
 		INT INT_OUT_OF_MEM_ERROR
 	@formatt
 		XOR STATUS, STATUS
-		INT INT_STRING_FORMATT
+		INT INT_STRING_FORMAT
 		|> set the result values
-		MOV X03, [SP - 32] |> X03 <-- backup data
+		MOV X03, [SP + -32] |> X03 <-- backup data
 		MOV X03, [X03] |> X03 <-- function structure
 		MOV [X03], X00
 		MOV [X03 + 8], X01
@@ -1011,7 +1026,7 @@ func exp string_formatt(char# source, char# target, num target_size, num argumen
 		POP X01
 		POP X02
 		INT INT_MEMORY_MOVE
-	>> 
+	>> ;
 }
 
 /*
@@ -1035,9 +1050,9 @@ func exp string_to_u8(char# string, ubyte# u8buffer, num buffer_size) --> <ubyte
  * length will be the offset of the '\0' character
  */
 func exp string_from_u8(ubyte# u8string, char# buffer, num buffer_size) --> <char# string, num new_buffer_size, num string_length> {
-	asm string --> X00 u8buffer --> X01 buffer_size --> X02 ::
+	asm string --> X00 buffer --> X01 buffer_size --> X02 ::
 		INT INT_STR_TO_U8STR
-	>> X01 --> u8string X02 --> new_buffer_size X03 --> u8string_length ;
+	>> X01 --> u8string X02 --> new_buffer_size X03 --> string_length ;
 }
 
 /*
@@ -1045,7 +1060,7 @@ func exp string_from_u8(ubyte# u8string, char# buffer, num buffer_size) --> <cha
  * 
  * after the files data are no longer needed they should be freed
  */
-func exp fs_load_file(char# file) --> <byte# data, num size, unum errno> {
+func exp load_file(char# file) --> <byte# data, num size, unum errno> {
 	asm file --> X00 ::
 		XOR STATUS, STATUS
 		INT INT_LOAD_FILE
@@ -1066,7 +1081,7 @@ func exp fs_load_file(char# file) --> <byte# data, num size, unum errno> {
  * will be zero, if the function loaded the file loaded_file will
  * be set to a non zero value
  */
-func exp fs_get_file(char# file) --> <byte# data, num size, num loaded_file, unum errno> {
+func exp get_file(char# file) --> <byte# data, num size, num loaded_file, unum errno> {
 	asm file --> X00 ::
 		XOR STATUS, STATUS
 		INT INT_GET_FILE

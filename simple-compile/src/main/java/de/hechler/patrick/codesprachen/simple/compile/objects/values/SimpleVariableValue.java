@@ -1,16 +1,20 @@
 package de.hechler.patrick.codesprachen.simple.compile.objects.values;
 
+import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.A_NUM;
+import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.A_SR;
+import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.B_NUM;
+import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.B_REG;
+import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.build;
+
 import java.util.List;
 
 import de.hechler.patrick.codesprachen.primitive.assemble.enums.Commands;
 import de.hechler.patrick.codesprachen.primitive.assemble.objects.Command;
 import de.hechler.patrick.codesprachen.primitive.assemble.objects.Param;
-import de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder;
+import de.hechler.patrick.codesprachen.primitive.core.utils.PrimAsmPreDefines;
 import de.hechler.patrick.codesprachen.simple.compile.objects.SimplePool;
 import de.hechler.patrick.codesprachen.simple.compile.objects.SimpleVariable;
 import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleTypePointer;
-
-import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.*;
 
 public class SimpleVariableValue extends SimpleValueNoConst {
 	
@@ -23,41 +27,27 @@ public class SimpleVariableValue extends SimpleValueNoConst {
 	
 	@Override
 	public long loadValue(int targetRegister, boolean[] blockedRegisters, List <Command> commands, long pos) {
-		assert !blockedRegisters[targetRegister];
+		assert !blockedRegisters[targetRegister] : targetRegister + " : " + tbs(blockedRegisters, '_', '#');
 		blockedRegisters[targetRegister] = true;
-		if (sv.reg == -1) {
-			throw new InternalError("not yet initlized");
-		}
 		Param p1, p2;
-		ParamBuilder build = new ParamBuilder();
-		build.art = A_SR;
-		build.v1 = targetRegister;
-		p1 = build.build();
-		build.v1 = sv.reg;
-		Command addCmd;
+		p1 = build(A_SR, targetRegister);
+		assert sv.reg != -1;
 		if (sv.addr == -1L) {
-			p2 = build.build();
-			// no need for complex move of small numbers, since this register is only for this number and thus everything should be correct
-			addCmd = new Command(Commands.CMD_MOV, p1, p2);
+			p2 = build(A_SR, sv.reg);
+		} else if (sv.addr == 0) {
+			p2 = build(A_SR | B_REG, sv.reg);
 		} else {
-			if (sv.type.isArray() || sv.type.isStruct()) {
-				Param p3;
-				p2 = build.build();
-				build.art = A_NUM;
-				build.v1 = sv.addr;
-				p3 = build.build();
-				addCmd = new Command(Commands.CMD_MVAD, p1, p2, p3);
-			} else {
-				build.art = A_SR | B_NUM;
-				build.v2 = sv.addr;
-				p2 = build.build();
-				addCmd = new Command(Commands.CMD_MOV, p1, p2);
-				pos = addMovCmd(t, commands, pos, p1, p2, targetRegister);
-			}
+			p2 = build(A_SR | B_NUM, sv.reg, sv.addr);
 		}
-		pos += addCmd.length();
-		commands.add(addCmd);
-		return pos;
+		return addMovCmd(t, commands, pos, p1, p2);
+	}
+	
+	private static String tbs(boolean[] blockedRegisters, char f, char t) {
+		char[] chars = new char[blockedRegisters.length];
+		for (int i = 0; i < chars.length; i ++ ) {
+			chars[i] = blockedRegisters[i] ? t : f;
+		}
+		return new String(chars);
 	}
 	
 	@Override
@@ -80,19 +70,23 @@ public class SimpleVariableValue extends SimpleValueNoConst {
 		public long loadValue(int targetRegister, boolean[] blockedRegisters, List <Command> commands, long pos) {
 			assert !blockedRegisters[targetRegister];
 			blockedRegisters[targetRegister] = true;
-			Param p1, p2, p3;
-			ParamBuilder build = new ParamBuilder();
-			build.art = A_SR;
-			build.v1 = targetRegister;
-			p1 = build.build();
-			build.v1 = sv.reg;
-			p2 = build.build();
-			build.art = A_NUM;
-			build.v1 = sv.addr;
-			p3 = build.build();
-			Command addCmd = new Command(Commands.CMD_MVAD, p1, p2, p3);
-			pos += addCmd.length();
-			commands.add(addCmd);
+			Param p1, p2;
+			Command c;
+			p1 = build(A_SR, targetRegister);
+			if (sv.addr == -1L) {
+				p2 = build(A_NUM, PrimAsmPreDefines.REGISTER_MEMORY_START + (sv.reg * 8));
+				c = new Command(Commands.CMD_MOV, p1, p2);
+			} else if (sv.addr == 0L) {
+				p2 = build(A_SR, sv.reg);
+				c = new Command(Commands.CMD_MOV, p1, p2);
+			} else {
+				Param p3;
+				p2 = build(A_SR, sv.reg);
+				p3 = build(A_NUM, sv.addr);
+				c = new Command(Commands.CMD_MVAD, p1, p2, p3);
+			}
+			pos += c.length();
+			commands.add(c);
 			return pos;
 		}
 		

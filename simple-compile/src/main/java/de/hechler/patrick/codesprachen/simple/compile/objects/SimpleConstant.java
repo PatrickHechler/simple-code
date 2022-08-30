@@ -36,11 +36,19 @@ public class SimpleConstant extends PrimitiveConstant implements SimpleExportabl
 	}
 	
 	@Override
+	public String name() {
+		return super.name;
+	}
+	
+	@Override
 	public String toExportString() {
+		if (!export) {
+			throw new IllegalStateException("this is not marked as export!");
+		}
 		StringBuilder b = new StringBuilder();
-		b.append(SimpleExportable.E_CONST_START);
+		b.append(CONST);
 		b.append(this.name);
-		b.append(SimpleExportable.E_CONST_NAME_END);
+		b.append(CONST);
 		b.append(Long.toHexString(this.value));
 		return b.toString();
 	}

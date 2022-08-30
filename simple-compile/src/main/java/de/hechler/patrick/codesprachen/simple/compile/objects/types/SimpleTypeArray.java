@@ -1,8 +1,7 @@
 package de.hechler.patrick.codesprachen.simple.compile.objects.types;
 
-import static de.hechler.patrick.codesprachen.simple.compile.interfaces.SimpleExportable.*;
-
-import java.util.Set;
+import static de.hechler.patrick.codesprachen.simple.compile.interfaces.SimpleExportable.ARRAY;
+import static de.hechler.patrick.codesprachen.simple.compile.interfaces.SimpleExportable.UNKNOWN_SIZE_ARRAY;
 
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleValue;
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleValueConst;
@@ -58,13 +57,15 @@ public class SimpleTypeArray extends SimpleTypePointer {
 	}
 	
 	@Override
-	public void appendToExportStr(StringBuilder build, Set <String> exportedStructs) {
-		if (elementCount == -1) {
-			build.append(E_T_EMPTY_ARRAY);
+	public void appendToExportStr(StringBuilder build) {
+		this.target.appendToExportStr(build);
+		if (this.elementCount == -1) {
+			build.append(UNKNOWN_SIZE_ARRAY);
 		} else {
-			build.append(E_T_ARRAY).append(elementCount);
+			build.append(ARRAY);
+			build.append(Long.toHexString(this.elementCount));
+			build.append(ARRAY);
 		}
-		target.appendToExportStr(build, exportedStructs);
 	}
 	
 	@Override

@@ -1,30 +1,34 @@
 package de.hechler.patrick.codesprachen.simple.compile.objects.types;
 
-import static de.hechler.patrick.codesprachen.simple.compile.interfaces.SimpleExportable.E_T_STRUCT_END;
-import static de.hechler.patrick.codesprachen.simple.compile.interfaces.SimpleExportable.E_T_STRUCT_NAME_END;
-import static de.hechler.patrick.codesprachen.simple.compile.interfaces.SimpleExportable.E_T_STRUCT_START;
+import static de.hechler.patrick.codesprachen.simple.compile.interfaces.SimpleExportable.exportVars;
 
 import java.util.List;
-import java.util.Set;
 
+import de.hechler.patrick.codesprachen.simple.compile.interfaces.SimpleExportable;
 import de.hechler.patrick.codesprachen.simple.compile.objects.SimpleVariable;
 
-public class SimpleStructType implements SimpleType {
+public class SimpleStructType implements SimpleType, SimpleExportable {
 	
 	public final String           name;
+	public final boolean          export;
 	/**
 	 * this array should not be modified
 	 */
 	public final SimpleVariable[] members;
 	
-	public SimpleStructType(String name, List <SimpleVariable> members) {
-		this.name = name;
-		this.members = members.toArray(new SimpleVariable[members.size()]);
+	public SimpleStructType(String name, boolean export, List <SimpleVariable> members) {
+		this(name, export, members.toArray(new SimpleVariable[members.size()]));
 	}
 	
-	public SimpleStructType(String name, SimpleVariable[] members) {
+	public SimpleStructType(String name, boolean export, SimpleVariable[] members) {
 		this.name = name;
 		this.members = members;
+		this.export = export;
+	}
+	
+	@Override
+	public String name() {
+		return this.name;
 	}
 	
 	@Override
@@ -102,14 +106,27 @@ public class SimpleStructType implements SimpleType {
 	}
 	
 	@Override
-	public void appendToExportStr(StringBuilder build, Set <String> exportedStructs) {
-		build.append(E_T_STRUCT_START).append(name).append(E_T_STRUCT_NAME_END);
-		if (exportedStructs.add(name)) {
-			for (SimpleVariable sv : members) {
-				sv.type.appendToExportStr(build, exportedStructs);
-			}
-			build.append(E_T_STRUCT_END);
+	public void appendToExportStr(StringBuilder build) {
+		build.append(this.name);
+	}
+	
+	@Override
+	public boolean isExport() {
+		return export;
+	}
+	
+	@Override
+	public String toExportString() {
+		if (!export) {
+			throw new IllegalStateException("this is not marked as export!");
 		}
+		StringBuilder b = new StringBuilder();
+		b.append(STRUCT);
+		b.append(this.name);
+		b.append(STRUCT);
+		exportVars(b, this.members);;
+		b.append(STRUCT);
+		return b.toString();
 	}
 	
 }
