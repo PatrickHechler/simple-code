@@ -40,7 +40,7 @@ public class DefMultiCompiler extends MultiCompiler {
 	}
 
 	public DefMultiCompiler(Charset cs, Compiler other, Path srcRoot, Path... lockups) {
-		this(other, new SimpleCompiler(cs, srcRoot, lockups), new PrimitiveCompiler(cs));
+		this(other, new SimpleCompiler(cs, srcRoot, lockups), new PrimitiveCompiler(cs, lockups));
 	}
 
 	public DefMultiCompiler(Charset cs, Path srcRoot, Path... lockups) {

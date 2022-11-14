@@ -3,6 +3,7 @@ package de.hechler.patrick.codesprachen.simple.compile;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -27,7 +28,6 @@ public class SimpleCompilerMain {
 
 	public static final Logger LOGGER = Logger.getLogger("simple-compile");
 
-//	private static PatrFileSystem pfs;
 	private static MultiCompiler compiler;
 	private static Path src;
 	private static Path bin;
@@ -35,7 +35,7 @@ public class SimpleCompilerMain {
 	public static void main(String[] args) {
 		setup(args);
 		try {
-			Files.newDirectoryStream(src);
+			compileRecursive(src);
 			compiler.compile();
 		} catch (Throwable t) {
 			System.err.println("erron while compiling: " + t);
@@ -63,24 +63,39 @@ public class SimpleCompilerMain {
 					System.err.println("context.class: " + ime.getCtx().getClass().getSimpleName());
 				}
 			}
-			closePFS();
+//			closePFS();
 			System.exit(1);
 		}
-		closePFS();
+//		closePFS();
 		LOGGER.info("compiled successful " + src.toString());
 	}
 
-	private static void closePFS() {
-		try {
-//			pfs.close();
-		} catch (Throwable e) {
-			if (e instanceof ThreadDeath) {
-				throw e;
+	private static void compileRecursive(Path src) throws IOException {
+		try (DirectoryStream<Path> dir = Files.newDirectoryStream(src)) {
+			for (Path sub : dir) {
+				Path target = bin.resolve(sub.relativize(bin));
+				if (Files.isDirectory(sub)) {
+					Files.createDirectory(target);
+
+				} else {
+					LOGGER.info("compile " + sub + " to " + target);
+					compiler.addTranslationUnit(sub, target);
+				}
 			}
-			LOGGER.warning("could not close the file system: " + e);
-			System.exit(2);
 		}
 	}
+
+//	private static void closePFS() {
+//		try {
+////			pfs.close();
+//		} catch (Throwable e) {
+//			if (e instanceof ThreadDeath) {
+//				throw e;
+//			}
+//			LOGGER.warning("could not close the file system: " + e);
+//			System.exit(2);
+//		}
+//	}
 
 	private static void setup(String[] args) {
 		List<Path> lookupPaths = new ArrayList<>();
@@ -150,10 +165,18 @@ public class SimpleCompilerMain {
 	}
 
 	private static void help() {
-		System.out.print(/* */ "Options:\n" + "    --help\n" + "    --?" + "        to print this message and exit\n"
-				+ "    --lookup [FOLDER]\n" + "        to add a lookup folder\n" + "    --src [FOLDER]\n"
-				+ "        to set the source folder\n" + "    --recreate-out\n"
-				+ "        to delete the output file if it\n" + "        exist already at the start\n");
+		System.out.print(//
+				/*		*/"Options:\n"//
+						+ "    --help\n"//
+						+ "    --?"//
+						+ "        to print this message and exit\n"//
+						+ "    --lookup [FOLDER]\n"//
+						+ "        to add a lookup folder\n"//
+						+ "    --src [FOLDER]\n"//
+						+ "        to set the source folder\n"//
+						+ "    --recreate-out\n"//
+						+ "        to delete the output file if it\n"//
+						+ "        exist already at the start\n");
 	}
 
 	private static void crash(String msg, int index, String[] args) {
