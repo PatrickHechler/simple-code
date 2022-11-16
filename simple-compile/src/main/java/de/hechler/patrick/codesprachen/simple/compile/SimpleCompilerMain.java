@@ -150,9 +150,9 @@ public class SimpleCompilerMain {
 			if (recreateOutput) {
 				Files.deleteIfExists(bin);
 			}
-			BlockAccessor ba;
-			Bool formatt = new Bool();
-			ba = SeekablePathBlockAccessor.create(bin, 1 << 14, false, formatt);
+//			BlockAccessor ba;
+//			Bool formatt = new Bool();
+//			ba = SeekablePathBlockAccessor.create(bin, 1 << 14, false, formatt);
 //			pfs = new PatrFileSysImpl(ba); // TODO pfs for java
 //			if (formatt.value) {
 //				pfs.format(1L << 16, 1 << 14);

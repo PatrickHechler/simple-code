@@ -71,7 +71,8 @@ import de.hechler.patrick.pfs.exception.ElementLockedException;
 import de.hechler.patrick.pfs.interfaces.PatrFile;
 import de.hechler.patrick.pfs.utils.PatrFileSysConstants;
 
-public class SimpleCompiler implements TriFunction <String, String, String, SimpleDependency> {
+@Deprecated
+public class SimpleCompiler implements TriFunction<String, String, String, SimpleDependency> {
 	
 	private static final long NO_LOCK = PatrFileSysConstants.NO_LOCK;
 	
@@ -80,12 +81,12 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 	private final Charset cs;
 	private final LogMode lm;
 	
-	private final Map <String, CompileTarget> targets = new HashMap <>();
+	private final Map<String, CompileTarget> targets = new HashMap<>();
 	
 	public SimpleCompiler(Path srcRoot, Path[] lockups, Charset cs, LogMode lm) {
 		this.srcRoot = srcRoot.toAbsolutePath().normalize();
 		this.lockups = new Path[lockups.length];
-		for (int i = 0; i < lockups.length; i ++ ) {
+		for (int i = 0; i < lockups.length; i++) {
 			this.lockups[i] = lockups[i].toAbsolutePath().normalize();
 		}
 		this.cs = cs;
@@ -94,16 +95,14 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 	
 	public synchronized void addFile(PatrFile outFile, Path currentFile, Path exports, boolean neverExecutable) {
 		lm.log(LogMode.files, "register simple source file file: ", currentFile.toString(), "");
-		CompileTarget target = new CompileTarget(currentFile, exports, outFile, neverExecutable);
-		String relPath = srcRoot.relativize(currentFile.toAbsolutePath().normalize()).toString();
-		CompileTarget old = targets.put(relPath, target);
+		CompileTarget target  = new CompileTarget(currentFile, exports, outFile, neverExecutable);
+		String        relPath = srcRoot.relativize(currentFile.toAbsolutePath().normalize()).toString();
+		CompileTarget old     = targets.put(relPath, target);
 		assert old == null;
 	}
 	
 	public void compile() {
-		if (targets.isEmpty()) {
-			return;
-		}
+		if (targets.isEmpty()) { return; }
 		try {
 			targets.values().iterator().next().binary.withLock(() -> {
 				precompileQueue();
@@ -135,8 +134,8 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 				try (Reader r = Files.newBufferedReader(pc.source, cs)) {
 					ANTLRInputStream in = new ANTLRInputStream();
 					in.load(r, 1024, 1024);
-					SimpleGrammarLexer lexer = new SimpleGrammarLexer(in);
-					CommonTokenStream toks = new CommonTokenStream(lexer);
+					SimpleGrammarLexer  lexer  = new SimpleGrammarLexer(in);
+					CommonTokenStream   toks   = new CommonTokenStream(lexer);
 					SimpleGrammarParser parser = new SimpleGrammarParser(toks);
 					parser.setErrorHandler(new BailErrorStrategy());
 					pc.file = new SimpleFile(this);
@@ -164,9 +163,9 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 	private SimpleDependency primitiveDependency(String name, String depend) {
 		Path p = findDependencyFile(depend);
 		try (Scanner sc = new Scanner(Files.newBufferedReader(p))) {
-			Map <String, PrimitiveConstant> primConsts = new HashMap <>();
+			Map<String, PrimitiveConstant> primConsts = new HashMap<>();
 			PrimitiveAssembler.readSymbols(null, primConsts, sc, p);
-			Map <String, SimpleConstant> consts = new HashMap <>();
+			Map<String, SimpleConstant> consts = new HashMap<>();
 			for (PrimitiveConstant pc : primConsts.values()) {
 				consts.put(pc.name, new SimpleConstant(name, pc.value, true));
 			}
@@ -176,7 +175,8 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 				public SimpleExportable get(String name) {
 					SimpleConstant sc = consts.get(name);
 					if (sc == null) {
-						throw new NoSuchElementException("this dependency (" + name + " > '" + p + "') has no constant with the name: " + name);
+						throw new NoSuchElementException(
+								"this dependency (" + name + " > '" + p + "') has no constant with the name: " + name);
 					}
 					return sc;
 				}
@@ -188,7 +188,8 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 	}
 	
 	private SimpleDependency sourceDependency(String name, String depend) {
-		CompileTarget dep = targets.get(srcRoot.relativize(srcRoot.getFileSystem().getPath(depend).normalize()).toString());
+		CompileTarget dep = targets
+				.get(srcRoot.relativize(srcRoot.getFileSystem().getPath(depend).normalize()).toString());
 		if (dep == null) {
 			throw new IllegalArgumentException("dependency could not be found! (dependnecy: '" + depend + "'");
 		}
@@ -207,18 +208,14 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 	private static final int PSF_LEN = 4;
 	
 	static {
-		if (SSF_LEN != MultiCompiler.SIMPLE_SYMBOL_FILE.length()) {
-			throw new AssertionError();
-		}
-		if (PSF_LEN != MultiCompiler.PRIMITIVE_SYMBOL_FILE.length()) {
-			throw new AssertionError();
-		}
+		if (SSF_LEN != MultiCompiler.SIMPLE_SYMBOL_FILE.length()) { throw new AssertionError(); }
+		if (PSF_LEN != MultiCompiler.PRIMITIVE_SYMBOL_FILE.length()) { throw new AssertionError(); }
 	}
 	
 	private SimpleDependency exportedDependency(String name, String depend, String runtime) {
 		Path p = findDependencyFile(depend);
 		try {
-			final Map <String, SimpleExportable> imps;
+			final Map<String, SimpleExportable> imps;
 			try (Reader in = Files.newBufferedReader(p, cs)) {
 				imps = SimpleExportable.readExports(in);
 			}
@@ -236,9 +233,7 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 				@Override
 				public SimpleExportable get(String name) {
 					SimpleExportable se = imps.get(name);
-					if (se == null) {
-						throw new NoSuchElementException(name);
-					}
+					if (se == null) { throw new NoSuchElementException(name); }
 					return se;
 				}
 				
@@ -251,34 +246,33 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 	private Path findDependencyFile(String depend) {
 		for (Path p : lockups) {
 			Path resolved = p.resolve(depend);
-			if (Files.exists(resolved)) {
-				return resolved;
-			}
+			if (Files.exists(resolved)) { return resolved; }
 		}
-		throw new IllegalArgumentException("dependency could not be found! (dependnecy: '" + depend + "', lockups: " + Arrays.toString(lockups) + ")");
-		
+		throw new IllegalArgumentException("dependency could not be found! (dependnecy: '" + depend + "', lockups: "
+				+ Arrays.toString(lockups) + ")");
 	}
 	
 	private void assemble(CompileTarget target) throws IOException, ElementLockedException {
 		try (OutputStream out = target.binary.openOutput(true, NO_LOCK)) {
-			PrimitiveAssembler asm = new PrimitiveAssembler(out, null, lockups, true, false) {
-				
-				@Override
-				protected Command replaceUnknownCommand(Command cmd) throws InternalError {
-					if (cmd instanceof FuncCallCmd) {
-						return replaceDepCall(cmd);
-					} else {
-						return super.replaceUnknownCommand(cmd);
-					}
-				}
-				
-			};
-			Collection <SimpleFunction> funcs = target.file.functions();
-			Map <String, Long> funcAddrs = new HashMap <>();
+			PrimitiveAssembler         asm       = new PrimitiveAssembler(out, null, lockups, true, false) {
+														
+														@Override
+														protected Command replaceUnknownCommand(Command cmd)
+																throws InternalError {
+															if (cmd instanceof FuncCallCmd) {
+																return replaceDepCall(cmd);
+															} else {
+																return super.replaceUnknownCommand(cmd);
+															}
+														}
+														
+													};
+			Collection<SimpleFunction> funcs     = target.file.functions();
+			Map<String, Long>          funcAddrs = new HashMap<>();
 			for (SimpleFunction func : funcs) {
 				funcAddrs.put(func.name, func.address);
 			}
-			List <Command> cmds = FileCommandsList.create(target.file, lm);
+			List<Command> cmds = FileCommandsList.create(target.file, lm);
 			asm.assemble(cmds, funcAddrs);
 		}
 	}
@@ -286,14 +280,15 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 	private Command replaceDepCall(Command cmd) {
 		FuncCallCmd fcc = (FuncCallCmd) cmd;
 		assert fcc.func.address != -1L;
-		Param p1 = build(A_SR, REG_DEP_FUNC_DEPENDENCY_FILE_REGISTER);
-		Param p2 = build(A_NUM, fcc.func.address);
-		Command c = new Command(Commands.CMD_CALO, p1, p2);
+		Param   p1 = build(A_SR, REG_DEP_FUNC_DEPENDENCY_FILE_REGISTER);
+		Param   p2 = build(A_NUM, fcc.func.address);
+		Command c  = new Command(Commands.CMD_CALO, p1, p2);
 		return c;
 	}
 	
 	private void makeFileStart(CompileTarget target) throws IOException {
-		lm.log(LogMode.files, "make the start for file: ", target.source.toString(), " (data, global variables and executable start)");
+		lm.log(LogMode.files, "make the start for file: ", target.source.toString(),
+				" (data, global variables and executable start)");
 		assert target.pos == -1L;
 		SimpleFunction main = target.neverExe ? null : target.file.mainFunction();
 		target.pos = 0L;
@@ -325,10 +320,10 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 	private static final long MY_INT_DEP_LOAD_ERROR   = MY_INT_OUT_OF_MEM_ERROR + 1L;
 	private static final long MY_INT_CNT              = MY_INT_DEP_LOAD_ERROR + 1L;
 	
-	public static final Map <String, SimpleConstant> DEFAULT_CONSTANTS;
+	public static final Map<String, SimpleConstant> DEFAULT_CONSTANTS;
 	
 	static {
-		Map <String, SimpleConstant> defConsts = new LinkedHashMap <>();
+		Map<String, SimpleConstant> defConsts = new LinkedHashMap<>();
 		for (PrimitiveConstant pc : PrimAsmConstants.START_CONSTANTS.values()) {
 			defConsts.put(pc.name, new SimpleConstant(pc.name, pc.value, false));
 		}
@@ -351,16 +346,14 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 	static {
 		try (InputStream in = SimpleCompiler.class.getResourceAsStream(MY_EXPORT_FILE)) {
 			try (Scanner sc = new Scanner(in, "UTF-8")) {
-				Map <String, PrimitiveConstant> map = new HashMap <>();
+				Map<String, PrimitiveConstant> map = new HashMap<>();
 				PrimitiveAssembler.readSymbols(null, map, sc, Paths.get(MY_EXPORT_FILE));
 				PrimitiveConstant pc = map.get(MAIN_ADDRESS_EXPORT_SYMBOL);
 				MAIN_ADDRESS = pc.value;
 				pc = map.get(MAIN_ADDRESS_RELATIVE_EXPORT_SYMBOL);
 				MAIN_ADDRESS_RELATIVE_POSITION = pc.value;
 				pc = map.get(INTERRUPT_COUNT_SYMBOL);
-				if (pc.value != MY_INT_CNT) {
-					throw new AssertionError(pc + " expected: " + MY_INT_CNT);
-				}
+				if (pc.value != MY_INT_CNT) { throw new AssertionError(pc + " expected: " + MY_INT_CNT); }
 				pc = map.get(INT_OUT_OF_MEM_ERR_SYMBOL);
 				if (pc.value != MY_INT_OUT_OF_MEM_ERROR) {
 					throw new AssertionError(pc + " expected: " + MY_INT_OUT_OF_MEM_ERROR);
@@ -385,12 +378,12 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 		assert target.pos == target.binary.length(NO_LOCK);
 		try (OutputStream out = target.binary.openOutput(true, NO_LOCK)) {
 			target.outOfMemErrorAddr = target.pos;
-			PrimitiveAssembler asm = new PrimitiveAssembler(out, null, new Path[0], true, false);
-			Command outOfMem = new Command(Commands.CMD_INT, build(A_NUM, MY_INT_OUT_OF_MEM_ERROR), null);
-			Command mov1 = new Command(Commands.CMD_MOV, build(A_SR, X00), build(A_NUM, 1L));
-			Command iex = new Command(Commands.CMD_INT, build(A_NUM, INT_EXIT), null);
-			Command depLoad = new Command(Commands.CMD_INT, build(A_NUM, MY_INT_DEP_LOAD_ERROR), null);
-			long exitLen = mov1.length() + iex.length();
+			PrimitiveAssembler asm      = new PrimitiveAssembler(out, null, new Path[0], true, false);
+			Command            outOfMem = new Command(Commands.CMD_INT, build(A_NUM, MY_INT_OUT_OF_MEM_ERROR), null);
+			Command            mov1     = new Command(Commands.CMD_MOV, build(A_SR, X00), build(A_NUM, 1L));
+			Command            iex      = new Command(Commands.CMD_INT, build(A_NUM, INT_EXIT), null);
+			Command            depLoad  = new Command(Commands.CMD_INT, build(A_NUM, MY_INT_DEP_LOAD_ERROR), null);
+			long               exitLen  = mov1.length() + iex.length();
 			target.pos += outOfMem.length() + exitLen;
 			target.dependencyLoadErrorAddr = target.pos;
 			target.pos += depLoad.length() + exitLen;
@@ -424,7 +417,7 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 	}
 	
 	private void align(CompileTarget target, byte[] zeros) throws IOException, ElementLockedException {
-		if ( (target.pos & 7) != 0) {
+		if ((target.pos & 7) != 0) {
 			int len = (int) (8 - (target.pos & 7));
 			target.binary.appendContent(zeros, 0, len, NO_LOCK);
 			target.pos += len;
@@ -460,8 +453,8 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 	 */
 	public static final int REG_METHOD_STRUCT     = X00 + 4;
 	/**
-	 * this method is reserved for array and structure variables<br>
-	 * and also used by pointer/primitive variables when there are not enough registers)
+	 * this method is reserved for array and structure variables<br> and also used by pointer/primitive variables when
+	 * there are not enough registers)
 	 */
 	public static final int REG_VARIABLE_POINTER  = X00 + 5;
 	public static final int REG_MIN_VARIABLE      = X00 + 6;
@@ -470,24 +463,6 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 	 * the compiler won't use any registers above this value for critical stuff
 	 */
 	public static final int MAX_COMPILER_REGISTER = REG_MAX_VARIABLE;
-	
-	public static class UsedData implements Cloneable {
-		
-		private int  regs        = REG_MIN_VARIABLE;
-		private int  maxregs     = -1;
-		private long currentaddr = 0L;
-		private long maxaddr     = -1L;
-		
-		@Override
-		protected UsedData clone() {
-			try {
-				return (UsedData) super.clone();
-			} catch (CloneNotSupportedException e) {
-				throw new InternalError();
-			}
-		}
-		
-	}
 	
 	private void compileFunction(CompileTarget target, SimpleFunction sf) throws IOException {
 		lm.log(LogMode.functions, "compile function ", sf.name, " of file: " + target.source);
@@ -504,7 +479,7 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 		boolean[] regs = new boolean[256];
 		regs[REG_METHOD_STRUCT] = true;
 		regs[REG_VARIABLE_POINTER] = true;
-		for (int i = REG_MIN_VARIABLE; i < used.regs; i ++ ) {
+		for (int i = REG_MIN_VARIABLE; i < used.regs; i++) {
 			regs[i] = true;
 		}
 		if (used.maxaddr > 0L) {
@@ -532,9 +507,9 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 	}
 	
 	private void copyArgs(CompileTarget target, SimpleFunction sf, UsedData funcArgs, SimpleVariable[] myargs) {
-		for (int i = 0; i < sf.type.arguments.length; i ++ ) {
+		for (int i = 0; i < sf.type.arguments.length; i++) {
 			SimpleVariable myarg = myargs[i];
-			SimpleVariable arg = sf.type.arguments[i];
+			SimpleVariable arg   = sf.type.arguments[i];
 			assert arg.reg == REG_METHOD_STRUCT;
 			assert arg.addr != -1L;
 			Param p1, p2;
@@ -584,7 +559,7 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 	}
 	
 	private void compileCommand(CompileTarget target, SimpleFunction sf, boolean[] regs, SimpleCommand cmd)
-		throws InternalError {
+			throws InternalError {
 		if (cmd instanceof SimpleCommandIf) {
 			SimpleCommandIf ifCmd = (SimpleCommandIf) cmd;
 			compileIf(target, sf, regs, ifCmd);
@@ -604,15 +579,14 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 			}
 		} else if (cmd instanceof SimpleCommandVarDecl) {
 			SimpleCommandVarDecl varDeclCmd = (SimpleCommandVarDecl) cmd;
-			if (varDeclCmd.init == null) {
-				return;
-			}
+			if (varDeclCmd.init == null) { return; }
 			assignVariable(target, sf, regs, varDeclCmd, varDeclCmd.init);
 		} else if (cmd instanceof SimpleCommandAsm) {
 			SimpleCommandAsm asm = (SimpleCommandAsm) cmd;
 			compileAsm(target, sf, regs, asm);
 		} else {
-			throw new InternalError("unknown command type: " + cmd.getClass().getName() + " (of command: '" + cmd + "')");
+			throw new InternalError(
+					"unknown command type: " + cmd.getClass().getName() + " (of command: '" + cmd + "')");
 		}
 	}
 	
@@ -620,29 +594,27 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 	private static final int JMPEQ_LEN = JMP_LEN;
 	
 	static {
-		if (new Command(Commands.CMD_JMP, build(A_NUM, -1L), null).length() != JMP_LEN) {
-			throw new AssertionError();
-		}
+		if (new Command(Commands.CMD_JMP, build(A_NUM, -1L), null).length() != JMP_LEN) { throw new AssertionError(); }
 		if (new Command(Commands.CMD_JMPEQ, build(A_NUM, -1L), null).length() != JMPEQ_LEN) {
 			throw new AssertionError();
 		}
 	}
 	
 	private void compileAsm(CompileTarget target, SimpleFunction sf, boolean[] regs, SimpleCommandAsm asmCmd) {
-		final int arglen = asmCmd.asmArguments.length;
-		final int reslen = asmCmd.asmResults.length;
+		final int arglen   = asmCmd.asmArguments.length;
+		final int reslen   = asmCmd.asmResults.length;
 		boolean[] argsolds = new boolean[arglen];
-		for (int i = 0; i < arglen; i ++ ) {
+		for (int i = 0; i < arglen; i++) {
 			AsmParam arg = asmCmd.asmArguments[i];
 			freeAsmReg(target, sf, regs, argsolds, i, arg);
 			target.pos = arg.value.loadValue(arg.register, regs, sf.cmds, target.pos);
 		}
 		addAsmCommands(target, sf, asmCmd);
-		for (int i = 0; i < reslen; i ++ ) {
-			AsmParam res = asmCmd.asmResults[i];
+		for (int i = 0; i < reslen; i++) {
+			AsmParam    res = asmCmd.asmResults[i];
 			SimpleValue val = res.value.addExpUnary(asmCmd.pool, SimpleValue.EXP_UNARY_AND);
-			int reg = register(regs, res.register + 1 >= 256 ? MAX_COMPILER_REGISTER + 1 : res.register + 1);
-			boolean old = makeRegUsable(regs, reg, sf.cmds, target);
+			int         reg = register(regs, res.register + 1 >= 256 ? MAX_COMPILER_REGISTER + 1 : res.register + 1);
+			boolean     old = makeRegUsable(regs, reg, sf.cmds, target);
 			target.pos = val.loadValue(reg, regs, sf.cmds, target.pos);
 			Param p1, p2;
 			p1 = build(A_SR | B_REG, reg);
@@ -662,7 +634,8 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 					mv = Commands.CMD_MVB;
 					break;
 				default:
-					throw new InternalError("primitive type with unknown byte count: " + val.type().byteCount() + " (" + val.type() + ")");
+					throw new InternalError("primitive type with unknown byte count: " + val.type().byteCount() + " ("
+							+ val.type() + ")");
 				}
 			}
 			Command mov = new Command(mv, p1, p2);
@@ -670,7 +643,7 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 			sf.cmds.add(mov);
 			releseReg(regs, reg, old, sf.cmds, target);
 		}
-		for (int i = 0; i < arglen; i ++ ) {
+		for (int i = 0; i < arglen; i++) {
 			AsmParam arg = asmCmd.asmArguments[i];
 			assert regs[arg.register];
 			if (argsolds[i]) {
@@ -682,22 +655,25 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 	}
 	
 	/*
-	 * private ParseContext parse(String asmCode, Map <String, SimpleConstant> consts) { asmCode = asmCode.substring(2, asmCode.length() - 2); PrimitiveAssembler asm = new
-	 * PrimitiveAssembler(OutputStream.nullOutputStream(), null, new Path[0], false, true); try {
+	 * private ParseContext parse(String asmCode, Map <String, SimpleConstant> consts) { asmCode = asmCode.substring(2,
+	 * asmCode.length() - 2); PrimitiveAssembler asm = new PrimitiveAssembler(OutputStream.nullOutputStream(), null, new
+	 * Path[0], false, true); try {
 	 * 
-	 * @SuppressWarnings("unchecked") ParseContext context = return context; } catch (IOException | AssembleError e) { throw new RuntimeException(e); } }
+	 * @SuppressWarnings("unchecked") ParseContext context = return context; } catch (IOException | AssembleError e) {
+	 * throw new RuntimeException(e); } }
 	 */
 	
 	@SuppressWarnings("unchecked")
 	private void addAsmCommands(CompileTarget target, SimpleFunction sf, SimpleCommandAsm asmCmd) {
 		try {
 			final ConstantPoolCommand cpc = new ConstantPoolCommand();
+			
 			PrimitiveAssembler asm = new PrimitiveAssembler(new OutputStream() {
 				
 				@Override
 				public void write(int b) throws IOException {
-					cpc.addBytes(new byte[] {(byte) b });
-					target.pos ++ ;
+					cpc.addBytes(new byte[] { (byte) b });
+					target.pos++;
 				}
 				
 				@Override
@@ -713,12 +689,14 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 				}
 				
 			}, null, lockups, false, true);
-			asm.assemble(Paths.get("[INVALID]"), new ANTLRInputStream(asmCmd.asmCode), (Map <String, PrimitiveConstant>) (Map <String, ? extends PrimitiveConstant>) asmCmd.pool.getConstants());
+			asm.assemble(Paths.get("[INVALID]"), new ANTLRInputStream(asmCmd.asmCode),
+					(Map<String, PrimitiveConstant>) (Map<String, ? extends PrimitiveConstant>) asmCmd.pool
+							.getConstants());
 			sf.cmds.add(cpc);
-			if ( (target.pos & 7) != 0) {
-				byte[] bytes = new byte[ (8 - ((int) target.pos & 7))];
-				Param p1 = build(A_NUM, JMP_LEN + bytes.length);
-				Command jmp = new Command(Commands.CMD_JMP, p1, null);
+			if ((target.pos & 7) != 0) {
+				byte[]  bytes = new byte[(8 - ((int) target.pos & 7))];
+				Param   p1    = build(A_NUM, JMP_LEN + bytes.length);
+				Command jmp   = new Command(Commands.CMD_JMP, p1, null);
 				target.pos += jmp.length() + bytes.length;
 				sf.cmds.add(jmp);
 				ConstantPoolCommand ocpc = new ConstantPoolCommand();
@@ -730,7 +708,8 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 		}
 	}
 	
-	private void freeAsmReg(CompileTarget target, SimpleFunction sf, boolean[] regs, boolean[] olds, int i, AsmParam arg) {
+	private void freeAsmReg(CompileTarget target, SimpleFunction sf, boolean[] regs, boolean[] olds, int i,
+			AsmParam arg) {
 		olds[i] = regs[arg.register];
 		if (olds[i]) {
 			singlePushOrPop(target, sf, arg, Commands.CMD_PUSH);
@@ -738,14 +717,14 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 	}
 	
 	private void singlePushOrPop(CompileTarget target, SimpleFunction sf, AsmParam arg, Commands pushOrPop) {
-		Param p1 = build(A_SR, arg.register);
+		Param   p1   = build(A_SR, arg.register);
 		Command push = new Command(pushOrPop, p1, null);
 		target.pos += push.length();
 		sf.cmds.add(push);
 	}
 	
 	private void compileIf(CompileTarget target, SimpleFunction sf, boolean[] regs, SimpleCommandIf ifCmd) {
-		int reg = register(regs, MAX_COMPILER_REGISTER + 2);
+		int     reg = register(regs, MAX_COMPILER_REGISTER + 2);
 		boolean old = makeRegUsable(regs, reg, sf.cmds, target);
 		target.pos = ifCmd.condition.loadValue(reg, regs, sf.cmds, target.pos);
 		Param p1, p2;
@@ -756,8 +735,8 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 		sf.cmds.add(c);
 		long startIfAddr = target.pos;
 		target.pos += JMPEQ_LEN;
-		List <Command> cmds = sf.cmds;
-		List <Command> sub = new LinkedList <>();
+		List<Command> cmds = sf.cmds;
+		List<Command> sub  = new LinkedList<>();
 		sf.cmds = sub;
 		compileCommand(target, sf, regs, ifCmd.ifCmd);
 		p1 = build(A_NUM, target.pos - startIfAddr);
@@ -773,13 +752,13 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 	}
 	
 	private void compileElse(CompileTarget target, SimpleFunction sf, boolean[] regs, SimpleCommandIf ifCmd,
-		List <Command> cmds) throws InternalError {
-		Param p1;
-		Command c;
-		List <Command> sub;
-		long ifEndAddr = target.pos;
+			List<Command> cmds) throws InternalError {
+		Param         p1;
+		Command       c;
+		List<Command> sub;
+		long          ifEndAddr = target.pos;
 		target.pos += JMP_LEN;
-		sub = new LinkedList <>();
+		sub = new LinkedList<>();
 		sf.cmds = sub;
 		compileCommand(target, sf, regs, ifCmd.elseCmd);
 		assert sf.cmds == sub;
@@ -791,9 +770,9 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 	}
 	
 	private void compileWhile(CompileTarget target, SimpleFunction sf, boolean[] regs, SimpleCommandWhile whileCmd) {
-		int reg = register(regs, MAX_COMPILER_REGISTER + 1);
-		boolean old = makeRegUsable(regs, reg, sf.cmds, target);
-		long loopStart = target.pos;
+		int     reg       = register(regs, MAX_COMPILER_REGISTER + 1);
+		boolean old       = makeRegUsable(regs, reg, sf.cmds, target);
+		long    loopStart = target.pos;
 		target.pos = whileCmd.condition.loadValue(reg, regs, sf.cmds, target.pos);
 		Param p1, p2;
 		p1 = build(A_SR, reg);
@@ -802,8 +781,8 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 		target.pos += c.length();
 		sf.cmds.add(c);
 		target.pos += JMPEQ_LEN;
-		List <Command> cmds = sf.cmds;
-		List <Command> sub = new LinkedList <>();
+		List<Command> cmds = sf.cmds;
+		List<Command> sub  = new LinkedList<>();
 		sf.cmds = sub;
 		compileCommand(target, sf, regs, whileCmd);
 		assert sub == sf.cmds;
@@ -816,31 +795,30 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 	}
 	
 	private void compileAssignCommand(CompileTarget target, SimpleFunction sf, boolean[] regs,
-		SimpleCommandAssign assignCmd) {
-		if (assignCmd.target.type().isPrimitive())
-			if (assignCmd.target instanceof SimpleVariableValue) {
-				assignVariable(target, sf, regs, ((SimpleVariableValue) assignCmd.target).sv, assignCmd.value);
-			} else {
-				int r1 = register(regs, MAX_COMPILER_REGISTER + 1);
-				boolean o1 = makeRegUsable(regs, r1, sf.cmds, target);
-				SimpleValue nt = assignCmd.target.addExpUnary(assignCmd.pool, SimpleValue.EXP_UNARY_AND);
-				target.pos = nt.loadValue(r1, regs, sf.cmds, target.pos);
-				int r2 = register(regs, MAX_COMPILER_REGISTER + 2);
-				boolean o2 = makeRegUsable(regs, r2, sf.cmds, target);
-				target.pos = assignCmd.value.loadValue(r2, regs, sf.cmds, target.pos);
-				Param p1, p2;
-				p1 = build(A_SR | B_REG, r1);
-				p2 = build(A_SR, r2);
-				Command c = new Command(Commands.CMD_MOV, p1, p2);
-				target.pos += c.length();
-				sf.cmds.add(c);
-				releseReg(regs, r2, o2, sf.cmds, target);
-				releseReg(regs, r1, o1, sf.cmds, target);
-			}
+			SimpleCommandAssign assignCmd) {
+		if (assignCmd.target.type().isPrimitive()) if (assignCmd.target instanceof SimpleVariableValue) {
+			assignVariable(target, sf, regs, ((SimpleVariableValue) assignCmd.target).sv, assignCmd.value);
+		} else {
+			int         r1 = register(regs, MAX_COMPILER_REGISTER + 1);
+			boolean     o1 = makeRegUsable(regs, r1, sf.cmds, target);
+			SimpleValue nt = assignCmd.target.addExpUnary(assignCmd.pool, SimpleValue.EXP_UNARY_AND);
+			target.pos = nt.loadValue(r1, regs, sf.cmds, target.pos);
+			int     r2 = register(regs, MAX_COMPILER_REGISTER + 2);
+			boolean o2 = makeRegUsable(regs, r2, sf.cmds, target);
+			target.pos = assignCmd.value.loadValue(r2, regs, sf.cmds, target.pos);
+			Param p1, p2;
+			p1 = build(A_SR | B_REG, r1);
+			p2 = build(A_SR, r2);
+			Command c = new Command(Commands.CMD_MOV, p1, p2);
+			target.pos += c.length();
+			sf.cmds.add(c);
+			releseReg(regs, r2, o2, sf.cmds, target);
+			releseReg(regs, r1, o1, sf.cmds, target);
+		}
 	}
 	
 	private void compileFuncCall(CompileTarget target, SimpleFunction sf, boolean[] regs,
-		SimpleCommandFuncCall funcCallCmd) {
+			SimpleCommandFuncCall funcCallCmd) {
 		validateFuncCall(funcCallCmd);
 		push(target, sf);
 		call(target, sf, funcCallCmd, regs);
@@ -853,22 +831,22 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 			func = funcCallCmd.pool.getFunction(funcCallCmd.firstName);
 		} else {
 			SimpleDependency dep = funcCallCmd.pool.getDependency(funcCallCmd.firstName);
-			SimpleExportable se = dep.get(funcCallCmd.secondName);
-			if (se == null || ! (se instanceof SimpleFunction)) {
+			SimpleExportable se  = dep.get(funcCallCmd.secondName);
+			if (se == null || !(se instanceof SimpleFunction)) {
 				throw new IllegalStateException("function call needs a function! dependency: " + dep.path + " > '"
-					+ dep.depend + "' (not) function name: " + funcCallCmd.secondName + " > " + se);
+						+ dep.depend + "' (not) function name: " + funcCallCmd.secondName + " > " + se);
 			}
 			func = (SimpleFunction) se;
 			assert dep.path.addr != -1L;
 		}
-		if ( !func.type.equals(funcCallCmd.function.type())) {
+		if (!func.type.equals(funcCallCmd.function.type())) {
 			throw new IllegalStateException(
-				"the function call structure is diffrent to the type needed by the called function! (function: "
-					+ (funcCallCmd.firstName)
-					+ (funcCallCmd.secondName == null ? "" : (":" + funcCallCmd.secondName))
-					+ " given func-struct type: '" + funcCallCmd.function.type()
-					+ "' needded func-struct type: '" + func.type + "' given func-struct: '"
-					+ funcCallCmd.function + "')");
+					"the function call structure is diffrent to the type needed by the called function! (function: "
+							+ (funcCallCmd.firstName)
+							+ (funcCallCmd.secondName == null ? "" : (":" + funcCallCmd.secondName))
+							+ " given func-struct type: '" + funcCallCmd.function.type()
+							+ "' needded func-struct type: '" + func.type + "' given func-struct: '"
+							+ funcCallCmd.function + "')");
 		}
 	}
 	
@@ -878,7 +856,7 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 		target.pos = funcCallCmd.function.loadValue(REG_METHOD_STRUCT, regs, sf.cmds, target.pos);
 		assert regs[REG_METHOD_STRUCT];
 		if (funcCallCmd.secondName == null) {
-			Param p1;
+			Param   p1;
 			Command c;
 			p1 = Param.createLabel(funcCallCmd.firstName);
 			c = new Command(Commands.CMD_CALL, p1, null);
@@ -890,9 +868,9 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 	}
 	
 	private void dependencyCall(CompileTarget target, SimpleFunction sf, SimpleCommandFuncCall funcCallCmd) {
-		SimpleDependency dep = funcCallCmd.pool.getDependency(funcCallCmd.firstName);
-		SimpleFunction func = (SimpleFunction) dep.get(funcCallCmd.secondName);
-		Param p1, p2;
+		SimpleDependency dep  = funcCallCmd.pool.getDependency(funcCallCmd.firstName);
+		SimpleFunction   func = (SimpleFunction) dep.get(funcCallCmd.secondName);
+		Param            p1, p2;
 		// load dependency
 		p1 = build(A_SR, REG_DEP_FUNC_DEPENDENCY_FILE_REGISTER);
 		p2 = build(A_NUM, dep.path.addr - target.pos);
@@ -920,8 +898,9 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 	}
 	
 	/**
-	 * a {@link FuncCallCmd} is a {@link Command} which is only for Compiler internal use<br>
-	 * this command is used when a function outside of the current file is called and replaced by a non internal command in the {@link SimpleCompiler#link(CompileTarget)} method
+	 * a {@link FuncCallCmd} is a {@link Command} which is only for Compiler internal use<br> this command is used when
+	 * a function outside of the current file is called and replaced by a non internal command in the
+	 * {@link SimpleCompiler#link(CompileTarget)} method
 	 * 
 	 * @author pat
 	 */
@@ -950,9 +929,9 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 	}
 	
 	private void pop(CompileTarget target, SimpleFunction sf) {
-		Param p1;
+		Param   p1;
 		Command c;
-		for (int i = sf.regVars - 1; i >= 0; i -- ) {
+		for (int i = sf.regVars - 1; i >= 0; i--) {
 			p1 = build(A_SR, REG_MIN_VARIABLE + i);
 			c = new Command(Commands.CMD_PUSH, p1, null);
 			target.pos += c.length();
@@ -971,7 +950,7 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 	}
 	
 	private void push(CompileTarget target, SimpleFunction sf) {
-		Param p1;
+		Param   p1;
 		Command c;
 		p1 = build(A_SR, REG_METHOD_STRUCT);
 		c = new Command(Commands.CMD_PUSH, p1, null);
@@ -983,7 +962,7 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 			target.pos += c.length();
 			sf.cmds.add(c);
 		}
-		for (int i = 0; i < sf.regVars; i ++ ) {
+		for (int i = 0; i < sf.regVars; i++) {
 			p1 = build(A_SR, REG_MIN_VARIABLE + i);
 			c = new Command(Commands.CMD_PUSH, p1, null);
 			target.pos += c.length();
@@ -992,11 +971,11 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 	}
 	
 	private void assignVariable(CompileTarget target, SimpleFunction sf, boolean[] regs, SimpleVariable vari,
-		SimpleValue value) {
+			SimpleValue value) {
 		assert vari.reg != -1;
 		assert vari.type.isPrimitive() || vari.type.isPointer();
 		if (vari.addr != -1L) {
-			int reg = register(regs, MAX_COMPILER_REGISTER + 1);
+			int     reg = register(regs, MAX_COMPILER_REGISTER + 1);
 			boolean old = makeRegUsable(regs, reg, sf.cmds, target);
 			target.pos = value.loadValue(reg, regs, sf.cmds, target.pos);
 			Param p1, p2;
@@ -1030,11 +1009,11 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 		}
 	}
 	
-	private boolean makeRegUsable(boolean[] regs, int reg, List <Command> cmds, CompileTarget target) {
+	private boolean makeRegUsable(boolean[] regs, int reg, List<Command> cmds, CompileTarget target) {
 		boolean old = regs[reg];
 		if (old) {
-			Param p1 = build(A_SR, reg);
-			Command c = new Command(Commands.CMD_PUSH, p1, null);
+			Param   p1 = build(A_SR, reg);
+			Command c  = new Command(Commands.CMD_PUSH, p1, null);
 			target.pos += c.length();
 			cmds.add(c);
 			regs[reg] = false;
@@ -1042,10 +1021,10 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 		return old;
 	}
 	
-	private void releseReg(boolean[] regs, int reg, boolean old, List <Command> cmds, CompileTarget target) {
+	private void releseReg(boolean[] regs, int reg, boolean old, List<Command> cmds, CompileTarget target) {
 		if (old) {
-			Param p1 = build(A_SR, reg);
-			Command c = new Command(Commands.CMD_POP, p1, null);
+			Param   p1 = build(A_SR, reg);
+			Command c  = new Command(Commands.CMD_POP, p1, null);
 			target.pos += c.length();
 			cmds.add(c);
 		}
@@ -1053,21 +1032,17 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 	}
 	
 	private int register(boolean[] regs, int fallback) {
-		for (int i = fallback; i < 256; i ++ ) {
-			if ( !regs[i]) {
-				return i;
-			}
+		for (int i = fallback; i < 256; i++) {
+			if (!regs[i]) { return i; }
 		}
-		for (int i = fallback - 1; i > 0; i -- ) {
-			if ( !regs[i]) {
-				return i;
-			}
+		for (int i = fallback - 1; i > 0; i--) {
+			if (!regs[i]) { return i; }
 		}
 		return fallback;
 	}
 	
-	public static void count(UsedData used, Iterable <?> countTarget) {
-		final int startRegs = used.regs;
+	public static void count(UsedData used, Iterable<?> countTarget) {
+		final int  startRegs = used.regs;
 		final long startAddr = used.currentaddr;
 		for (Object obj : countTarget) {
 			if (obj instanceof SimpleCommandBlock) {
@@ -1076,9 +1051,9 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 				SimpleVariable sv = (SimpleVariable) obj;
 				assert sv.addr == -1L;
 				assert sv.reg == -1;
-				if ( (sv.type.isPrimitive() || sv.type.isPointer()) && used.regs < MAX_COMPILER_REGISTER) {
+				if ((sv.type.isPrimitive() || sv.type.isPointer()) && used.regs < MAX_COMPILER_REGISTER) {
 					sv.reg = used.regs;
-					used.regs ++ ;
+					used.regs++;
 				} else {
 					int bc = sv.type.byteCount();
 					used.currentaddr = align(used.currentaddr, bc);
@@ -1108,7 +1083,7 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 			high = bc;
 		}
 		int and = high - 1;
-		if ( (pos & and) != 0) {
+		if ((pos & and) != 0) {
 			pos += high - (pos & and);
 		}
 		return pos;
@@ -1137,7 +1112,7 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 		
 	}
 	
-	private static class FileCommandsList extends AbstractList <Command> implements List <Command> {
+	private static class FileCommandsList extends AbstractList<Command> implements List<Command> {
 		
 		private final SimpleFunction[] funcs;
 		private final LogMode          lm;
@@ -1147,9 +1122,9 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 			this.lm = lm;
 		}
 		
-		public static List <Command> create(SimpleFile file, LogMode lm) {
-			Collection <SimpleFunction> functions = file.functions();
-			SimpleFunction[] funcs = functions.toArray(new SimpleFunction[functions.size()]);
+		public static List<Command> create(SimpleFile file, LogMode lm) {
+			Collection<SimpleFunction> functions = file.functions();
+			SimpleFunction[]           funcs     = functions.toArray(new SimpleFunction[functions.size()]);
 			try {
 				assert false;
 			} catch (AssertionError ae) {
@@ -1161,11 +1136,11 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 		}
 		
 		@Override
-		public Iterator <Command> iterator() {
-			return new Iterator <Command>() {
+		public Iterator<Command> iterator() {
+			return new Iterator<Command>() {
 				
-				private int                i   = 0;
-				private Iterator <Command> sub = null;
+				private int               i   = 0;
+				private Iterator<Command> sub = null;
 				
 				@Override
 				public boolean hasNext() {
@@ -1174,12 +1149,8 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 				
 				@Override
 				public Command next() {
-					if (sub != null && sub.hasNext()) {
-						return sub.next();
-					}
-					if (i >= funcs.length) {
-						throw new NoSuchElementException();
-					}
+					if (sub != null && sub.hasNext()) { return sub.next(); }
+					if (i >= funcs.length) { throw new NoSuchElementException(); }
 					sub = funcs[i].cmds.iterator();
 					lm.log(LogMode.functions, "assemble function: ", funcs[i].toString(), "");
 					CompilerCommandCommand ccc;
@@ -1188,7 +1159,7 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 					} else {
 						ccc = new CompilerCommandCommand(CompilerCommand.setPos, funcs[i].address);
 					}
-					i ++ ;
+					i++;
 					return ccc;
 				}
 				
@@ -1198,8 +1169,8 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 		@Override
 		public Command get(int index) {
 			long i;
-			int fsi;
-			for (i = 1, fsi = 0; fsi < funcs.length; i ++ , fsi ++ ) {
+			int  fsi;
+			for (i = 1, fsi = 0; fsi < funcs.length; i++, fsi++) {
 				if (i > index) {
 					if (i == 0) {
 						return new CompilerCommandCommand(CompilerCommand.setPos, funcs[fsi].address);
@@ -1208,9 +1179,7 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 					}
 				}
 				long newI = i + funcs[fsi].cmds.size();
-				if (newI > index) {
-					return funcs[fsi].cmds.get((int) (index - i));
-				}
+				if (newI > index) { return funcs[fsi].cmds.get((int) (index - i)); }
 				i = newI;
 			}
 			throw new IndexOutOfBoundsException();
@@ -1219,8 +1188,8 @@ public class SimpleCompiler implements TriFunction <String, String, String, Simp
 		@Override
 		public int size() {
 			long s;
-			int i;
-			for (s = 0L, i = 0; i < funcs.length; i ++ , s ++ ) {
+			int  i;
+			for (s = 0L, i = 0; i < funcs.length; i++, s++) {
 				s += funcs[i].cmds.size();
 			}
 			return (int) Math.min(Integer.MAX_VALUE, s);

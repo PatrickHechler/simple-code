@@ -4,14 +4,16 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 
+import de.hechler.patrick.codesprachen.simple.compile.objects.compiler.SimpleCompiler;
+
 import de.hechler.patrick.codesprachen.simple.compile.interfaces.SimpleExportable;
 import de.hechler.patrick.codesprachen.simple.compile.interfaces.TriFunction;
-import de.hechler.patrick.codesprachen.simple.compile.objects.SimpleCompiler.UsedData;
 import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommand;
 import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommandBlock;
 import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommandVarDecl;
@@ -27,26 +29,24 @@ import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleVaria
 
 public class SimpleFile implements SimplePool {
 	
-	private final TriFunction <String, String, String, SimpleDependency> dependencyProvider;
-	private final Map <String, SimpleDependency>                         dependencies = new HashMap <>();
-	private final Map <String, SimpleVariable>                           vars         = new LinkedHashMap <>();
-	private final Map <String, SimpleStructType>                         structs      = new HashMap <>();
-	private final Map <String, SimpleFunction>                           funcs        = new LinkedHashMap <>();
-	private final Map <String, SimpleConstant>                           consts       = new HashMap <>(SimpleCompiler.DEFAULT_CONSTANTS);
-	private final List <SimpleValueDataPointer>                          datas        = new ArrayList <>();
-	private final List <SimpleExportable>                                exports      = new ArrayList <>();
-	private SimpleFunction                                               main         = null;
+	private final TriFunction<String, String, String, SimpleDependency> dependencyProvider;
+	private final Map<String, SimpleDependency>                         dependencies = new HashMap<>();
+	private final Map<String, SimpleVariable>                           vars         = new LinkedHashMap<>();
+	private final Map<String, SimpleStructType>                         structs      = new HashMap<>();
+	private final Map<String, SimpleFunction>                           funcs        = new LinkedHashMap<>();
+	private final Map<String, SimpleConstant>                           consts       = new HashMap<>(
+			SimpleCompiler.DEFAULT_CONSTANTS);
+	private final List<SimpleValueDataPointer>                          datas        = new ArrayList<>();
+	private final List<SimpleExportable>                                exports      = new ArrayList<>();
+	private SimpleFunction                                              main         = null;
 	
-	public SimpleFile(TriFunction <String, String, String, SimpleDependency> dependencyProvider) {
+	public SimpleFile(TriFunction<String, String, String, SimpleDependency> dependencyProvider) {
 		this.dependencyProvider = dependencyProvider;
 	}
 	
 	private void checkName(String name) {
-		if (dependencies.containsKey(name)
-			|| vars.containsKey(name)
-			|| structs.containsKey(name)
-			|| funcs.containsKey(name)
-			|| consts.containsKey(name)) {
+		if (dependencies.containsKey(name) || vars.containsKey(name) || structs.containsKey(name)
+				|| funcs.containsKey(name) || consts.containsKey(name)) {
 			throw new IllegalArgumentException("name already in use! name: '" + name + "'");
 		}
 	}
@@ -67,30 +67,26 @@ public class SimpleFile implements SimplePool {
 	public void addStructure(SimpleStructType struct) {
 		checkName(struct.name);
 		SimpleStructType old = structs.put(struct.name, struct);
-		if (old != null) {
-			throw new IllegalStateException("structure already exist: name: " + struct.name);
-		}
+		if (old != null) { throw new IllegalStateException("structure already exist: name: " + struct.name); }
 	}
 	
 	private static final SimpleFuncType MAIN_TYPE = new SimpleFuncType(
-		Arrays.asList(new SimpleVariable(SimpleType.NUM, "argc", false), new SimpleVariable(new SimpleTypePointer(new SimpleTypePointer(SimpleType.UWORD)), "argv", false)),
-		Arrays.asList(new SimpleVariable(SimpleType.NUM, "exitnum", false)));
+			Arrays.asList(new SimpleVariable(SimpleType.NUM, "argc", false),
+					new SimpleVariable(new SimpleTypePointer(new SimpleTypePointer(SimpleType.UWORD)), "argv", false)),
+			Arrays.asList(new SimpleVariable(SimpleType.NUM, "exitnum", false)));
 	
 	public void addFunction(SimpleFunction func) {
 		checkName(func.name);
 		if (func.main) {
-			if (this.main != null) {
-				throw new IllegalStateException("there is already a main function!");
-			}
-			if ( !MAIN_TYPE.equals(func.type)) {
-				throw new IllegalStateException("the main function needs to have a head like this: '" + MAIN_TYPE + "'! (main: '" + func + "')");
+			if (this.main != null) { throw new IllegalStateException("there is already a main function!"); }
+			if (!MAIN_TYPE.equals(func.type)) {
+				throw new IllegalStateException("the main function needs to have a head like this: '" + MAIN_TYPE
+						+ "'! (main: '" + func + "')");
 			}
 			this.main = func;
 		}
 		SimpleFunction old = funcs.put(func.name, func);
-		if (old != null) {
-			throw new IllegalStateException("function already exist: name: " + func.name);
-		}
+		if (old != null) { throw new IllegalStateException("function already exist: name: " + func.name); }
 		if (func.export) {
 			this.exports.add(func);
 		}
@@ -101,7 +97,7 @@ public class SimpleFile implements SimplePool {
 		consts.put(constant.name, constant);
 	}
 	
-	public Collection <SimpleFunction> functions() {
+	public Collection<SimpleFunction> functions() {
 		return this.funcs.values();
 	}
 	
@@ -109,8 +105,8 @@ public class SimpleFile implements SimplePool {
 		return this.main;
 	}
 	
-	public Collection <SimpleValueDataPointer> dataValues() {
-		List <SimpleValueDataPointer> result = new ArrayList <>();
+	public Collection<SimpleValueDataPointer> dataValues() {
+		List<SimpleValueDataPointer> result = new ArrayList<>();
 		for (SimpleDependency sd : dependencies.values()) {
 			result.add(sd.path);
 		}
@@ -118,15 +114,63 @@ public class SimpleFile implements SimplePool {
 		return result;
 	}
 	
-	public SimpleFuncPool newFuncPool(List <SimpleVariable> args, List <SimpleVariable> results) {
-		SimpleFuncType type = new SimpleFuncType(args, results);
+	public SimpleFuncPool newFuncPool(List<SimpleVariable> args, List<SimpleVariable> results) {
+		SimpleFuncType   type     = new SimpleFuncType(args, results);
 		SimpleVariable[] funcargs = type.arguments.clone();
-		for (int i = 0; i < funcargs.length; i ++ ) {
+		for (int i = 0; i < funcargs.length; i++) {
 			funcargs[i] = new SimpleVariable(funcargs[i].type, funcargs[i].name, funcargs[i].export);
 		}
 		UsedData used = new UsedData();
-		SimpleCompiler.count(used, Arrays.asList(funcargs));
+		count(used, Arrays.asList(funcargs));
 		return new SimpleFuncPool(type, funcargs, used);
+	}
+	
+	public static void count(UsedData used, Iterable<?> countTarget) {
+		final int  startRegs = used.regs;
+		final long startAddr = used.currentaddr;
+		for (Object obj : countTarget) {
+			if (obj instanceof SimpleCommandBlock) {
+				count(used, ((SimpleCommandBlock) obj).commands);
+			} else if (obj instanceof SimpleVariable) {
+				SimpleVariable sv = (SimpleVariable) obj;
+				assert sv.addr == -1L;
+				assert sv.reg == -1;
+				if ((sv.type.isPrimitive() || sv.type.isPointer()) && used.regs < SimpleCompiler.REG_MAX_VARIABLE) {
+					sv.reg = used.regs;
+					used.regs++;
+				} else {
+					int bc = sv.type.byteCount();
+					used.currentaddr = align(used.currentaddr, bc);
+					sv.addr = used.currentaddr;
+					sv.reg = de.hechler.patrick.codesprachen.simple.compile.objects.compiler.SimpleCompiler.REG_VARIABLE_POINTER;
+					used.currentaddr += bc;
+				}
+			} else if (obj instanceof SimpleCommand) {
+				// do nothing
+			} else {
+				throw new InternalError("unknown class: '" + obj.getClass().getName() + "' of object: '" + obj + "'");
+			}
+		}
+		if (used.currentaddr > used.maxaddr) {
+			used.maxaddr = used.currentaddr;
+		}
+		if (used.regs > used.maxregs) {
+			used.maxregs = used.regs;
+		}
+		used.regs = startRegs;
+		used.currentaddr = startAddr;
+	}
+	
+	private static long align(long pos, int bc) {
+		int high = 8;
+		if (Integer.bitCount(bc) == 1 && bc < 8) {
+			high = bc;
+		}
+		int and = high - 1;
+		if ((pos & and) != 0) {
+			pos += high - (pos & and);
+		}
+		return pos;
 	}
 	
 	@Override
@@ -139,7 +183,7 @@ public class SimpleFile implements SimplePool {
 		}
 	}
 	
-	public Collection <SimpleVariable> vars() {
+	public Collection<SimpleVariable> vars() {
 		return vars.values();
 	}
 	
@@ -151,35 +195,25 @@ public class SimpleFile implements SimplePool {
 	@Override
 	public SimpleValue newNameUseValue(String name) {
 		SimpleVariable vari = vars.get(name);
-		if (vari != null) {
-			return new SimpleVariableValue(vari);
-		}
+		if (vari != null) { return new SimpleVariableValue(vari); }
 		SimpleDependency dep = dependencies.get(name);
-		if (dep != null) {
-			return new SimpleVariableValue(dep);
-		}
+		if (dep != null) { return new SimpleVariableValue(dep); }
 		SimpleConstant constant = consts.get(name);
-		if (constant != null) {
-			return new SimpleNumberValue(SimpleType.NUM, constant.value);
-		}
+		if (constant != null) { return new SimpleNumberValue(SimpleType.NUM, constant.value); }
 		throw new IllegalArgumentException("there is nothign with the given name! (name='" + name + "')");
 	}
 	
 	@Override
 	public SimpleDependency getDependency(String name) {
 		SimpleDependency dep = dependencies.get(name);
-		if (dep == null) {
-			throw new NoSuchElementException("there is no dependency with the name '" + name + "'");
-		}
+		if (dep == null) { throw new NoSuchElementException("there is no dependency with the name '" + name + "'"); }
 		return dep;
 	}
 	
 	@Override
 	public SimpleFunction getFunction(String name) {
 		SimpleFunction func = funcs.get(name);
-		if (func == null) {
-			throw new NoSuchElementException("there is no function with the name '" + name + "'");
-		}
+		if (func == null) { throw new NoSuchElementException("there is no function with the name '" + name + "'"); }
 		return func;
 	}
 	
@@ -189,19 +223,23 @@ public class SimpleFile implements SimplePool {
 			se = vars.get(name);
 			if (se == null) {
 				se = consts.get(name);
-				if (se == null) {
-					throw new NoSuchElementException("there is no export with the name '" + name + "'");
-				}
+				if (se == null) { throw new NoSuchElementException("there is no export with the name '" + name + "'"); }
 			}
 		}
-		if ( !se.isExport()) {
-			throw new NoSuchElementException("there is no export with the name '" + name + "' (the needed export is NOT declared as export)");
+		if (!se.isExport()) {
+			throw new NoSuchElementException(
+					"there is no export with the name '" + name + "' (the needed export is NOT declared as export)");
 		}
 		return se;
 	}
 	
+	public Iterator<SimpleExportable> exportsIter() {
+		return new FilteringIter<>(new MultiIter<>(consts.values().iterator(), funcs.values().iterator(),
+				structs.values().iterator(), vars.values().iterator()), se -> se.isExport());
+	}
+	
 	@Override
-	public Map <String, SimpleConstant> getConstants() {
+	public Map<String, SimpleConstant> getConstants() {
 		return consts;
 	}
 	
@@ -244,14 +282,10 @@ public class SimpleFile implements SimplePool {
 		@Override
 		public SimpleValue newNameUseValue(String name) {
 			for (SimpleVariable sv : myargs) {
-				if (sv.name.equals(name)) {
-					return new SimpleVariableValue(sv);
-				}
+				if (sv.name.equals(name)) { return new SimpleVariableValue(sv); }
 			}
 			for (SimpleVariable sv : func.results) {
-				if (sv.name.equals(name)) {
-					return new SimpleVariableValue(sv);
-				}
+				if (sv.name.equals(name)) { return new SimpleVariableValue(sv); }
 			}
 			return SimpleFile.this.newNameUseValue(name);
 		}
@@ -272,7 +306,7 @@ public class SimpleFile implements SimplePool {
 		}
 		
 		@Override
-		public Map <String, SimpleConstant> getConstants() {
+		public Map<String, SimpleConstant> getConstants() {
 			return SimpleFile.this.getConstants();
 		}
 		
@@ -321,9 +355,7 @@ public class SimpleFile implements SimplePool {
 			for (SimpleCommand cmd : block.commands) {
 				if (cmd instanceof SimpleCommandVarDecl) {
 					SimpleCommandVarDecl vd = (SimpleCommandVarDecl) cmd;
-					if (vd.name.equals(name)) {
-						return new SimpleVariableValue(vd);
-					}
+					if (vd.name.equals(name)) { return new SimpleVariableValue(vd); }
 				}
 			}
 			return parent.newNameUseValue(name);
@@ -355,7 +387,7 @@ public class SimpleFile implements SimplePool {
 		}
 		
 		@Override
-		public Map <String, SimpleConstant> getConstants() {
+		public Map<String, SimpleConstant> getConstants() {
 			return p().getConstants();
 		}
 		
@@ -391,10 +423,10 @@ public class SimpleFile implements SimplePool {
 		
 		public abstract SimpleExportable get(String name);
 		
-		private static final List <String> normalize(String depend) {
+		private static final List<String> normalize(String depend) {
 			String[] segs = depend.replace('\\', '/').split("\\/");
-			int len, start, i;
-			for (start = 0; start < segs.length && segs[start].isEmpty(); start ++ );
+			int      len, start, i;
+			for (start = 0; start < segs.length && segs[start].isEmpty(); start++);
 			for (i = start, len = segs.length; i < len;) {
 				switch (segs[i]) {
 				case ".":
@@ -402,11 +434,11 @@ public class SimpleFile implements SimplePool {
 					break;
 				case "..":
 					System.arraycopy(segs, i + 1, segs, i - 1, len - i);
-					i -- ;
-					len -- ;
+					i--;
+					len--;
 					break;
 				default:
-					i ++ ;
+					i++;
 				}
 			}
 			return Arrays.asList(segs).subList(start, start + len);
@@ -423,7 +455,7 @@ public class SimpleFile implements SimplePool {
 			if (obj == null) return false;
 			if (getClass() != obj.getClass()) return false;
 			SimpleDependency other = (SimpleDependency) obj;
-			if ( !depend.equals(other.depend)) return false;
+			if (!depend.equals(other.depend)) return false;
 			return true;
 		}
 		

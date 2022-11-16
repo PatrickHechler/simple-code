@@ -25,6 +25,7 @@ import de.hechler.patrick.pfs.interfaces.PatrFile;
 import de.hechler.patrick.pfs.interfaces.PatrFileSysElement;
 import de.hechler.patrick.pfs.interfaces.PatrFolder;
 
+@Deprecated
 public class MultiCompiler {
 	
 	public static final String SIMPLE_SOURCE_CODE_END    = "s";
