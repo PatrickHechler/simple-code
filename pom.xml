@@ -23,11 +23,11 @@
     <repositories>
         <repository>
             <id>patmcsreleases</id>
-            <url>http://nexuspat.hechler.de/repository/maven-releases/</url>
+            <url>https://nexuspat.hechler.de/repository/maven-releases/</url>
         </repository>
         <repository>
             <id>patmcssnapshots</id>
-            <url>http://nexuspat.hechler.de/repository/maven-snapshots/</url>
+            <url>https://nexuspat.hechler.de/repository/maven-snapshots/</url>
         </repository>
         <repository>
             <id>central</id>
