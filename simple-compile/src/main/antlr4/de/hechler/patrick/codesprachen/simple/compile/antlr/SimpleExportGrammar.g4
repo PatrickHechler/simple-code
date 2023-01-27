@@ -160,20 +160,20 @@ UNKNOWN_SIZE_ARRAY : ']' ;
 ARRAY :              '[' ;
 POINTER :            '#' ;
 
-PRIM_FPNUM :        '.' ;
-PRIM_NUM :          '-' ;
-PRIM_UNUM :         '+' ;
-PRIM_DWORD :        '\\' ;
-PRIM_UDWORD :       '/' ;
-PRIM_WORD :         '!' ;
-PRIM_UWORD :        '&' ;
-PRIM_BYTE :         '"' ;
-PRIM_UBYTE :        '\'' ;
+PRIM_FPNUM :        '.fp' ;
+PRIM_NUM :          '.n' ;
+PRIM_UNUM :         '.un' ;
+PRIM_DWORD :        '.dw' ;
+PRIM_UDWORD :       '.udw' ;
+PRIM_WORD :         '.w' ;
+PRIM_UWORD :        '.uw' ;
+PRIM_BYTE :         '.b' ;
+PRIM_UBYTE :        '.ub' ;
 
-FUNC :              '*' ;
-VAR :               ';' ;
-STRUCT :            '~' ;
-CONST :             '%' ;
+FUNC :              '~f' ;
+VAR :               '~v' ;
+STRUCT :            '~s' ;
+CONST :             '~c' ;
 
 NAME_TYPE_SEP :     ':' ;
 VAR_SEP :           ',' ;

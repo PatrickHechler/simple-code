@@ -1,5 +1,6 @@
 package de.hechler.patrick.codesprachen.simple.compile.interfaces;
 
+import java.io.IOError;
 import java.io.IOException;
 import java.io.Reader;
 import java.util.HashMap;
@@ -13,18 +14,19 @@ import org.antlr.v4.runtime.BailErrorStrategy;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.Lexer;
 
-import de.hechler.patrick.codesprachen.simple.compile.antlr.SimpleExportGrammarLexer;
-import de.hechler.patrick.codesprachen.simple.compile.antlr.SimpleExportGrammarParser;
-import de.hechler.patrick.codesprachen.simple.compile.antlr.SimpleExportGrammarParser.SimpleExportsContext;
-import de.hechler.patrick.codesprachen.simple.compile.objects.SimpleConstant;
-import de.hechler.patrick.codesprachen.simple.compile.objects.SimpleFunction;
-import de.hechler.patrick.codesprachen.simple.compile.objects.SimpleVariable;
-import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleFuncType;
-import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleStructType;
-import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleType;
-import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleTypeArray;
-import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleTypePointer;
-import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleTypePrimitive;
+import de.hechler.patrick.codesprachen.simple.symbol.SimpleExportGrammarLexer;
+import de.hechler.patrick.codesprachen.simple.symbol.SimpleExportGrammarParser;
+import de.hechler.patrick.codesprachen.simple.symbol.SimpleExportGrammarParser.SimpleExportsContext;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleConstant;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleFunction;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleVariable;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleFuncType;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleStructType;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleType;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleTypeArray;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleTypePointer;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleTypePrimitive;
+
 
 public interface SimpleExportable {
 	
@@ -183,7 +185,7 @@ public interface SimpleExportable {
 			}
 			return result;
 		} catch (IOException e) {
-			throw new RuntimeException(e);
+			throw new IOError(e);
 		}
 	}
 	
