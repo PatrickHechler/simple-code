@@ -1,7 +1,7 @@
 package de.hechler.patrick.codesprachen.simple.compile.objects.values;
 
 import de.hechler.patrick.codesprachen.simple.compile.objects.SimplePool;
-import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleType;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleType;
 
 public abstract class SimpleValueConst extends SimpleValueNoConst {
 	

@@ -1,5 +1,7 @@
 package de.hechler.patrick.codesprachen.simple.compile.objects;
 
+import static de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleStructType.*;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -10,22 +12,24 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 
-import de.hechler.patrick.codesprachen.simple.compile.objects.compiler.SimpleCompiler;
-
-import de.hechler.patrick.codesprachen.simple.compile.interfaces.SimpleExportable;
+import de.hechler.patrick.codesprachen.primitive.assemble.enums.FileTypes;
 import de.hechler.patrick.codesprachen.simple.compile.interfaces.TriFunction;
 import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommand;
 import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommandBlock;
 import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommandVarDecl;
-import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleFuncType;
-import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleStructType;
-import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleType;
-import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleTypePointer;
+import de.hechler.patrick.codesprachen.simple.compile.objects.compiler.SimpleCompiler;
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleNumberValue;
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleStringValue;
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleValue;
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleValueDataPointer;
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleVariableValue;
+import de.hechler.patrick.codesprachen.simple.symbol.interfaces.SimpleExportable;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleConstant;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleVariable;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleFuncType;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleStructType;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleType;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleTypePointer;
 
 public class SimpleFile implements SimplePool {
 	
@@ -93,8 +97,8 @@ public class SimpleFile implements SimplePool {
 	}
 	
 	public void addConstant(SimpleConstant constant) {
-		checkName(constant.name);
-		consts.put(constant.name, constant);
+		checkName(constant.name());
+		consts.put(constant.name(), constant);
 	}
 	
 	public Collection<SimpleFunction> functions() {
@@ -129,20 +133,19 @@ public class SimpleFile implements SimplePool {
 		final int  startRegs = used.regs;
 		final long startAddr = used.currentaddr;
 		for (Object obj : countTarget) {
-			if (obj instanceof SimpleCommandBlock) {
-				count(used, ((SimpleCommandBlock) obj).commands);
-			} else if (obj instanceof SimpleVariable) {
-				SimpleVariable sv = (SimpleVariable) obj;
+			if (obj instanceof SimpleCommandBlock scb) {
+				count(used, scb.commands);
+			} else if (obj instanceof SimpleVariable sv) {
 				assert sv.addr == -1L;
 				assert sv.reg == -1;
-				if ((sv.type.isPrimitive() || sv.type.isPointer()) && used.regs < SimpleCompiler.REG_MAX_VARIABLE) {
+				if ((sv.type.isPrimitive() || sv.type.isPointer()) && used.regs < SimpleCompiler.MAX_VAR_REGISTER) {
 					sv.reg = used.regs;
 					used.regs++;
 				} else {
-					int bc = sv.type.byteCount();
+					long bc = sv.type.byteCount();
 					used.currentaddr = align(used.currentaddr, bc);
 					sv.addr = used.currentaddr;
-					sv.reg = de.hechler.patrick.codesprachen.simple.compile.objects.compiler.SimpleCompiler.REG_VARIABLE_POINTER;
+					sv.reg = de.hechler.patrick.codesprachen.simple.compile.objects.compiler.SimpleCompiler.REG_VAR_PNTR;
 					used.currentaddr += bc;
 				}
 			} else if (obj instanceof SimpleCommand) {
@@ -159,18 +162,6 @@ public class SimpleFile implements SimplePool {
 		}
 		used.regs = startRegs;
 		used.currentaddr = startAddr;
-	}
-	
-	private static long align(long pos, int bc) {
-		int high = 8;
-		if (Integer.bitCount(bc) == 1 && bc < 8) {
-			high = bc;
-		}
-		int and = high - 1;
-		if ((pos & and) != 0) {
-			pos += high - (pos & and);
-		}
-		return pos;
 	}
 	
 	@Override
@@ -199,7 +190,7 @@ public class SimpleFile implements SimplePool {
 		SimpleDependency dep = dependencies.get(name);
 		if (dep != null) { return new SimpleVariableValue(dep); }
 		SimpleConstant constant = consts.get(name);
-		if (constant != null) { return new SimpleNumberValue(SimpleType.NUM, constant.value); }
+		if (constant != null) { return new SimpleNumberValue(SimpleType.NUM, constant.value()); }
 		throw new IllegalArgumentException("there is nothign with the given name! (name='" + name + "')");
 	}
 	
@@ -405,44 +396,32 @@ public class SimpleFile implements SimplePool {
 		@Override public boolean isPointer()                            { return false; }
 		@Override public boolean isArray()                              { return false; }
 		@Override public boolean isFunc()                               { return false; }
-		@Override public int     byteCount()                            { throw new UnsupportedOperationException(); }
+		@Override public long    byteCount()                            { throw new UnsupportedOperationException(); }
 		@Override public void    appendToExportStr(StringBuilder build) { throw new UnsupportedOperationException(); }
 	}; // @formatter:on
 	
-	public static abstract class SimpleDependency extends SimpleVariable {
+	public abstract static class SimpleDependency extends SimpleVariable {
 		
 		public final SimpleValueDataPointer path;
 		public final String                 depend;
 		
-		public SimpleDependency(String name, String depend) {
+		public SimpleDependency(String name, String runtimeDepend) {
 			super(DEPENDENCY_TYPE, name, false);
-			this.path = new SimpleStringValue(normalize(depend));
-			this.depend = depend;
+			this.path = new SimpleStringValue(runtimeDepend);
+			this.depend = runtimeDepend;
 		}
 		
+		public static String runtimeName(String compileDepend) {
+			return switch (FileTypes.getTypeFromName(compileDepend, FileTypes.PRIMITIVE_MASHINE_CODE)) {
+			case PRIMITIVE_SYMBOL_FILE -> compileDepend.substring(0,
+					compileDepend.length() - FileTypes.PRIMITIVE_SOURCE_CODE.getExtensionWithDot().length());
+			case SIMPLE_SYMBOL_FILE -> compileDepend.substring(0,
+					compileDepend.length() - FileTypes.PRIMITIVE_SOURCE_CODE.getExtensionWithDot().length());
+			default -> compileDepend;
+			};
+		}
 		
 		public abstract SimpleExportable get(String name);
-		
-		private static final List<String> normalize(String depend) {
-			String[] segs = depend.replace('\\', '/').split("\\/");
-			int      len, start, i;
-			for (start = 0; start < segs.length && segs[start].isEmpty(); start++);
-			for (i = start, len = segs.length; i < len;) {
-				switch (segs[i]) {
-				case ".":
-					System.arraycopy(segs, i + 1, segs, i, len - i);
-					break;
-				case "..":
-					System.arraycopy(segs, i + 1, segs, i - 1, len - i);
-					i--;
-					len--;
-					break;
-				default:
-					i++;
-				}
-			}
-			return Arrays.asList(segs).subList(start, start + len);
-		}
 		
 		@Override
 		public int hashCode() {
@@ -455,8 +434,7 @@ public class SimpleFile implements SimplePool {
 			if (obj == null) return false;
 			if (getClass() != obj.getClass()) return false;
 			SimpleDependency other = (SimpleDependency) obj;
-			if (!depend.equals(other.depend)) return false;
-			return true;
+			return depend.equals(other.depend);
 		}
 		
 	}

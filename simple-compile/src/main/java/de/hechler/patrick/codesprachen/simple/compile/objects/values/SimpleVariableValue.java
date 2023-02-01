@@ -13,8 +13,8 @@ import de.hechler.patrick.codesprachen.primitive.assemble.objects.Command;
 import de.hechler.patrick.codesprachen.primitive.assemble.objects.Param;
 import de.hechler.patrick.codesprachen.primitive.core.utils.PrimAsmPreDefines;
 import de.hechler.patrick.codesprachen.simple.compile.objects.SimplePool;
-import de.hechler.patrick.codesprachen.simple.compile.objects.SimpleVariable;
-import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleTypePointer;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleVariable;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleTypePointer;
 
 public class SimpleVariableValue extends SimpleValueNoConst {
 	

@@ -2,20 +2,22 @@ package de.hechler.patrick.codesprachen.simple.compile.objects.compiler;
 
 import java.nio.file.Path;
 
+import de.hechler.patrick.zeugs.pfs.interfaces.File;
+
 
 public class TranslationUnit {
 	
 	public final Path source;
-	public final Path target;
+	public final File target;
 	
-	public TranslationUnit(Path source, Path target) {
+	public TranslationUnit(Path source, File target) {
 		this.source = source;
 		this.target = target;
 	}
 	
 	@Override
 	public final int hashCode() {
-		return source.hashCode() ^ target.hashCode();
+		return source.hashCode() * 31 + target.hashCode();
 	}
 	
 	@Override
@@ -28,7 +30,7 @@ public class TranslationUnit {
 			return false;
 		}
 		TranslationUnit tu = (TranslationUnit) obj;
-		return this.source.equals(tu.source) && this.target.equals(tu.target);
+		return this.source.equals(tu.source) && this.target.equals((Object) tu.target);
 	}
 	
 }

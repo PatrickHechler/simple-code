@@ -7,38 +7,49 @@ import java.io.PrintStream;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 
+import de.hechler.patrick.codesprachen.primitive.assemble.enums.FileTypes;
 import de.hechler.patrick.codesprachen.primitive.assemble.objects.PrimitiveAssembler;
+import de.hechler.patrick.zeugs.pfs.interfaces.File;
 
 
 public class PrimitiveCompiler extends PerFileCompiler {
 	
 	private final Charset cs;
-	private final Path[] lockups;
+	private final Path[]  lockups;
 	
-	public PrimitiveCompiler(Charset cs, Path[] lockups) {
+	public PrimitiveCompiler(Charset cs, Path... lockups) {
 		this.cs = cs;
 		this.lockups = lockups;
 	}
 	
-	public void compile(Path source, Path target) throws IOException {
-		Path expout = target.resolveSibling(target.getFileName().toString().replaceFirst("(.*)[.]"  + DefMultiCompiler.PRIMITIVE_SOURCE_CODE_END, "$1") + ("." +  DefMultiCompiler.PRIMITIVE_SYMBOL_FILE_END));
-		try (OutputStream out = Files.newOutputStream(target)) {
+	public void compile(Path source, File target) throws IOException {
+		Path sym = symFile(source);
+		try (OutputStream out = target.openAppend().asOutputStream()) {
 			try (BufferedReader reader = Files.newBufferedReader(source, cs)) {
 				PrimitiveAssembler asm;
-				try (OutputStream eo = Files.newOutputStream(expout, StandardOpenOption.WRITE, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
+				try (OutputStream eo = Files.newOutputStream(sym)) {
 					try (PrintStream eop = new PrintStream(eo, false, cs)) {
 						asm = new PrimitiveAssembler(out, eop, lockups, false, true);
-						asm.assemble(source, reader);
+						asm.assemble(Path.of(source.toString()), reader);
 						eop.flush();
 					}
 				}
-				if (Files.size(expout) == 0) {
-					Files.delete(expout);
+				if (Files.size(sym) == 0) {
+					Files.delete(sym);
 				}
 			}
 		}
+	}
+	
+	private static Path symFile(Path src) {
+		String name = src.getFileName().toString();
+		String end  = FileTypes.PRIMITIVE_SOURCE_CODE.getExtensionWithDot();
+		if (name.endsWith(end)) {
+			name = name.substring(0, name.length() - end.length());
+		}
+		name += FileTypes.PRIMITIVE_SYMBOL_FILE.getExtensionWithDot();
+		return src.resolveSibling(name);
 	}
 	
 }

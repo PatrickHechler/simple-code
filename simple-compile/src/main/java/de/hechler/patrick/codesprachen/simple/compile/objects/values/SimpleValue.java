@@ -3,16 +3,16 @@ package de.hechler.patrick.codesprachen.simple.compile.objects.values;
 import java.util.List;
 
 import de.hechler.patrick.codesprachen.primitive.assemble.objects.Command;
-import de.hechler.patrick.codesprachen.simple.compile.objects.SimpleCompiler;
 import de.hechler.patrick.codesprachen.simple.compile.objects.SimplePool;
-import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleType;
+import de.hechler.patrick.codesprachen.simple.compile.objects.compiler.SimpleCompiler;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleType;
 
 public interface SimpleValue {
 	
 	/**
 	 * the minimum register number which is allowed to be used when a value should load its value to a register
 	 */
-	public static final int MIN_REGISTER = SimpleCompiler.MAX_COMPILER_REGISTER + 1;
+	public static final int MIN_REGISTER = SimpleCompiler.MIN_TMP_VAL_REG;
 	
 	public static final int EXP_MULTIPLY              = 1;
 	public static final int EXP_DIVIDE                = 2;

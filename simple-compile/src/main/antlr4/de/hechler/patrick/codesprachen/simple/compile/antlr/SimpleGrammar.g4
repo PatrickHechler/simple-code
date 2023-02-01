@@ -12,11 +12,13 @@ import java.util.*;
 import java.io.*;
 import java.nio.file.*;
 import de.hechler.patrick.codesprachen.simple.compile.objects.*;
+import de.hechler.patrick.codesprachen.simple.compile.objects.compiler.SimpleCompiler;
 import de.hechler.patrick.codesprachen.simple.compile.objects.SimpleFile.*;
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.*;
 import de.hechler.patrick.codesprachen.simple.compile.objects.commands.*;
 import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommandAsm.*;
-import de.hechler.patrick.codesprachen.simple.compile.objects.types.*;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.*;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.types.*;
 }
 
 @parser::members {
@@ -156,7 +158,7 @@ constant [SimpleFile file] returns [SimpleConstant c]:
 		{export = true;}
 	)?
 	NAME ARROW_LEFT value [file] SEMI
-	{$c = SimpleConstant.create($NAME.getText(), $value.val, export);}
+	{$c = SimpleCompiler.createConstant($NAME.getText(), $value.val, export);}
 ;
 
 value [SimplePool pool] returns [SimpleValue val]:
@@ -440,7 +442,7 @@ type [SimplePool pool] returns [SimpleType t]:
 		{$t = $typeFunc.t;}
 	)
 	(
-		DIAMOND // pointer
+		DIAMOND
 		{$t = new SimpleTypePointer($t);}
 		|
 		{SimpleValue val = null;}
@@ -450,7 +452,7 @@ type [SimplePool pool] returns [SimpleType t]:
 			{val = $value.val;}
 		)?
 		CLOSE_ARRAY_BLOCK
-		{$t = SimpleTypeArray.create($t, val);}
+		{$t = SimpleCompiler.createArray($t, val);}
 	)*
 ;
 

@@ -6,8 +6,8 @@ import de.hechler.patrick.codesprachen.primitive.assemble.enums.Commands;
 import de.hechler.patrick.codesprachen.primitive.assemble.objects.Command;
 import de.hechler.patrick.codesprachen.primitive.assemble.objects.Param;
 import de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder;
-import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleType;
-import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleTypePrimitive;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleType;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleTypePrimitive;
 
 public class SimpleNumberValue extends SimpleValueConst implements SimpleValue {
 	

@@ -15,12 +15,12 @@ import de.hechler.patrick.codesprachen.primitive.assemble.objects.Command;
 import de.hechler.patrick.codesprachen.primitive.assemble.objects.Param;
 import de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder;
 import de.hechler.patrick.codesprachen.simple.compile.objects.SimplePool;
-import de.hechler.patrick.codesprachen.simple.compile.objects.SimpleVariable;
-import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleFuncType;
-import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleStructType;
-import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleType;
-import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleTypePointer;
-import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleTypePrimitive;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleVariable;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleFuncType;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleStructType;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleType;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleTypePointer;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleTypePrimitive;
 
 public abstract class SimpleValueNoConst implements SimpleValue {
 	
@@ -684,7 +684,7 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 					jmpnbCmd = new Command(Commands.CMD_JMPNB, p1, null);
 					p1 = param1;
 					p2 = build(A_NUM, cmpbits);
-					bcpCmd = new Command(Commands.CMD_BCP, p1, p2);
+					bcpCmd = new Command(Commands.CMD_CMPL, p1, p2);
 				}
 			}
 		}

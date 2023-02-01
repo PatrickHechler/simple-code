@@ -7,9 +7,9 @@ import de.hechler.patrick.codesprachen.primitive.assemble.objects.Command;
 import de.hechler.patrick.codesprachen.primitive.assemble.objects.Param;
 import de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder;
 import de.hechler.patrick.codesprachen.simple.compile.objects.SimplePool;
-import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleType;
-import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleTypeArray;
-import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleTypePointer;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleType;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleTypeArray;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleTypePointer;
 
 public abstract class SimpleValueDataPointer extends SimpleValueNoConst {
 	

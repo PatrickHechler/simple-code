@@ -1,9 +1,9 @@
 package de.hechler.patrick.codesprachen.simple.compile.objects.commands;
 
 import de.hechler.patrick.codesprachen.simple.compile.objects.SimplePool;
-import de.hechler.patrick.codesprachen.simple.compile.objects.SimpleVariable;
-import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleType;
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleValue;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleVariable;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleType;
 
 public class SimpleCommandVarDecl extends SimpleVariable implements SimpleCommand {
 	
@@ -23,10 +23,21 @@ public class SimpleCommandVarDecl extends SimpleVariable implements SimpleComman
 		assert init == null;
 		init = val;
 	}
-
+	
 	@Override
 	public SimplePool pool() {
 		return pool;
+	}
+	
+	@Override
+	public int hashCode() {
+		return 128 ^ super.hashCode();
+	}
+	
+	@Override
+	public boolean equals(Object obj) {
+		if (!super.equals(obj)) return false;
+		else return getClass() == obj.getClass();
 	}
 	
 }

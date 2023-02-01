@@ -4,7 +4,7 @@ import de.hechler.patrick.codesprachen.simple.compile.objects.compiler.SimpleCom
 
 public class UsedData implements Cloneable {
 	
-	public int  regs        = SimpleCompiler.REG_MIN_VARIABLE;
+	public int  regs        = SimpleCompiler.MIN_VAR_REGISTER;
 	public int  maxregs     = -1;
 	public long currentaddr = 0L;
 	public long maxaddr     = -1L;

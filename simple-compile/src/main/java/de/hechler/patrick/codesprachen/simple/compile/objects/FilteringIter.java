@@ -2,8 +2,7 @@ package de.hechler.patrick.codesprachen.simple.compile.objects;
 
 import java.util.Iterator;
 import java.util.NoSuchElementException;
-
-import de.hechler.patrick.pfs.interfaces.functional.ThrowingBooleanFunction;
+import java.util.function.Predicate;
 
 public class FilteringIter<T> implements Iterator<T> {
 	
@@ -11,9 +10,9 @@ public class FilteringIter<T> implements Iterator<T> {
 	
 	private final Iterator<T> iter;
 	
-	private final ThrowingBooleanFunction<T, RuntimeException> func;
+	private final Predicate<T> func;
 	
-	public FilteringIter(Iterator<T> iter, ThrowingBooleanFunction<T, RuntimeException> func) {
+	public FilteringIter(Iterator<T> iter, Predicate<T> func) {
 		this.iter = iter;
 		this.func = func;
 	}
@@ -24,7 +23,7 @@ public class FilteringIter<T> implements Iterator<T> {
 		try {
 			while (true) {
 				T t = iter.next();
-				if (func.calc(t)) {
+				if (func.test(t)) {
 					next = t;
 					return true;
 				}
@@ -43,7 +42,7 @@ public class FilteringIter<T> implements Iterator<T> {
 		}
 		while (true) {
 			T t = iter.next();
-			if (func.calc(t)) return t;
+			if (func.test(t)) return t;
 		}
 	}
 	

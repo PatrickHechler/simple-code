@@ -1,1095 +1,259 @@
 package de.hechler.patrick.codesprachen.simple.compile.objects.compiler;
 
-import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.A_NUM;
-import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.A_SR;
-import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.B_NUM;
-import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.B_REG;
-import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.build;
-import static de.hechler.patrick.codesprachen.primitive.core.utils.PrimAsmPreDefines.INTERRUPT_COUNT;
-import static de.hechler.patrick.codesprachen.primitive.core.utils.PrimAsmPreDefines.INT_EXIT;
-import static de.hechler.patrick.codesprachen.primitive.core.utils.PrimAsmPreDefines.INT_GET_FILE;
-import static de.hechler.patrick.codesprachen.primitive.core.utils.PrimAsmPreDefines.INT_MEMORY_ALLOC;
-import static de.hechler.patrick.codesprachen.primitive.core.utils.PrimAsmPreDefines.INT_MEMORY_FREE;
-import static de.hechler.patrick.codesprachen.simple.compile.SimpleCompilerMain.LOGGER;
+import static de.hechler.patrick.codesprachen.primitive.core.utils.PrimAsmConstants.X_ADD;
 
-import static java.nio.file.StandardOpenOption.*;
-
+import java.io.BufferedReader;
+import java.io.IOError;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.io.Reader;
-import java.io.Writer;
-import java.nio.ByteBuffer;
-import java.nio.channels.SeekableByteChannel;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
-import java.util.AbstractList;
-import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
-import java.util.Scanner;
 
 import org.antlr.v4.runtime.ANTLRInputStream;
 import org.antlr.v4.runtime.BailErrorStrategy;
 import org.antlr.v4.runtime.CommonTokenStream;
 
-import de.hechler.patrick.codesprachen.primitive.assemble.enums.Commands;
-import de.hechler.patrick.codesprachen.primitive.assemble.enums.CompilerCommand;
-import de.hechler.patrick.codesprachen.primitive.assemble.objects.Command;
-import de.hechler.patrick.codesprachen.primitive.assemble.objects.CompilerCommandCommand;
-import de.hechler.patrick.codesprachen.primitive.assemble.objects.ConstantPoolCommand;
-import de.hechler.patrick.codesprachen.primitive.assemble.objects.Param;
-import de.hechler.patrick.codesprachen.primitive.assemble.objects.PrimitiveAssembler;
 import de.hechler.patrick.codesprachen.primitive.core.objects.PrimitiveConstant;
 import de.hechler.patrick.codesprachen.primitive.core.utils.PrimAsmConstants;
+import de.hechler.patrick.codesprachen.primitive.core.utils.PrimAsmPreDefines;
 import de.hechler.patrick.codesprachen.simple.compile.antlr.SimpleGrammarLexer;
 import de.hechler.patrick.codesprachen.simple.compile.antlr.SimpleGrammarParser;
-import de.hechler.patrick.codesprachen.simple.compile.interfaces.SimpleExportable;
+import de.hechler.patrick.codesprachen.simple.compile.antlr.SimpleGrammarParser.SimpleFileContext;
 import de.hechler.patrick.codesprachen.simple.compile.interfaces.TriFunction;
-import de.hechler.patrick.codesprachen.simple.compile.objects.CommandList;
-import de.hechler.patrick.codesprachen.simple.compile.objects.SimpleConstant;
 import de.hechler.patrick.codesprachen.simple.compile.objects.SimpleFile;
 import de.hechler.patrick.codesprachen.simple.compile.objects.SimpleFile.SimpleDependency;
-import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommand;
-import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommandAsm;
-import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommandAssign;
-import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommandBlock;
-import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommandFuncCall;
-import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommandIf;
-import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommandVarDecl;
-import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommandWhile;
-import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommandAsm.AsmParam;
-import de.hechler.patrick.codesprachen.simple.compile.objects.SimpleFunction;
-import de.hechler.patrick.codesprachen.simple.compile.objects.SimpleVariable;
-import de.hechler.patrick.codesprachen.simple.compile.objects.UsedData;
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleValue;
-import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleValueDataPointer;
-import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleValueNoConst;
-import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleVariableValue;
+import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleValueConst;
+import de.hechler.patrick.codesprachen.simple.symbol.interfaces.SimpleExportable;
+import de.hechler.patrick.codesprachen.simple.symbol.interfaces.SimpleNameable;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleConstant;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleType;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleTypeArray;
+import de.hechler.patrick.zeugs.pfs.interfaces.File;
 
-public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU>
-		implements TriFunction<String, String, String, SimpleDependency> {
+public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 	
-	private static final int JMP_LEN   = 16;
-	private static final int JMPEQ_LEN = JMP_LEN;
+	// X00 .. X0F are reserved for interrupts and asm blocks
+	// X10 .. X1F are reserved for special compiler registers
+	// X20 .. XCF are reserved for variables
+	// XD0 .. XF9 are reserved for temporary values
+	public static final int MIN_COMPILER_REGISTER = X_ADD + 0x10;
+	public static final int REG_METHOD_STRUCT     = MIN_COMPILER_REGISTER;
+	public static final int REG_VAR_PNTR          = X_ADD + 0x11;
+	public static final int MIN_VAR_REGISTER      = X_ADD + 0x20;
+	public static final int MAX_VAR_REGISTER      = X_ADD + 0xCF;
+	public static final int MIN_TMP_VAL_REG       = MAX_VAR_REGISTER + 1;
 	
-	static {
-		if (new Command(Commands.CMD_JMP, build(A_NUM, -1L), null).length() != JMP_LEN) { throw new AssertionError(); }
-		if (new Command(Commands.CMD_JMPEQ, build(A_NUM, -1L), null).length() != JMPEQ_LEN) {
-			throw new AssertionError();
-		}
-	}
-	
-	private static final long                       MY_INT_OUT_OF_MEM_ERROR = INTERRUPT_COUNT;
-	private static final long                       MY_INT_DEP_LOAD_ERROR   = MY_INT_OUT_OF_MEM_ERROR + 1L;
-	private static final long                       MY_INT_CNT              = MY_INT_DEP_LOAD_ERROR + 1L;
 	public static final Map<String, SimpleConstant> DEFAULT_CONSTANTS;
 	
+	public static final long INT_ERR_OUT_OF_MEM = PrimAsmPreDefines.INTERRUPT_COUNT;
+	public static final long INTERRUPT_COUNT    = INT_ERR_OUT_OF_MEM + 1;
+	
 	static {
-		Map<String, SimpleConstant> defConsts = new LinkedHashMap<>();
-		for (PrimitiveConstant pc : PrimAsmConstants.START_CONSTANTS.values()) {
-			defConsts.put(pc.name, new SimpleConstant(pc.name, pc.value, false));
+		Map<String, SimpleConstant> defConsts = new HashMap<>();
+		for (PrimitiveConstant cnst : PrimAsmConstants.START_CONSTANTS.values()) {
+			defConsts.put(cnst.name(), new SimpleConstant(cnst.name(), cnst.value(), false));
 		}
-		defConsts.put("INT_OUT_OF_MEM_ERROR", new SimpleConstant("INT_OUT_OF_MEM_ERROR", MY_INT_CNT, false));
-		defConsts.put("INT_DEP_LOAD_ERROR", new SimpleConstant("INT_DEP_LOAD_ERROR", MY_INT_DEP_LOAD_ERROR, false));
-		defConsts.put("INTERRUPT_COUNT", new SimpleConstant("INTERRUPT_COUNT", MY_INT_CNT, false));
+		defConsts.put("INT_ERR_OUT_OF_MEM", new SimpleConstant("INT_ERR_OUT_OF_MEM", INT_ERR_OUT_OF_MEM, false));
+		defConsts.put("INTERRUPT_COUNT", new SimpleConstant("INTERRUPT_COUNT", INTERRUPT_COUNT, false));
 		DEFAULT_CONSTANTS = Collections.unmodifiableMap(defConsts);
-	}
-	
-	public static final int X00                  = PrimAsmConstants.X_ADD;
-	public static final int X01                  = X00 + 1;
-	public static final int X02                  = X00 + 2;
-	public static final int X03                  = X00 + 3;
-	public static final int REG_METHOD_STRUCT    = X00 + 4;
-	public static final int REG_VARIABLE_POINTER = X00 + 5;
-	public static final int REG_MIN_VARIABLE     = X00 + 6;
-	public static final int REG_MAX_VARIABLE     = X00 + 0x9F;
-	
-	private static final String MY_EXPORT_FILE                      = "/de/hechler/patrick/codesprachen/simple/compile/executableStart.psf";
-	private static final String EXECUTABLE_START_FILE               = "/de/hechler/patrick/codesprachen/simple/compile/executableStart.pmc";
-	private static final String MAIN_ADDRESS_EXPORT_SYMBOL          = "MAIN_ADDRESS";
-	private static final String MAIN_ADDRESS_RELATIVE_EXPORT_SYMBOL = "MAIN_ADDRESS_REL_POS";
-	private static final String INTERRUPT_COUNT_SYMBOL              = "INTERRUPT_COUNT";
-	private static final String INT_OUT_OF_MEM_ERR_SYMBOL           = "INT_OUT_OF_MEM_ERR";
-	private static final String INT_DEP_LOAD_ERR_SYMBOL             = "INT_DEP_LOAD_ERR";
-	private static final long   MAIN_ADDRESS;
-	private static final long   MAIN_ADDRESS_RELATIVE_POSITION;
-	
-	static {
-		try (InputStream in = SimpleCompiler.class.getResourceAsStream(MY_EXPORT_FILE)) {
-			try (Scanner sc = new Scanner(in, "UTF-8")) {
-				Map<String, PrimitiveConstant> map = new HashMap<>();
-				PrimitiveAssembler.readSymbols(null, map, sc, Paths.get(MY_EXPORT_FILE));
-				PrimitiveConstant pc = map.get(MAIN_ADDRESS_EXPORT_SYMBOL);
-				MAIN_ADDRESS = pc.value;
-				pc = map.get(MAIN_ADDRESS_RELATIVE_EXPORT_SYMBOL);
-				MAIN_ADDRESS_RELATIVE_POSITION = pc.value;
-				pc = map.get(INTERRUPT_COUNT_SYMBOL);
-				if (pc.value != MY_INT_CNT) { throw new AssertionError(pc + " expected: " + MY_INT_CNT); }
-				pc = map.get(INT_OUT_OF_MEM_ERR_SYMBOL);
-				if (pc.value != MY_INT_OUT_OF_MEM_ERROR) {
-					throw new AssertionError(pc + " expected: " + MY_INT_OUT_OF_MEM_ERROR);
-				}
-				pc = map.get(INT_DEP_LOAD_ERR_SYMBOL);
-				if (pc.value != MY_INT_DEP_LOAD_ERROR) {
-					throw new AssertionError(pc + " expected: " + MY_INT_DEP_LOAD_ERROR);
-				}
-			}
-		} catch (IOException e) {
-			throw new RuntimeException(e.toString(), e);
-		}
 	}
 	
 	private final Charset cs;
 	private final Path    srcRoot;
 	private final Path[]  lockups;
 	
-	public SimpleCompiler(Charset cs, Path srcRoot, Path... lockups) {
+	public SimpleCompiler(Charset cs, Path srcRoot, Path[] lockups) {
 		this.cs = cs;
 		this.srcRoot = srcRoot;
-		this.lockups = lockups;
+		this.lockups = lockups.clone();
 	}
 	
 	@Override
-	protected SimpleTU createTU(Path source, Path target) {
-		String name = source.getFileName().toString();
-		Path   sym  = source
-				.resolveSibling(name.replaceFirst("(*)[.][^.]*", "$1") + DefMultiCompiler.SIMPLE_SYMBOL_FILE);
-		return new SimpleTU(CompileMode.possibleExe, source, sym, target);
+	protected SimpleTU createTU(Path source, File target) {
+		return new SimpleTU(source, target);
 	}
 	
 	@Override
-	protected void init(SimpleTU target) throws IOException {
-		try {
-			LOGGER.fine("start parsing " + target.source.toString() + "");
-			try (Reader r = Files.newBufferedReader(target.source, cs)) {
-				ANTLRInputStream in = new ANTLRInputStream();
-				in.load(r, 1024, 1024);
-				SimpleGrammarLexer  lexer  = new SimpleGrammarLexer(in);
-				CommonTokenStream   toks   = new CommonTokenStream(lexer);
-				SimpleGrammarParser parser = new SimpleGrammarParser(toks);
-				parser.setErrorHandler(new BailErrorStrategy());
-				target.file = new SimpleFile(this);
-				parser.simpleFile(target.file);
+	protected void init(SimpleTU tu) throws IOException {
+		try (Reader r = Files.newBufferedReader(tu.source, cs)) {
+			ANTLRInputStream in = new ANTLRInputStream();
+			in.load(r, 1024, 1024);
+			SimpleGrammarLexer  lexer  = new SimpleGrammarLexer(in);
+			CommonTokenStream   toks   = new CommonTokenStream(lexer);
+			SimpleGrammarParser parser = new SimpleGrammarParser(toks);
+			parser.setErrorHandler(new BailErrorStrategy());
+			tu.sf = new SimpleFile(tu);
+			tu.context = parser.simpleFile(tu.sf);
+		}
+	}
+	
+	@Override
+	protected void precompile(SimpleTU tu) throws IOException {
+		// TODO Auto-generated method stub
+	}
+	
+	@Override
+	protected void compile(SimpleTU tu) throws IOException {
+		// TODO Auto-generated method stub
+	}
+	
+	@Override
+	protected void finish(SimpleTU tu) throws IOException {
+		// TODO Auto-generated method stub
+	}
+	
+	public static long align(long addr, int bc) {
+		return SimpleCompiler.align(addr, bc);
+	}
+	
+	private class SimpleSourceDependency extends SimpleDependency {
+		
+		private final Path dependency;
+		
+		public SimpleSourceDependency(String name, String runtimeDepend, Path dependency) {
+			super(name, runtimeDepend);
+			this.dependency = dependency;
+		}
+		
+		@Override
+		public SimpleExportable get(String name) {
+			SimpleTU stu = SimpleCompiler.super.tus.get(dependency);
+			if (stu == null) {
+				throw new NoSuchElementException(
+						"the dependency " + depend + ": '" + dependency + "' could not be found");
 			}
-			LOGGER.fine("finished parsing " + target.source.toString() + "");
-		} catch (IOException e) {
-			e.printStackTrace();
+			SimpleNameable named = stu.named.get(name);
+			if (!(named instanceof SimpleExportable se) || !se.isExport()) {
+				throw new NoSuchElementException(
+						"the dependency " + depend + ": does not export anything with the given " + name);
+			}
+			return se;
+		}
+		
+		@Override
+		public int hashCode() {
+			return super.hashCode();
+		}
+		
+		@Override
+		public boolean equals(Object obj) {
+			return super.equals(obj);
 		}
 	}
 	
-	@Override
-	public SimpleDependency apply(String name, String depend, String runtime) {
-		switch (depend.substring(depend.lastIndexOf('.') + 1)) {
-		case DefMultiCompiler.SIMPLE_SOURCE_CODE_END:
-			return sourceDependency(name, depend);
-		case DefMultiCompiler.SIMPLE_SYMBOL_FILE_END:
-		default:
-			return exportedDependency(name, depend, runtime);
-		case DefMultiCompiler.PRIMITIVE_SYMBOL_FILE_END:
-			return primitiveDependency(name, depend);
+	public static class SimpleSymbolDependency extends SimpleDependency {
+		
+		private final Map<String, SimpleExportable> imported;
+		
+		public SimpleSymbolDependency(String name, String runtimeDepend, Map<String, SimpleExportable> imported) {
+			super(name, runtimeDepend);
+			this.imported = imported;
 		}
-	}
-	
-	private SimpleDependency sourceDependency(String name, String depend) {
-		SimpleTU dep = super.tus.get(srcRoot.resolve(depend));
-		if (dep == null) {
-			throw new IllegalArgumentException("dependency could not be found! (dependnecy: '" + depend + "'");
-		}
-		final SimpleFile file = dep.file;
-		return new SimpleDependency(name, depend) {
+		
+		private static SimpleSymbolDependency create(String name, String run, Path path, Charset cs) {
+			try (BufferedReader r = Files.newBufferedReader(path, cs)) {
+				Map<String, SimpleExportable> is = SimpleExportable.readExports(r);
+				return new SimpleSymbolDependency(name, run, is);
+			} catch (IOException e) {
+				throw new IOError(e);
+			}
 			
-			@Override
-			public SimpleExportable get(String name) {
-				return file.getExport(name);
-			}
-			
-		};
-	}
-	
-	private SimpleDependency exportedDependency(String name, String depend, String runtime) {
-		Path p = findDependency(depend);
-		try {
-			final Map<String, SimpleExportable> imps;
-			try (Reader in = Files.newBufferedReader(p, cs)) {
-				imps = SimpleExportable.readExports(in);
-			}
-			if (runtime == null) {
-				if (depend.endsWith(DefMultiCompiler.SIMPLE_SYMBOL_FILE)) {
-					runtime = depend.substring(0, depend.length() - DefMultiCompiler.FILE_LEN);
-				} else if (depend.endsWith(DefMultiCompiler.PRIMITIVE_SYMBOL_FILE)) {
-					runtime = depend.substring(0, depend.length() - DefMultiCompiler.FILE_LEN);
-				} else {
-					runtime = depend;
-				}
-			}
-			return new SimpleDependency(name, runtime) {
-				
-				@Override
-				public SimpleExportable get(String name) {
-					SimpleExportable se = imps.get(name);
-					if (se == null) { throw new NoSuchElementException(name); }
-					return se;
-				}
-				
-			};
-		} catch (IOException e) {
-			throw new RuntimeException(e.toString(), e);
 		}
+		
+		@Override
+		public SimpleExportable get(String name) {
+			SimpleExportable se = imported.get(name);
+			if (se == null) { throw new NoSuchElementException(name); }
+			return se;
+		}
+		
+		@Override
+		public int hashCode() {
+			return super.hashCode();
+		}
+		
+		@Override
+		public boolean equals(Object obj) {
+			return super.equals(obj);
+		}
+		
 	}
 	
-	private SimpleDependency primitiveDependency(String name, String depend) {
-		Path p = findDependency(depend);
-		try (Scanner sc = new Scanner(Files.newBufferedReader(p))) {
-			Map<String, PrimitiveConstant> primConsts = new HashMap<>();
-			PrimitiveAssembler.readSymbols(null, primConsts, sc, p);
-			Map<String, SimpleConstant> consts = new HashMap<>();
-			for (PrimitiveConstant pc : primConsts.values()) {
-				consts.put(pc.name, new SimpleConstant(name, pc.value, true));
+	public class SimpleTU extends TranslationUnit implements TriFunction<String, String, String, SimpleDependency> {
+		
+		public SimpleFileContext context;
+		
+		private final Map<String, SimpleNameable> named = new HashMap<>();
+		
+		public SimpleFile sf;
+		
+		public SimpleTU(Path source, File target) {
+			super(source, target);
+		}
+		
+		@Override
+		public SimpleDependency apply(String name, String compileDepend, String runtimeDepend) {
+			Path   path = srcRoot.resolve(compileDepend);
+			String dep;
+			if (runtimeDepend != null) {
+				dep = runtimeDepend;
+			} else {
+				dep = SimpleDependency.runtimeName(compileDepend);
 			}
-			return new SimpleDependency(name, depend) {
-				
-				@Override
-				public SimpleExportable get(String name) {
-					SimpleConstant sc = consts.get(name);
-					if (sc == null) {
-						throw new NoSuchElementException(
-								"this dependency (" + name + " > '" + p + "') has no constant with the name: " + name);
-					}
-					return sc;
-				}
-				
-			};
-		} catch (IOException e) {
-			throw new RuntimeException(e);
-		}
-	}
-	
-	private Path findDependency(String depend) {
-		for (Path p : lockups) {
-			Path resolved = p.resolve(depend);
-			if (Files.exists(resolved)) { return resolved; }
-		}
-		throw new IllegalArgumentException("dependency could not be found! (dependnecy: '" + depend + "', lockups: "
-				+ Arrays.toString(lockups) + ")");
-	}
-	
-	@Override
-	protected void precompile(SimpleTU target) throws IOException {
-		LOGGER.fine("make the start for file: " + target.source.toString()
-				+ " (data, global variables and executable start)");
-		assert target.pos == -1L;
-		SimpleFunction main = target.mode == CompileMode.noExe ? null : target.file.mainFunction();
-		target.pos = 0L;
-		if (main != null) {
-			executableStart(target);
-		} else {
-			Files.newOutputStream(target.target, WRITE, CREATE, TRUNCATE_EXISTING).close();
-		}
-		fillData(target);
-		LOGGER.fine("made the start of file: " + target.source.toString() + "");
-	}
-	
-	private void executableStart(SimpleTU target) throws IOException {
-		assert target.pos == 0L;
-		try (InputStream in = getClass().getResourceAsStream(EXECUTABLE_START_FILE)) {
-			try (OutputStream out = Files.newOutputStream(target.target, WRITE, CREATE, TRUNCATE_EXISTING)) {
-				byte[] buf = new byte[512];
-				while (true) {
-					int r = in.read(buf, 0, 512);
-					if (r == -1) {
+			SimpleDependency res = null;
+			if (Files.exists(path)) {
+				res = new SimpleSourceDependency(name, dep, path.normalize());
+			} else {
+				for (Path p : lockups) {
+					if (Files.exists(p)) {
+						res = SimpleSymbolDependency.create(name, dep, path, cs);
 						break;
 					}
-					out.write(buf, 0, r);
-					target.pos += r;
+				}
+				if (res == null) {
+					throw new NoSuchElementException(
+							"could not find the dependency " + name + "; '" + compileDepend + "'");
 				}
 			}
-		}
-		LOGGER.fine("made the file executable: " + target.source.toString() + "");
-	}
-	
-	private void fillData(SimpleTU target) throws IOException {
-		assert target.pos == Files.size(target.target);
-		try (OutputStream out = Files.newOutputStream(target.target, APPEND)) {
-			target.outOfMemErrorAddr = target.pos;
-			PrimitiveAssembler asm      = new PrimitiveAssembler(out, null, new Path[0], true, false);
-			Command            outOfMem = new Command(Commands.CMD_INT, build(A_NUM, MY_INT_OUT_OF_MEM_ERROR), null);
-			Command            mov1     = new Command(Commands.CMD_MOV, build(A_SR, X00), build(A_NUM, 1L));
-			Command            iex      = new Command(Commands.CMD_INT, build(A_NUM, INT_EXIT), null);
-			Command            depLoad  = new Command(Commands.CMD_INT, build(A_NUM, MY_INT_DEP_LOAD_ERROR), null);
-			long               exitLen  = mov1.length() + iex.length();
-			target.pos += outOfMem.length() + exitLen;
-			target.dependencyLoadErrorAddr = target.pos;
-			target.pos += depLoad.length() + exitLen;
-			asm.assemble(Arrays.asList(outOfMem, mov1, iex, depLoad, mov1, iex), Collections.emptyMap());
-			assert (target.pos & 7) == 0;
-			byte[] zeros = new byte[8];
-			for (SimpleValueDataPointer dv : target.file.dataValues()) {
-				dv.addr = target.pos;
-				out.write(dv.data, 0, dv.data.length);
-				target.pos += dv.data.length;
-				align(target, out, zeros);
+			if (named.put(name, res) != null) {
+				throw new IllegalStateException("the name " + name + " is already used!");
 			}
-			for (SimpleVariable sv : target.file.vars()) {
-				int len = sv.type.byteCount();
-				if (zeros.length < len) {
-					zeros = new byte[len];
-				}
-				sv.addr = target.pos;
-				out.write(zeros, 0, len);
-				target.pos += len;
-				align(target, out, zeros);
-			}
-		}
-		assert target.pos == Files.size(target.target);
-	}
-	
-	private void align(SimpleTU target, OutputStream out, byte[] zeros) throws IOException {
-		if ((target.pos & 7) != 0) {
-			out.write(zeros, 0, 8 - (int) (target.pos & 7));
-		}
-	}
-	
-	@Override
-	protected void compile(SimpleTU target) throws IOException {
-		SimpleFunction main = target.mode == CompileMode.noExe ? null : target.file.mainFunction();
-		if (main != null) {
-			correctMainAddress(target);
-			compileFunction(target, main);
-		}
-		for (SimpleFunction sf : target.file.functions()) {
-			if (sf == main) continue;
-			compileFunction(target, sf);
-		}
-	}
-	
-	private void correctMainAddress(SimpleTU target) throws IOException {
-		try (SeekableByteChannel out = Files.newByteChannel(target.target, WRITE)) {
-			out.position(MAIN_ADDRESS);
-			ByteBuffer buf = ByteBuffer.allocate(8);
-			buf.putLong(0, target.pos - MAIN_ADDRESS_RELATIVE_POSITION);
-			do {
-				out.write(buf);
-			} while (buf.remaining() > 0);
-		}
-	}
-	
-	private void compileFunction(SimpleTU target, SimpleFunction sf) throws IOException {
-		LOGGER.finer("compile function " + sf.name + " of file: " + target.source);
-		sf.address = target.pos;
-		sf.cmds = new CommandList();
-		UsedData used = sf.pool.used();
-		used.currentaddr = used.maxaddr;
-		used.regs = used.maxregs;
-		UsedData funcArgs = used.clone();
-		SimpleFile.count(used, sf.body.commands);
-		boolean[] regs = new boolean[256];
-		regs[REG_METHOD_STRUCT] = true;
-		regs[REG_VARIABLE_POINTER] = true;
-		for (int i = REG_MIN_VARIABLE; i < used.regs; i++) {
-			regs[i] = true;
-		}
-		if (used.maxaddr > 0L) {
-			initVariableMemory(target, sf);
-			sf.addrVars = true;
-		} else {
-			sf.addrVars = false;
-		}
-		copyArgs(target, sf, funcArgs, sf.pool.myargs);
-		sf.regVars = used.maxregs;
-		for (SimpleCommand cmd : sf.body.commands) {
-			compileCommand(target, sf, regs, cmd);
-		}
-		if (used.maxaddr > 0L) {
-			Param p1;
-			p1 = build(A_NUM, INT_MEMORY_FREE);
-			Command c = new Command(Commands.CMD_INT, p1, null);
-			target.pos += c.length();
-			sf.cmds.add(c);
-		}
-		Command c = new Command(Commands.CMD_RET, null, null);
-		target.pos += c.length();
-		sf.cmds.add(c);
-		LOGGER.finer("comped function " + sf.name + " of file: " + target.source);
-	}
-	
-	private void initVariableMemory(SimpleTU target, SimpleFunction sf) {
-		assert target.outOfMemErrorAddr != -1L;
-		Param p1, p2;
-		p1 = build(A_NUM, INT_MEMORY_ALLOC);
-		Command c = new Command(Commands.CMD_INT, p1, null);
-		target.pos += c.length();
-		sf.cmds.add(c);
-		p1 = build(A_SR, X00);
-		p2 = build(A_NUM, -1L);
-		c = new Command(Commands.CMD_CMP, p1, p2);
-		target.pos += c.length();
-		sf.cmds.add(c);
-		p1 = build(A_NUM, target.pos - target.outOfMemErrorAddr);
-		c = new Command(Commands.CMD_JMPEQ, p1, null);
-		target.pos += c.length();
-		sf.cmds.add(c);
-		p1 = build(A_SR, REG_VARIABLE_POINTER);
-		p2 = build(A_SR, X00);
-		c = new Command(Commands.CMD_MOV, p1, p2);
-		target.pos += c.length();
-		sf.cmds.add(c);
-	}
-	
-	private void copyArgs(SimpleTU target, SimpleFunction sf, UsedData funcArgs, SimpleVariable[] myargs) {
-		for (int i = 0; i < sf.type.arguments.length; i++) {
-			SimpleVariable myarg = myargs[i];
-			SimpleVariable arg   = sf.type.arguments[i];
-			assert arg.reg == REG_METHOD_STRUCT;
-			assert arg.addr != -1L;
-			Param p1, p2;
-			if (myarg.addr == -1L) {
-				assert myarg.reg >= REG_MIN_VARIABLE && myarg.reg <= REG_MAX_VARIABLE : myarg.reg;
-				p1 = build(A_SR, myarg.reg);
-			} else if (myarg.addr == 0L) {
-				assert myarg.reg == REG_VARIABLE_POINTER : myarg.name + " : " + myarg.reg + " : " + sf;
-				p1 = build(A_SR | B_REG, REG_VARIABLE_POINTER);
-			} else {
-				assert myarg.reg == REG_VARIABLE_POINTER : myarg.name + " : " + myarg.reg + " : " + sf;
-				p1 = build(A_SR | B_NUM, REG_VARIABLE_POINTER, myarg.addr);
-			}
-			if (arg.addr == 0L) {
-				assert arg.reg == REG_METHOD_STRUCT : arg.name + " : " + arg.reg + " : " + sf;
-				p2 = build(A_SR | B_REG, REG_METHOD_STRUCT);
-			} else {
-				assert arg.addr != -1L : arg.name + " : " + sf;
-				assert arg.reg == REG_METHOD_STRUCT : arg.name + " : " + arg.reg + " : " + sf;
-				p2 = build(A_SR | B_NUM, REG_METHOD_STRUCT, arg.addr);
-			}
-			target.pos = SimpleValueNoConst.addMovCmd(arg.type, sf.cmds, target.pos, p1, p2);
-		}
-	}
-	
-	private void compileCommand(SimpleTU target, SimpleFunction sf, boolean[] regs, SimpleCommand cmd) {
-		if (cmd instanceof SimpleCommandIf) {
-			SimpleCommandIf ifCmd = (SimpleCommandIf) cmd;
-			compileIf(target, sf, regs, ifCmd);
-		} else if (cmd instanceof SimpleCommandWhile) {
-			SimpleCommandWhile whileCmd = (SimpleCommandWhile) cmd;
-			compileWhile(target, sf, regs, whileCmd);
-		} else if (cmd instanceof SimpleCommandFuncCall) {
-			SimpleCommandFuncCall funcCallCmd = (SimpleCommandFuncCall) cmd;
-			compileFuncCall(target, sf, regs, funcCallCmd);
-		} else if (cmd instanceof SimpleCommandAssign) {
-			SimpleCommandAssign assignCmd = (SimpleCommandAssign) cmd;
-			compileAssignCommand(target, sf, regs, assignCmd);
-		} else if (cmd instanceof SimpleCommandBlock) {
-			SimpleCommandBlock blockCmd = (SimpleCommandBlock) cmd;
-			for (SimpleCommand childCmd : blockCmd.commands) {
-				compileCommand(target, sf, regs, childCmd);
-			}
-		} else if (cmd instanceof SimpleCommandVarDecl) {
-			SimpleCommandVarDecl varDeclCmd = (SimpleCommandVarDecl) cmd;
-			if (varDeclCmd.init == null) { return; }
-			assignVariable(target, sf, regs, varDeclCmd, varDeclCmd.init);
-		} else if (cmd instanceof SimpleCommandAsm) {
-			SimpleCommandAsm asm = (SimpleCommandAsm) cmd;
-			compileAsm(target, sf, regs, asm);
-		} else {
-			throw new InternalError(
-					"unknown command type: " + cmd.getClass().getName() + " (of command: '" + cmd + "')");
-		}
-	}
-	
-	private void compileIf(SimpleTU target, SimpleFunction sf, boolean[] regs, SimpleCommandIf ifCmd) {
-		int     reg = register(regs, REG_MAX_VARIABLE + 2);
-		boolean old = makeRegUsable(regs, reg, sf.cmds, target);
-		target.pos = ifCmd.condition.loadValue(reg, regs, sf.cmds, target.pos);
-		Param p1, p2;
-		p1 = build(A_SR, reg);
-		p2 = build(A_NUM, 0L);
-		Command c = new Command(Commands.CMD_CMP, p1, p2);
-		target.pos += c.length();
-		sf.cmds.add(c);
-		long startIfAddr = target.pos;
-		target.pos += JMPEQ_LEN;
-		List<Command> cmds = sf.cmds;
-		List<Command> sub  = new LinkedList<>();
-		sf.cmds = sub;
-		compileCommand(target, sf, regs, ifCmd.ifCmd);
-		p1 = build(A_NUM, target.pos - startIfAddr);
-		assert sf.cmds == sub;
-		sf.cmds = cmds;
-		c = new Command(Commands.CMD_JMPEQ, p1, null);
-		sf.cmds.add(c);
-		sf.cmds.addAll(sub);
-		if (ifCmd.elseCmd != null) {
-			compileElse(target, sf, regs, ifCmd, cmds);
-		}
-		releseReg(regs, reg, old, sf.cmds, target);
-	}
-	
-	private void compileElse(SimpleTU target, SimpleFunction sf, boolean[] regs, SimpleCommandIf ifCmd,
-			List<Command> cmds) throws InternalError {
-		Param         p1;
-		Command       c;
-		List<Command> sub;
-		long          ifEndAddr = target.pos;
-		target.pos += JMP_LEN;
-		sub = new LinkedList<>();
-		sf.cmds = sub;
-		compileCommand(target, sf, regs, ifCmd.elseCmd);
-		assert sf.cmds == sub;
-		sf.cmds = cmds;
-		p1 = build(A_NUM, target.pos - ifEndAddr);
-		c = new Command(Commands.CMD_JMP, p1, null);
-		sf.cmds.add(c);
-		sf.cmds.addAll(sub);
-	}
-	
-	private void compileWhile(SimpleTU target, SimpleFunction sf, boolean[] regs, SimpleCommandWhile whileCmd) {
-		int     reg       = register(regs, REG_MAX_VARIABLE + 1);
-		boolean old       = makeRegUsable(regs, reg, sf.cmds, target);
-		long    loopStart = target.pos;
-		target.pos = whileCmd.condition.loadValue(reg, regs, sf.cmds, target.pos);
-		Param p1, p2;
-		p1 = build(A_SR, reg);
-		p2 = build(A_NUM, 0L);
-		Command c = new Command(Commands.CMD_CMP, p1, p2);
-		target.pos += c.length();
-		sf.cmds.add(c);
-		target.pos += JMPEQ_LEN;
-		List<Command> cmds = sf.cmds;
-		List<Command> sub  = new LinkedList<>();
-		sf.cmds = sub;
-		compileCommand(target, sf, regs, whileCmd);
-		assert sub == sf.cmds;
-		sf.cmds = cmds;
-		p1 = build(A_NUM, loopStart - target.pos);
-		c = new Command(Commands.CMD_JMPEQ, p1, null);
-		sf.cmds.add(c);
-		sf.cmds.addAll(sub);
-		releseReg(regs, reg, old, sf.cmds, target);
-	}
-	
-	private void compileFuncCall(SimpleTU target, SimpleFunction sf, boolean[] regs,
-			SimpleCommandFuncCall funcCallCmd) {
-		validateFuncCall(funcCallCmd);
-		push(target, sf);
-		call(target, sf, funcCallCmd, regs);
-		pop(target, sf);
-	}
-	
-	private void validateFuncCall(SimpleCommandFuncCall funcCallCmd) {
-		SimpleFunction func;
-		if (funcCallCmd.secondName == null) {
-			func = funcCallCmd.pool.getFunction(funcCallCmd.firstName);
-		} else {
-			SimpleDependency dep = funcCallCmd.pool.getDependency(funcCallCmd.firstName);
-			SimpleExportable se  = dep.get(funcCallCmd.secondName);
-			if (se == null || !(se instanceof SimpleFunction)) {
-				throw new IllegalStateException("function call needs a function! dependency: " + dep.path + " > '"
-						+ dep.depend + "' (not) function name: " + funcCallCmd.secondName + " > " + se);
-			}
-			func = (SimpleFunction) se;
-			assert dep.path.addr != -1L;
-		}
-		if (!func.type.equals(funcCallCmd.function.type())) {
-			throw new IllegalStateException(
-					"the function call structure is diffrent to the type needed by the called function! (function: "
-							+ (funcCallCmd.firstName)
-							+ (funcCallCmd.secondName == null ? "" : (":" + funcCallCmd.secondName))
-							+ " given func-struct type: '" + funcCallCmd.function.type()
-							+ "' needded func-struct type: '" + func.type + "' given func-struct: '"
-							+ funcCallCmd.function + "')");
-		}
-	}
-	
-	private void compileAssignCommand(SimpleTU target, SimpleFunction sf, boolean[] regs,
-			SimpleCommandAssign assignCmd) {
-		if (assignCmd.target.type().isPrimitive()) if (assignCmd.target instanceof SimpleVariableValue) {
-			assignVariable(target, sf, regs, ((SimpleVariableValue) assignCmd.target).sv, assignCmd.value);
-		} else {
-			int         r1 = register(regs, REG_MAX_VARIABLE + 1);
-			boolean     o1 = makeRegUsable(regs, r1, sf.cmds, target);
-			SimpleValue nt = assignCmd.target.addExpUnary(assignCmd.pool, SimpleValue.EXP_UNARY_AND);
-			target.pos = nt.loadValue(r1, regs, sf.cmds, target.pos);
-			int     r2 = register(regs, REG_MAX_VARIABLE + 2);
-			boolean o2 = makeRegUsable(regs, r2, sf.cmds, target);
-			target.pos = assignCmd.value.loadValue(r2, regs, sf.cmds, target.pos);
-			Param p1, p2;
-			p1 = build(A_SR | B_REG, r1);
-			p2 = build(A_SR, r2);
-			Command c = new Command(Commands.CMD_MOV, p1, p2);
-			target.pos += c.length();
-			sf.cmds.add(c);
-			releseReg(regs, r2, o2, sf.cmds, target);
-			releseReg(regs, r1, o1, sf.cmds, target);
-		}
-	}
-	
-	private void assignVariable(SimpleTU target, SimpleFunction sf, boolean[] regs, SimpleVariable vari,
-			SimpleValue value) {
-		assert vari.reg != -1;
-		assert vari.type.isPrimitive() || vari.type.isPointer();
-		if (vari.addr != -1L) {
-			int     reg = register(regs, REG_MAX_VARIABLE + 1);
-			boolean old = makeRegUsable(regs, reg, sf.cmds, target);
-			target.pos = value.loadValue(reg, regs, sf.cmds, target.pos);
-			Param p1, p2;
-			p2 = build(A_SR, reg);
-			p1 = build(A_SR | B_NUM, vari.reg, vari.addr);
-			Commands mov;
-			switch (vari.type.byteCount()) {
-			case 8:
-				mov = Commands.CMD_MOV;
-				break;
-			case 4:
-				mov = Commands.CMD_MVDW;
-				break;
-			case 2:
-				mov = Commands.CMD_MVW;
-				break;
-			case 1:
-				mov = Commands.CMD_MVB;
-				break;
-			default:
-				throw new InternalError("unknown byte count of variable!");
-			}
-			Command c = new Command(mov, p1, p2);
-			target.pos += c.length();
-			sf.cmds.add(c);
-			releseReg(regs, reg, old, sf.cmds, target);
-		} else {
-			regs[vari.reg] = false;
-			target.pos = value.loadValue(vari.reg, regs, sf.cmds, target.pos);
-			assert regs[vari.reg];
-		}
-	}
-	
-	private void compileAsm(SimpleTU target, SimpleFunction sf, boolean[] regs, SimpleCommandAsm asmCmd) {
-		final int arglen   = asmCmd.asmArguments.length;
-		final int reslen   = asmCmd.asmResults.length;
-		boolean[] argsolds = new boolean[arglen];
-		for (int i = 0; i < arglen; i++) {
-			AsmParam arg = asmCmd.asmArguments[i];
-			freeAsmReg(target, sf, regs, argsolds, i, arg);
-			target.pos = arg.value.loadValue(arg.register, regs, sf.cmds, target.pos);
-		}
-		addAsmCommands(target, sf, asmCmd);
-		for (int i = 0; i < reslen; i++) {
-			AsmParam    res = asmCmd.asmResults[i];
-			SimpleValue val = res.value.addExpUnary(asmCmd.pool, SimpleValue.EXP_UNARY_AND);
-			int         reg = register(regs, res.register + 1 >= 256 ? REG_MAX_VARIABLE + 1 : res.register + 1);
-			boolean     old = makeRegUsable(regs, reg, sf.cmds, target);
-			target.pos = val.loadValue(reg, regs, sf.cmds, target.pos);
-			Param p1, p2;
-			p1 = build(A_SR | B_REG, reg);
-			p2 = build(A_SR, res.register);
-			Commands mv = Commands.CMD_MOV;
-			if (val.type().isPrimitive()) {
-				switch (val.type().byteCount()) {
-				case 8:
-					break;
-				case 4:
-					mv = Commands.CMD_MVDW;
-					break;
-				case 2:
-					mv = Commands.CMD_MVW;
-					break;
-				case 1:
-					mv = Commands.CMD_MVB;
-					break;
-				default:
-					throw new InternalError("primitive type with unknown byte count: " + val.type().byteCount() + " ("
-							+ val.type() + ")");
-				}
-			}
-			Command mov = new Command(mv, p1, p2);
-			target.pos += mov.length();
-			sf.cmds.add(mov);
-			releseReg(regs, reg, old, sf.cmds, target);
-		}
-		for (int i = 0; i < arglen; i++) {
-			AsmParam arg = asmCmd.asmArguments[i];
-			assert regs[arg.register];
-			if (argsolds[i]) {
-				singlePushOrPop(target, sf, arg, Commands.CMD_POP);
-			} else {
-				regs[arg.register] = false;
-			}
-		}
-	}
-	
-	@SuppressWarnings("unchecked")
-	private void addAsmCommands(SimpleTU target, SimpleFunction sf, SimpleCommandAsm asmCmd) {
-		try {
-			final ConstantPoolCommand cpc = new ConstantPoolCommand();
-			
-			PrimitiveAssembler asm = new PrimitiveAssembler(new OutputStream() {
-				
-				@Override
-				public void write(int b) throws IOException {
-					cpc.addBytes(new byte[] { (byte) b });
-					target.pos++;
-				}
-				
-				@Override
-				public void write(byte[] b) throws IOException {
-					cpc.addBytes(b);
-					target.pos += b.length;
-				}
-				
-				@Override
-				public void write(byte[] b, int off, int len) throws IOException {
-					cpc.addBytes(Arrays.copyOfRange(b, off, off + len));
-					target.pos += len;
-				}
-				
-			}, null, lockups, false, true);
-			asm.assemble(Paths.get("[INVALID]"), new ANTLRInputStream(asmCmd.asmCode),
-					(Map<String, PrimitiveConstant>) (Map<String, ? extends PrimitiveConstant>) asmCmd.pool
-							.getConstants());
-			sf.cmds.add(cpc);
-			if ((target.pos & 7) != 0) {
-				byte[]  bytes = new byte[(8 - ((int) target.pos & 7))];
-				Param   p1    = build(A_NUM, JMP_LEN + bytes.length);
-				Command jmp   = new Command(Commands.CMD_JMP, p1, null);
-				target.pos += jmp.length() + bytes.length;
-				sf.cmds.add(jmp);
-				ConstantPoolCommand ocpc = new ConstantPoolCommand();
-				ocpc.addBytes(bytes);
-				sf.cmds.add(ocpc);
-			}
-		} catch (IOException e) {
-			throw new RuntimeException(e);
-		}
-	}
-	
-	private void freeAsmReg(SimpleTU target, SimpleFunction sf, boolean[] regs, boolean[] olds, int i, AsmParam arg) {
-		olds[i] = regs[arg.register];
-		if (olds[i]) {
-			singlePushOrPop(target, sf, arg, Commands.CMD_PUSH);
-		}
-	}
-	
-	private void call(SimpleTU target, SimpleFunction sf, SimpleCommandFuncCall funcCallCmd, boolean[] regs) {
-		assert regs[REG_METHOD_STRUCT];
-		regs[REG_METHOD_STRUCT] = false;
-		target.pos = funcCallCmd.function.loadValue(REG_METHOD_STRUCT, regs, sf.cmds, target.pos);
-		assert regs[REG_METHOD_STRUCT];
-		if (funcCallCmd.secondName == null) {
-			Param   p1;
-			Command c;
-			p1 = Param.createLabel(funcCallCmd.firstName);
-			c = new Command(Commands.CMD_CALL, p1, null);
-			target.pos += c.length();
-			sf.cmds.add(c);
-		} else {
-			dependencyCall(target, sf, funcCallCmd);
-		}
-	}
-	
-	private void dependencyCall(SimpleTU target, SimpleFunction sf, SimpleCommandFuncCall funcCallCmd) {
-		SimpleDependency dep  = funcCallCmd.pool.getDependency(funcCallCmd.firstName);
-		SimpleFunction   func = (SimpleFunction) dep.get(funcCallCmd.secondName);
-		Param            p1, p2;
-		// load dependency
-		p1 = build(A_SR, X00);
-		p2 = build(A_NUM, dep.path.addr - target.pos);
-		Command c = new Command(Commands.CMD_LEA, p1, p2);
-		target.pos += c.length();
-		sf.cmds.add(c);
-		p1 = build(A_NUM, INT_GET_FILE);
-		c = new Command(Commands.CMD_INT, p1, null);
-		target.pos += c.length();
-		sf.cmds.add(c);
-		// check if error on load
-		p1 = build(A_SR, X00);
-		p2 = build(A_NUM, -1L);
-		c = new Command(Commands.CMD_CMP, p1, p2);
-		target.pos += c.length();
-		sf.cmds.add(c);
-		p1 = build(A_NUM, target.dependencyLoadErrorAddr - target.pos);
-		c = new Command(Commands.CMD_JMPEQ, p1, null);
-		target.pos += c.length();
-		sf.cmds.add(c);
-		// add FuncCallCmd for the link method
-		c = new FuncCallCmd(func);
-		target.pos += c.length();
-		sf.cmds.add(c);
-	}
-	
-	private void singlePushOrPop(SimpleTU target, SimpleFunction sf, AsmParam arg, Commands pushOrPop) {
-		Param   p1   = build(A_SR, arg.register);
-		Command push = new Command(pushOrPop, p1, null);
-		target.pos += push.length();
-		sf.cmds.add(push);
-	}
-	
-	private void pop(SimpleTU target, SimpleFunction sf) {
-		Param   p1;
-		Command c;
-		for (int i = sf.regVars - 1; i >= 0; i--) {
-			p1 = build(A_SR, REG_MIN_VARIABLE + i);
-			c = new Command(Commands.CMD_PUSH, p1, null);
-			target.pos += c.length();
-			sf.cmds.add(c);
-		}
-		if (sf.addrVars) {
-			p1 = build(A_SR, REG_VARIABLE_POINTER);
-			c = new Command(Commands.CMD_PUSH, p1, null);
-			target.pos += c.length();
-			sf.cmds.add(c);
-		}
-		p1 = build(A_SR, REG_METHOD_STRUCT);
-		c = new Command(Commands.CMD_PUSH, p1, null);
-		target.pos += c.length();
-		sf.cmds.add(c);
-	}
-	
-	private void push(SimpleTU target, SimpleFunction sf) {
-		Param   p1;
-		Command c;
-		p1 = build(A_SR, REG_METHOD_STRUCT);
-		c = new Command(Commands.CMD_PUSH, p1, null);
-		target.pos += c.length();
-		sf.cmds.add(c);
-		if (sf.addrVars) {
-			p1 = build(A_SR, REG_VARIABLE_POINTER);
-			c = new Command(Commands.CMD_PUSH, p1, null);
-			target.pos += c.length();
-			sf.cmds.add(c);
-		}
-		for (int i = 0; i < sf.regVars; i++) {
-			p1 = build(A_SR, REG_MIN_VARIABLE + i);
-			c = new Command(Commands.CMD_PUSH, p1, null);
-			target.pos += c.length();
-			sf.cmds.add(c);
-		}
-	}
-	
-	private boolean makeRegUsable(boolean[] regs, int reg, List<Command> cmds, SimpleTU target) {
-		boolean old = regs[reg];
-		if (old) {
-			Param   p1 = build(A_SR, reg);
-			Command c  = new Command(Commands.CMD_PUSH, p1, null);
-			target.pos += c.length();
-			cmds.add(c);
-			regs[reg] = false;
-		}
-		return old;
-	}
-	
-	private void releseReg(boolean[] regs, int reg, boolean old, List<Command> cmds, SimpleTU target) {
-		if (old) {
-			Param   p1 = build(A_SR, reg);
-			Command c  = new Command(Commands.CMD_POP, p1, null);
-			target.pos += c.length();
-			cmds.add(c);
-		}
-		regs[reg] = old;
-	}
-	
-	private int register(boolean[] regs, int fallback) {
-		for (int i = fallback; i < 256; i++) {
-			if (!regs[i]) { return i; }
-		}
-		for (int i = fallback - 1; i > 0; i--) {
-			if (!regs[i]) { return i; }
-		}
-		return fallback;
-	}
-	
-	@Override
-	protected void finish(SimpleTU target) throws IOException {
-		Iterator<SimpleExportable> exports = target.file.exportsIter();
-		if (exports.hasNext()) {
-			try (Writer expOut = Files.newBufferedWriter(target.symTarget, StandardOpenOption.CREATE,
-					StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)) {
-				do {
-					expOut.append(exports.next().toExportString()).append('\n');
-				} while (exports.hasNext());
-			}
-		} else {
-			Files.deleteIfExists(target.symTarget);
-		}
-		try (OutputStream out = Files.newOutputStream(target.target, StandardOpenOption.WRITE,
-				StandardOpenOption.APPEND)) {
-			PrimitiveAssembler asm = new PrimitiveAssembler(out, null, lockups, true, false) {
-				
-				@Override
-				protected Command replaceUnknownCommand(Command cmd) throws InternalError {
-					if (cmd instanceof FuncCallCmd) {
-						return replaceDepCall(cmd);
-					} else {
-						return super.replaceUnknownCommand(cmd);
-					}
-				}
-				
-				private Command replaceDepCall(Command cmd) {
-					FuncCallCmd fcc = (FuncCallCmd) cmd;
-					assert fcc.func.address != -1L;
-					Param   p1 = build(A_SR, X00);
-					Param   p2 = build(A_NUM, fcc.func.address);
-					Command c  = new Command(Commands.CMD_CALO, p1, p2);
-					return c;
-				}
-				
-			};
-			
-			Collection<SimpleFunction> funcs     = target.file.functions();
-			Map<String, Long>          funcAddrs = new HashMap<>();
-			for (SimpleFunction func : funcs) {
-				funcAddrs.put(func.name, func.address);
-			}
-			List<Command> cmds = FileCommandsList.create(target.file);
-			asm.assemble(cmds, funcAddrs);
-		}
-	}
-	
-	public static class SimpleTU extends TranslationUnit {
-		
-		private final CompileMode mode;
-		private final Path        symTarget;
-		
-		private SimpleFile file;
-//		private final List<Command> cmds = new TUCmdList();
-//		private final List<Command> cmds = new LinkedList<>();
-		private long pos                     = -1L;
-		private long outOfMemErrorAddr       = -1L;
-		private long dependencyLoadErrorAddr = -1L;
-		
-		private SimpleTU(CompileMode mode, Path source, Path symTarget, Path target) {
-			super(source, target);
-			this.mode = mode;
-			this.symTarget = symTarget;
+			return res;
 		}
 		
 	}
 	
-	public static enum CompileMode {
-		noExe, possibleExe,
-	}
-	
-	
+	// this is used by antlr, can't be done in the SimpleConstant class because the SimpleValue class is not known there
 	/**
-	 * a {@link FuncCallCmd} is a {@link Command} which is only for Compiler internal use<br> this command is used when
-	 * a function outside of the current file is called and replaced by a non internal command in the
-	 * {@link SimpleCompiler#link(CompileTarget)} method
+	 * creates a new {@link SimpleConstant}
 	 * 
-	 * @author pat
+	 * @param name   the name of the constant
+	 * @param val    the value of the constant
+	 * @param export the export flag of the constnat
+	 * 
+	 * @return the newly created constant
 	 */
-	private static class FuncCallCmd extends Command {
-		
-		private static final long CALO_REG_CONST_LENGTH = 16L;
-		
-		static {
-			if (CALO_REG_CONST_LENGTH != new Command(Commands.CMD_CALO, build(A_SR, X00), build(A_NUM, 0L)).length()) {
-				throw new AssertionError();
-			}
+	public static SimpleConstant createConstant(String name, SimpleValue val, boolean export) {
+		if (!(val instanceof SimpleValueConst c)) {
+			throw new IllegalArgumentException("a constant needs a constant value (val: " + val + ')');
 		}
-		
-		private final SimpleFunction func;
-		
-		public FuncCallCmd(SimpleFunction func) {
-			super(null, null, null);
-			this.func = func;
-		}
-		
-		@Override
-		public long length() {
-			return CALO_REG_CONST_LENGTH;
-		}
-		
+		return new SimpleConstant(name, c.getNumber(), export);
 	}
 	
-	private static class FileCommandsList extends AbstractList<Command> implements List<Command> {
-		
-		private final SimpleFunction[] funcs;
-		
-		private FileCommandsList(SimpleFunction[] funcs) {
-			this.funcs = funcs;
+	public static SimpleType createArray(SimpleType t, SimpleValue val) {
+		if (val == null) {
+			return new SimpleTypeArray(t, -1L);
 		}
-		
-		public static List<Command> create(SimpleFile file) {
-			Collection<SimpleFunction> functions = file.functions();
-			SimpleFunction[]           funcs     = functions.toArray(new SimpleFunction[functions.size()]);
-			try {
-				assert false;
-			} catch (AssertionError ae) {
-				SimpleFunction[] sorted = funcs.clone();
-				Arrays.sort(sorted, (a, b) -> Long.compare(a.address, b.address));
-				assert Arrays.equals(funcs, sorted);
-			}
-			return new FileCommandsList(funcs);
+		if (!(val instanceof SimpleValueConst c)) {
+			throw new IllegalArgumentException("the length of an array needs to be constant (val: " + val + ')');
 		}
-		
-		@Override
-		public Iterator<Command> iterator() {
-			return new Iterator<Command>() {
-				
-				private int               i   = 0;
-				private Iterator<Command> sub = null;
-				
-				@Override
-				public boolean hasNext() {
-					return i < funcs.length || (sub != null && sub.hasNext());
-				}
-				
-				@Override
-				public Command next() {
-					if (sub != null && sub.hasNext()) { return sub.next(); }
-					if (i >= funcs.length) { throw new NoSuchElementException(); }
-					sub = funcs[i].cmds.iterator();
-					LOGGER.finer("assemble function: " + funcs[i].toString());
-					CompilerCommandCommand ccc;
-					if (i != 0) {
-						ccc = new CompilerCommandCommand(CompilerCommand.assertPos, funcs[i].address);
-					} else {
-						ccc = new CompilerCommandCommand(CompilerCommand.setPos, funcs[i].address);
-					}
-					i++;
-					return ccc;
-				}
-				
-			};
-		}
-		
-		@Override
-		public Command get(int index) {
-			long i;
-			int  fsi;
-			for (i = 1, fsi = 0; fsi < funcs.length; i++, fsi++) {
-				if (i > index) {
-					if (i == 0) {
-						return new CompilerCommandCommand(CompilerCommand.setPos, funcs[fsi].address);
-					} else {
-						return new CompilerCommandCommand(CompilerCommand.assertPos, funcs[fsi].address);
-					}
-				}
-				long newI = i + funcs[fsi].cmds.size();
-				if (newI > index) { return funcs[fsi].cmds.get((int) (index - i)); }
-				i = newI;
-			}
-			throw new IndexOutOfBoundsException();
-		}
-		
-		@Override
-		public int size() {
-			long s;
-			int  i;
-			for (s = 0L, i = 0; i < funcs.length; i++, s++) {
-				s += funcs[i].cmds.size();
-			}
-			return (int) Math.min(Integer.MAX_VALUE, s);
-		}
-		
+		return new SimpleTypeArray(t, c.getNumber());
 	}
 	
 }

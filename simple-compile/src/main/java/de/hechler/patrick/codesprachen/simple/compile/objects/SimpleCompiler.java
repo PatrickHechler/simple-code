@@ -71,7 +71,7 @@ import de.hechler.patrick.pfs.exception.ElementLockedException;
 import de.hechler.patrick.pfs.interfaces.PatrFile;
 import de.hechler.patrick.pfs.utils.PatrFileSysConstants;
 
-@Deprecated
+@Deprecated(forRemoval = true)
 public class SimpleCompiler implements TriFunction<String, String, String, SimpleDependency> {
 	
 	private static final long NO_LOCK = PatrFileSysConstants.NO_LOCK;

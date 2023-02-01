@@ -1,8 +1,8 @@
 package de.hechler.patrick.codesprachen.simple.compile.objects.commands;
 
 import de.hechler.patrick.codesprachen.simple.compile.objects.SimplePool;
-import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleType;
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleValue;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleType;
 
 public class SimpleCommandAssign implements SimpleCommand {
 	

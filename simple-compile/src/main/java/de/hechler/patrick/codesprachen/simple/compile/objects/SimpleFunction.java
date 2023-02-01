@@ -3,39 +3,35 @@ package de.hechler.patrick.codesprachen.simple.compile.objects;
 import java.util.List;
 
 import de.hechler.patrick.codesprachen.primitive.assemble.objects.Command;
-import de.hechler.patrick.codesprachen.simple.compile.interfaces.SimpleExportable;
 import de.hechler.patrick.codesprachen.simple.compile.objects.SimpleFile.SimpleFuncPool;
 import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommandBlock;
-import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleFuncType;
+import de.hechler.patrick.codesprachen.simple.symbol.interfaces.SimpleExportable;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleFunctionSymbol;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleVariable;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleFuncType;
 
-public class SimpleFunction implements SimpleExportable {
+public class SimpleFunction extends SimpleFunctionSymbol implements SimpleExportable {
 	
 	public boolean                  addrVars;
 	public int                      regVars = -1;
-	public long                     address = -1L;
-	public List <Command>           cmds    = null;
-	public final boolean            export;
+	public List<Command>            cmds    = null;
 	public final boolean            main;
-	public final String             name;
-	public final SimpleFuncType     type;
 	public final SimpleCommandBlock body;
 	public final SimpleFuncPool     pool;
 	
-	public SimpleFunction(boolean export, boolean main, String name, List <SimpleVariable> args,
-		List <SimpleVariable> results, SimpleCommandBlock cmd, SimpleFuncPool pool) {
-		this( -1L, export, main, name, new SimpleFuncType(args, results), cmd, pool);
+	public SimpleFunction(boolean export, boolean main, String name, List<SimpleVariable> args,
+			List<SimpleVariable> results, SimpleCommandBlock cmd, SimpleFuncPool pool) {
+		this(-1L, export, main, name, new SimpleFuncType(args, results), cmd, pool);
 	}
 	
 	public SimpleFunction(long address, String name, SimpleFuncType type) {
 		this(address, true, false, name, type, null, null);
 	}
 	
-	private SimpleFunction(long address, boolean export, boolean main, String name, SimpleFuncType type, SimpleCommandBlock cmd, SimpleFuncPool pool) {
-		this.address = address;
-		this.export = export;
+	private SimpleFunction(long address, boolean export, boolean main, String name, SimpleFuncType type,
+			SimpleCommandBlock cmd, SimpleFuncPool pool) {
+		super(address, export, name, type);
 		this.main = main;
-		this.name = name;
-		this.type = type;
 		this.body = cmd;
 		this.pool = pool;
 	}
@@ -52,7 +48,7 @@ public class SimpleFunction implements SimpleExportable {
 	
 	@Override
 	public String toExportString() {
-		if ( !export) {
+		if (!export) {
 			throw new IllegalStateException("this is not marked as export!");
 		}
 		if (address == -1L) {
@@ -74,16 +70,11 @@ public class SimpleFunction implements SimpleExportable {
 	
 	@Override
 	public boolean equals(Object obj) {
-		if (this == obj)
-			return true;
-		if (obj == null)
-			return false;
-		if (getClass() != obj.getClass())
-			return false;
+		if (this == obj) return true;
+		if (obj == null) return false;
+		if (getClass() != obj.getClass()) return false;
 		SimpleFunction other = (SimpleFunction) obj;
-		if ( !type.equals(other.type))
-			return false;
-		return true;
+		return type.equals(other.type);
 	}
 	
 	@Override
@@ -93,9 +84,7 @@ public class SimpleFunction implements SimpleExportable {
 		if (export) {
 			b.append("exp ");
 		}
-		b.append(name);
-		b.append(type);
-		return b.toString();
+		return b.append(name).append(type).append(';').toString();
 	}
 	
 }

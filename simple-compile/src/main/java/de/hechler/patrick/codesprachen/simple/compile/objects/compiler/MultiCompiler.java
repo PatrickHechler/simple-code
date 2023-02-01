@@ -6,12 +6,13 @@ import java.util.HashSet;
 import java.util.Set;
 
 import de.hechler.patrick.codesprachen.simple.compile.interfaces.Compiler;
+import de.hechler.patrick.zeugs.pfs.interfaces.File;
 
 public abstract class MultiCompiler implements Compiler {
 
 	private final Set<Compiler> comps = new HashSet<>();
 
-	public void addTranslationUnit(Path source, Path target) throws IOException {
+	public void addTranslationUnit(Path source, File target) throws IOException {
 		Compiler c = findCompiler(source);
 		c.addTranslationUnit(source, target);
 		comps.add(c);

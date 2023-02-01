@@ -34,7 +34,7 @@ public class DefMultiCompiler extends MultiCompiler {
 	public DefMultiCompiler(Compiler other, Compiler simpleSym, Compiler simpleSrc, Compiler primSym,
 			Compiler primSrc) {
 		this.other = other;
-		this.simpleSym = simpleSrc;
+		this.simpleSym = simpleSym;
 		this.simpleSrc = simpleSrc;
 		this.primSym = primSym;
 		this.primSrc = primSrc;
@@ -57,7 +57,7 @@ public class DefMultiCompiler extends MultiCompiler {
 	}
 	
 	public DefMultiCompiler(Charset cs, Compiler other) {
-		this(cs, other, Paths.get("."), Paths.get("/s.sym/"));
+		this(cs, other, Paths.get("."), Paths.get("/patr-symbols/"), Paths.get("~/patr-symbols/"));
 	}
 	
 	public DefMultiCompiler(Charset cs) {

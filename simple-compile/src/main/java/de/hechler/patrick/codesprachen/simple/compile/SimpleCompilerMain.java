@@ -3,13 +3,13 @@ package de.hechler.patrick.codesprachen.simple.compile;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.DirectoryStream;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.antlr.v4.runtime.RecognitionException;
@@ -20,38 +20,41 @@ import de.hechler.patrick.codesprachen.primitive.assemble.exceptions.AssembleErr
 import de.hechler.patrick.codesprachen.simple.compile.antlr.SimpleGrammarLexer;
 import de.hechler.patrick.codesprachen.simple.compile.objects.compiler.DefMultiCompiler;
 import de.hechler.patrick.codesprachen.simple.compile.objects.compiler.MultiCompiler;
-import de.hechler.patrick.pfs.interfaces.BlockAccessor;
-import de.hechler.patrick.pfs.objects.ba.SeekablePathBlockAccessor;
-import de.hechler.patrick.pfs.objects.ba.SeekablePathBlockAccessor.Bool;
+import de.hechler.patrick.zeugs.pfs.interfaces.FSElement;
+import de.hechler.patrick.zeugs.pfs.interfaces.File;
+import de.hechler.patrick.zeugs.pfs.interfaces.Folder;
+import de.hechler.patrick.zeugs.pfs.interfaces.Folder.FolderIter;
 
 public class SimpleCompilerMain {
-
+	
 	public static final Logger LOGGER = Logger.getLogger("simple-compile");
-
+	
 	private static MultiCompiler compiler;
-	private static Path src;
-	private static Path bin;
-
+	private static Path          src;
+	private static Folder        bin;
+	
+	private static boolean force;
+	
 	public static void main(String[] args) {
 		setup(args);
+		if (force) {
+			deleteChilds(bin);
+		}
 		try {
-			compileRecursive(src);
+			compileRecursive(src, bin);
 			compiler.compile();
 		} catch (Throwable t) {
 			System.err.println("erron while compiling: " + t);
 			t.printStackTrace();
-			if (t instanceof AssembleError) {
-				AssembleError ae = (AssembleError) t;
+			if (t instanceof AssembleError ae) {
 				System.err.println("line:          " + ae.line);
 				System.err.println("posInLine:     " + ae.posInLine);
 				System.err.println("length:        " + ae.length);
 				System.err.println("charPos:       " + ae.charPos);
 			}
-			if (t instanceof ParseCancellationException) {
-				ParseCancellationException pce = (ParseCancellationException) t;
+			if (t instanceof ParseCancellationException pce) {
 				Throwable c = pce.getCause();
-				if (c instanceof RecognitionException) {
-					RecognitionException ime = (RecognitionException) c;
+				if (c instanceof RecognitionException ime) {
 					System.err.println("got:           " + ime.getOffendingToken());
 					System.err.println("line:          " + ime.getOffendingToken().getLine());
 					IntervalSet toks = ime.getExpectedTokens();
@@ -63,45 +66,68 @@ public class SimpleCompilerMain {
 					System.err.println("context.class: " + ime.getCtx().getClass().getSimpleName());
 				}
 			}
-//			closePFS();
+			closePFS();
 			System.exit(1);
 		}
-//		closePFS();
+		closePFS();
 		LOGGER.info("compiled successful " + src.toString());
 	}
-
-	private static void compileRecursive(Path src) throws IOException {
-		try (DirectoryStream<Path> dir = Files.newDirectoryStream(src)) {
-			for (Path sub : dir) {
-				Path target = bin.resolve(sub.relativize(bin));
-				if (Files.isDirectory(sub)) {
-					Files.createDirectory(target);
-
-				} else {
-					LOGGER.info("compile " + sub + " to " + target);
-					compiler.addTranslationUnit(sub, target);
-				}
+	
+	private static void deleteChilds(Folder bin) throws IOException {
+		try (FolderIter iter = bin.iter(true)) {
+			FSElement e = iter.next();
+			if (e.isFolder()) {
+				deleteChilds(e.getFolder());
+			}
+			iter.delete();
+		}
+	}
+	
+	private static void compileRecursive(Path src, Folder bin) throws IOException {
+		for (Path sub : Files.newDirectoryStream(src)) {
+			String name = sub.getFileName().toString();
+			if (Files.isDirectory(sub)) {
+				Folder target = bin.createFolder(name);
+				compileRecursive(sub, target);
+			} else {
+				File out;
+				try {
+					FSElement out0 = bin.childElement(name);
+					if (force) {
+						out0.delete();
+					} else {
+						throw new FileAlreadyExistsException(out0.toString());
+					}
+				} catch (NoSuchFileException ignore) {/**/}
+				out = bin.createFile(name);
+				compiler.addTranslationUnit(sub.getFile(), out);
+			}
+			if (Files.isDirectory(sub)) {
+				Files.createDirectory(target);
+			} else {
+				LOGGER.info(() -> "compile " + sub + " to " + target);
+				compiler.addTranslationUnit(sub, target);
 			}
 		}
 	}
-
-//	private static void closePFS() {
-//		try {
-////			pfs.close();
-//		} catch (Throwable e) {
-//			if (e instanceof ThreadDeath) {
-//				throw e;
-//			}
-//			LOGGER.warning("could not close the file system: " + e);
-//			System.exit(2);
-//		}
-//	}
-
+	
+	private static void closePFS() {
+		try {
+			pfs.close();
+		} catch (Throwable e) {
+			if (e instanceof ThreadDeath) {
+				throw e;
+			}
+			LOGGER.warning("could not close the file system: " + e);
+			System.exit(2);
+		}
+	}
+	
 	private static void setup(String[] args) {
-		List<Path> lookupPaths = new ArrayList<>();
-		Path bin = null;
-		boolean recreateOutput = false;
-		Charset cs = null;
+		List<Path> lookupPaths    = new ArrayList<>();
+		Path       bin            = null;
+		boolean    recreateOutput = false;
+		Charset    cs             = null;
 		for (int i = 0; i < args.length; i++) {
 			switch (args[i]) {
 			case "--help":
@@ -147,9 +173,7 @@ public class SimpleCompilerMain {
 			bin = Paths.get("./out.pfs");
 		}
 		try {
-			if (recreateOutput) {
-				Files.deleteIfExists(bin);
-			}
+			force = recreateOutput;
 //			BlockAccessor ba;
 //			Bool formatt = new Bool();
 //			ba = SeekablePathBlockAccessor.create(bin, 1 << 14, false, formatt);
@@ -163,7 +187,7 @@ public class SimpleCompilerMain {
 			crash("could not open the output file system: " + e.toString(), -1, args);
 		}
 	}
-
+	
 	private static void help() {
 		System.out.print(//
 				/*		*/"Options:\n"//
@@ -178,7 +202,7 @@ public class SimpleCompilerMain {
 						+ "        to delete the output file if it\n"//
 						+ "        exist already at the start\n");
 	}
-
+	
 	private static void crash(String msg, int index, String[] args) {
 		System.err.println(msg);
 		if (args != null) {
@@ -191,5 +215,5 @@ public class SimpleCompilerMain {
 		}
 		System.exit(1);
 	}
-
+	
 }

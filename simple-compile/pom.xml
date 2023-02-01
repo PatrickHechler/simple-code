@@ -15,16 +15,6 @@
 	<version>1.3.0</version>
 	<packaging>jar</packaging>
 
-	<properties>
-		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-	</properties>
-	<dependencies>
-		<dependency>
-			<groupId>de.hechler.patrick.codesprachen.primitive</groupId>
-			<artifactId>assemble</artifactId>
-			<version>13.2.0</version>
-		</dependency>
-	</dependencies>
 	<build>
 		<plugins>
 			<plugin>
