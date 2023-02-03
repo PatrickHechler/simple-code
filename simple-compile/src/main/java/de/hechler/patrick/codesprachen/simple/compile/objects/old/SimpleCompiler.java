@@ -1,4 +1,4 @@
-package de.hechler.patrick.codesprachen.simple.compile.objects;
+package de.hechler.patrick.codesprachen.simple.compile.objects.old;
 
 import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.A_NUM;
 import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.A_SR;

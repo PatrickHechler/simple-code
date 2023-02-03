@@ -32,13 +32,15 @@ public interface SimpleValue {
 	public static final int EXP_UNARY_BOOLEAN_NOT     = 16;
 	
 	/**
-	 * adds a command sequence which loads the runtime value of this {@link SimpleValue} to the {@code targetRegister}.<br>
+	 * adds a command sequence which loads the runtime value of this {@link SimpleValue} to the
+	 * {@code targetRegister}.<br>
 	 * the {@code blockedRegisters} are not allowed to be used.<br>
 	 * after this method returns the {@code blockedRegisters} will additionally contain the {@code targetRegister}.<br>
 	 * {@code blockedRegisters} is not allowed to contain {@code targetRegister}
 	 * <p>
 	 * note that the compiler is allowed to specify a target register below {@link #MIN_REGISTER}<br>
-	 * if the target register is below {@link #MIN_REGISTER} it is still not allowed to use any other register below {@link #MIN_REGISTER} except of the <code>targetRegister</code>
+	 * if the target register is below {@link #MIN_REGISTER} it is still not allowed to use any other register below
+	 * {@link #MIN_REGISTER} except of the <code>targetRegister</code>
 	 * <p>
 	 * if this value represents an array or structure (or pointer) the address of the first/target element is loaded
 	 * <p>
@@ -47,18 +49,17 @@ public interface SimpleValue {
 	 * note that the list does not have to contain all commands (it may even be empty (even if pos is not zero))
 	 * 
 	 * @return the new size of the {@code commands} in bytes
-	 * @param targetRegister
-	 *            the target register which will contain the runtime value<br>
-	 *            note that the compiler is allowed to specify a target register below {@link #MIN_REGISTER}<br>
-	 *            if the target register is below {@link #MIN_REGISTER} it is still not allowed to use any other register below {@link #MIN_REGISTER} except of the <code>targetRegister</code>
-	 * @param blockedRegisters
-	 *            the registers wich are not allowed to be modified (the length must be 256)
-	 * @param commands
-	 *            the list of commands, where the commands should be added
-	 * @param pos
-	 *            the current length of current the binary in bytes
+	 * 
+	 * @param targetRegister   the target register which will contain the runtime value<br>
+	 *                         note that the compiler is allowed to specify a target register below
+	 *                         {@link #MIN_REGISTER}<br>
+	 *                         if the target register is below {@link #MIN_REGISTER} it is still not allowed to use any
+	 *                         other register below {@link #MIN_REGISTER} except of the <code>targetRegister</code>
+	 * @param blockedRegisters the registers wich are not allowed to be modified (the length must be 256)
+	 * @param commands         the list of commands, where the commands should be added
+	 * @param pos              the current length of current the binary in bytes
 	 */
-	long loadValue(int targetRegister, boolean[] blockedRegisters, List <Command> commands, long pos);
+	long loadValue(int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos);
 	
 	SimpleType type();
 	
@@ -95,5 +96,7 @@ public interface SimpleValue {
 	SimpleValue addExpArrayRef(SimplePool pool, SimpleValue val);
 	
 	SimpleValue addExpNameRef(SimplePool pool, String text);
+	
+	SimpleValue cast(SimpleType t);
 	
 }

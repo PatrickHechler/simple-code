@@ -5,7 +5,7 @@ import java.util.List;
 import de.hechler.patrick.codesprachen.primitive.assemble.objects.Command;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleType;
 
-public class SimpleFPNumberValue extends SimpleValueConst implements SimpleValue {
+public class SimpleFPNumberValue extends SimpleValueConst {
 	
 	public final double value;
 	

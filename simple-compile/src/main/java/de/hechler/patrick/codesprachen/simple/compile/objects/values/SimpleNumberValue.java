@@ -9,7 +9,7 @@ import de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBui
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleType;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleTypePrimitive;
 
-public class SimpleNumberValue extends SimpleValueConst implements SimpleValue {
+public class SimpleNumberValue extends SimpleValueConst {
 	
 	public final int     bits;
 	public final boolean signed;
@@ -33,16 +33,16 @@ public class SimpleNumberValue extends SimpleValueConst implements SimpleValue {
 		this.signed = signed;
 		switch (bits) {
 		case 64:
-			this.value = value;
+			this.value = value; // & 0xFFFFFFFFFFFFFFFFL; (not needed)
 			break;
 		case 32:
-			this.value = value & 0xFFFFFFFF;
+			this.value = value & 0xFFFFFFFFL;
 			break;
 		case 16:
-			this.value = value & 0xFFFF;
+			this.value = value & 0xFFFFL;
 			break;
 		case 8:
-			this.value = value & 0xFF;
+			this.value = value & 0xFFL;
 			break;
 		default:
 			throw new InternalError("unknown bits value: " + bits);

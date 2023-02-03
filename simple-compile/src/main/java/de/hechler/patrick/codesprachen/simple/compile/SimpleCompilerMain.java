@@ -3,13 +3,13 @@ package de.hechler.patrick.codesprachen.simple.compile;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
-import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.NoSuchProviderException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.antlr.v4.runtime.RecognitionException;
@@ -20,27 +20,35 @@ import de.hechler.patrick.codesprachen.primitive.assemble.exceptions.AssembleErr
 import de.hechler.patrick.codesprachen.simple.compile.antlr.SimpleGrammarLexer;
 import de.hechler.patrick.codesprachen.simple.compile.objects.compiler.DefMultiCompiler;
 import de.hechler.patrick.codesprachen.simple.compile.objects.compiler.MultiCompiler;
+import de.hechler.patrick.zeugs.pfs.FSProvider;
+import de.hechler.patrick.zeugs.pfs.interfaces.FS;
 import de.hechler.patrick.zeugs.pfs.interfaces.FSElement;
 import de.hechler.patrick.zeugs.pfs.interfaces.File;
 import de.hechler.patrick.zeugs.pfs.interfaces.Folder;
 import de.hechler.patrick.zeugs.pfs.interfaces.Folder.FolderIter;
+import de.hechler.patrick.zeugs.pfs.opts.JavaFSOptions;
+import de.hechler.patrick.zeugs.pfs.opts.PatrFSOptions;
 
 public class SimpleCompilerMain {
 	
+	private static final String NOT_ENUGH_ARGS_MSG = "not enugh args";
+	
+	private static final String DOUBLED_OPTION_MSG = "doubled option";
+	
 	public static final Logger LOGGER = Logger.getLogger("simple-compile");
 	
+	private static FS            pfs;
 	private static MultiCompiler compiler;
 	private static Path          src;
 	private static Folder        bin;
-	
-	private static boolean force;
+	private static boolean       force;
 	
 	public static void main(String[] args) {
 		setup(args);
-		if (force) {
-			deleteChilds(bin);
-		}
 		try {
+			if (force) {
+				deleteChilds(bin);
+			}
 			compileRecursive(src, bin);
 			compiler.compile();
 		} catch (Throwable t) {
@@ -69,8 +77,11 @@ public class SimpleCompilerMain {
 			closePFS();
 			System.exit(1);
 		}
+		String binStr = bin.toString();
 		closePFS();
-		LOGGER.info("compiled successful " + src.toString());
+		if (LOGGER.isLoggable(Level.INFO)) {
+			System.out.println("compiled successfully " + src.toString() + " to " + binStr);
+		}
 	}
 	
 	private static void deleteChilds(Folder bin) throws IOException {
@@ -90,23 +101,11 @@ public class SimpleCompilerMain {
 				Folder target = bin.createFolder(name);
 				compileRecursive(sub, target);
 			} else {
-				File out;
-				try {
-					FSElement out0 = bin.childElement(name);
-					if (force) {
-						out0.delete();
-					} else {
-						throw new FileAlreadyExistsException(out0.toString());
-					}
-				} catch (NoSuchFileException ignore) {/**/}
-				out = bin.createFile(name);
-				compiler.addTranslationUnit(sub.getFile(), out);
-			}
-			if (Files.isDirectory(sub)) {
-				Files.createDirectory(target);
-			} else {
-				LOGGER.info(() -> "compile " + sub + " to " + target);
-				compiler.addTranslationUnit(sub, target);
+				File out = bin.createFile(name);
+				if (LOGGER.isLoggable(Level.INFO)) {
+					System.out.println("register: '" + sub + "' will be compiled to '" + out + '\'');
+				}
+				compiler.addTranslationUnit(sub, out);
 			}
 		}
 	}
@@ -115,76 +114,113 @@ public class SimpleCompilerMain {
 		try {
 			pfs.close();
 		} catch (Throwable e) {
-			if (e instanceof ThreadDeath) {
-				throw e;
+			if (e instanceof ThreadDeath td) {
+				throw td;
 			}
-			LOGGER.warning("could not close the file system: " + e);
+			System.err.println("could not close the file system:");
+			e.printStackTrace();
 			System.exit(2);
 		}
 	}
 	
 	private static void setup(String[] args) {
 		List<Path> lookupPaths    = new ArrayList<>();
-		Path       bin            = null;
 		boolean    recreateOutput = false;
 		Charset    cs             = null;
 		for (int i = 0; i < args.length; i++) {
 			switch (args[i]) {
-			case "--help":
-			case "--?":
-				help();
-				System.exit(0);
-			case "--lookup":
-				if (++i >= args.length) {
-					crash("not enugh args", i - 1, args);
-				}
-				lookupPaths.add(Paths.get(args[i]));
-				break;
-			case "--src":
-				if (src != null) {
-					crash("doubled option", i, args);
-				}
-				if (++i >= args.length) {
-					crash("not enugh args", i - 1, args);
-				}
-				src = Paths.get(args[i]);
-				break;
-			case "--recreate-out":
-				if (recreateOutput) {
-					crash("doubled option", i, args);
-				}
-				recreateOutput = true;
-				break;
-			default:
-				crash("unknown argument: '" + args[i] + '\'', i, args);
+			case "--help", "--?" -> argHelp();
+			case "--lookup" -> argLookup(args, lookupPaths, ++i);
+			case "--src" -> argSrc(args, ++i);
+			case "--recreate-out", "--force" -> recreateOutput = argForce(args, recreateOutput, i);
+			case "--charset" -> cs = argCs(args, cs, ++i);
+			case "--lfs", "--rfs" -> argLfs(args, ++i);
+			case "--pfs" -> argPfs(args, i += 2);
+			default -> crash("unknown argument: '" + args[i] + '\'', i, args);
 			}
 		}
 		if (src == null) {
 			crash("src folder not set", -1, args);
 		}
-		if (lookupPaths.size() == 0) {
+		if (lookupPaths.isEmpty()) {
 			lookupPaths.add(src);
 		}
 		Path[] lookups = lookupPaths.toArray(new Path[lookupPaths.size()]);
 		if (cs == null) {
 			cs = StandardCharsets.UTF_8;
 		}
-		if (bin == null) {
-			bin = Paths.get("./out.pfs");
+		force = recreateOutput;
+		compiler = new DefMultiCompiler(cs, src, lookups);
+	}
+	
+	private static void argHelp() throws InternalError {
+		help();
+		System.exit(0);
+	}
+	
+	private static void argLookup(String[] args, List<Path> lookupPaths, int i) {
+		if (i >= args.length) {
+			crash(NOT_ENUGH_ARGS_MSG, i - 1, args);
+		}
+		lookupPaths.add(Paths.get(args[i]));
+	}
+	
+	private static void argSrc(String[] args, int i) {
+		if (src != null) {
+			crash(DOUBLED_OPTION_MSG, i - 1, args);
+		}
+		if (i >= args.length) {
+			crash(NOT_ENUGH_ARGS_MSG, i - 1, args);
+		}
+		src = Paths.get(args[i]);
+	}
+	
+	private static boolean argForce(String[] args, boolean recreateOutput, int i) {
+		if (recreateOutput) {
+			crash(DOUBLED_OPTION_MSG, i, args);
+		}
+		recreateOutput = true;
+		return recreateOutput;
+	}
+	
+	private static Charset argCs(String[] args, Charset cs, int i) {
+		if (cs != null) {
+			crash(DOUBLED_OPTION_MSG, i - 1, args);
+		}
+		if (i >= args.length) {
+			crash(NOT_ENUGH_ARGS_MSG, i - 1, args);
+		}
+		cs = Charset.forName(args[i]);
+		return cs;
+	}
+	
+	private static void argLfs(String[] args, int i) {
+		if (pfs != null) {
+			crash(DOUBLED_OPTION_MSG, i - 1, args);
+		}
+		if (i >= args.length) {
+			crash(NOT_ENUGH_ARGS_MSG, i - 1, args);
 		}
 		try {
-			force = recreateOutput;
-//			BlockAccessor ba;
-//			Bool formatt = new Bool();
-//			ba = SeekablePathBlockAccessor.create(bin, 1 << 14, false, formatt);
-//			pfs = new PatrFileSysImpl(ba); // TODO pfs for java
-//			if (formatt.value) {
-//				pfs.format(1L << 16, 1 << 14);
-//			}
-//			PatrFolder root = pfs.getRoot();
-			compiler = new DefMultiCompiler(cs, src, lookups);
-		} catch (IOException e) {
-			crash("could not open the output file system: " + e.toString(), -1, args);
+			pfs = FSProvider.ofName(FSProvider.JAVA_FS_PROVIDER_NAME).loadFS(new JavaFSOptions(Path.of(args[i])));
+			bin = pfs.folder("/");
+		} catch (NoSuchProviderException | IOException e) {
+			crash(e.toString(), i, args);
+		}
+	}
+	
+	private static void argPfs(String[] args, int i) {
+		if (pfs != null) {
+			crash(DOUBLED_OPTION_MSG, i - 2, args);
+		}
+		if (i >= args.length) {
+			crash(NOT_ENUGH_ARGS_MSG, i - 2, args);
+		}
+		try {
+			pfs = FSProvider.ofName(FSProvider.PATR_FS_PROVIDER_NAME).loadFS(new PatrFSOptions(args[i - 1]));
+			bin = pfs.folder(args[i]);
+		} catch (NoSuchProviderException | IOException e) {
+			crash(e.toString(), i, args);
 		}
 	}
 	
@@ -199,8 +235,17 @@ public class SimpleCompilerMain {
 						+ "    --src [FOLDER]\n"//
 						+ "        to set the source folder\n"//
 						+ "    --recreate-out\n"//
+						+ "    --force\n"//
 						+ "        to delete the output file if it\n"//
-						+ "        exist already at the start\n");
+						+ "        exist already at the start\n"//
+						+ "    --rfs <PATH>\n"//
+						+ "    --lfs <PATH>\n"//
+						+ "        to use the real file system\n"//
+						+ "    --pfs <PATH> <PATH>\n"//
+						+ "        to set the patr file system path\n"//
+						+ "        the first path specifies the file system file\n"//
+						+ "        the second path specifies the output folder\n"//
+		);
 	}
 	
 	private static void crash(String msg, int index, String[] args) {

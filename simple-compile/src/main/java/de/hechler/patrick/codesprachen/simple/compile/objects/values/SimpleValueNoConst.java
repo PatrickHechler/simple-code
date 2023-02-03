@@ -1,11 +1,6 @@
 package de.hechler.patrick.codesprachen.simple.compile.objects.values;
 
-import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.A_NUM;
-import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.A_SR;
-import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.B_NUM;
-import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.B_REG;
-import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.B_SR;
-import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.build;
+import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.*;
 
 import java.util.LinkedList;
 import java.util.List;
@@ -24,6 +19,21 @@ import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleTypePri
 
 public abstract class SimpleValueNoConst implements SimpleValue {
 	
+	public static final int FORWARD_JMP_BASE_LEN = 8;
+	
+	static {
+		if (new Command(Commands.CMD_JMP, build(A_NUM, 0), null).length() != FORWARD_JMP_BASE_LEN) {
+			throw new AssertionError();
+		}
+		if (new Command(Commands.CMD_JMPERR, build(A_NUM, 0), null).length() != FORWARD_JMP_BASE_LEN) {
+			throw new AssertionError();
+		}
+		if (new Command(Commands.CMD_JMPNE, build(A_NUM, 0), Param.createLabel("--"))
+				.length() != FORWARD_JMP_BASE_LEN) {
+			throw new AssertionError();
+		}
+	}
+	
 	public final SimpleType t;
 	
 	public SimpleValueNoConst(SimpleType type) {
@@ -40,527 +50,891 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		return t;
 	}
 	
+	public abstract static class CalculatingUnValue extends SimpleValueNoConst {
+		
+		protected final SimpleValue val;
+		
+		public CalculatingUnValue(SimpleType type, SimpleValue val) {
+			super(type);
+			this.val = val;
+		}
+		
+	}
+	
+	public abstract static class CalculatingBIValue extends SimpleValueNoConst {
+		
+		protected final SimpleValue valA;
+		protected final SimpleValue valB;
+		
+		public CalculatingBIValue(SimpleType type, SimpleValue valA, SimpleValue valB) {
+			super(type);
+			this.valA = valA;
+			this.valB = valB;
+		}
+		
+	}
+	
+	private static class SimpleUnOperatorValue extends CalculatingUnValue {
+		
+		private final Commands op;
+		
+		public SimpleUnOperatorValue(SimpleType type, SimpleValue val, Commands op) {
+			super(type, val);
+			this.op = op;
+		}
+		
+		@Override
+		public long loadValue(int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos) {
+			pos = val.loadValue(targetRegister, blockedRegisters, commands, pos);
+			Command cmd = new Command(op, build(A_SR, targetRegister), null);
+			pos += cmd.length();
+			commands.add(cmd);
+			return pos;
+		}
+		
+		@Override
+		public String toString() {
+			return switch (op) {
+			default -> op + " (" + val + ')';
+			};
+		}
+		
+	}
+	
+	private static class SimpleBiOperatorValue extends CalculatingBIValue {
+		
+		private final Commands op;
+		private final boolean  swap;
+		
+		public SimpleBiOperatorValue(SimpleType type, SimpleValue valA, SimpleValue valB, Commands op) {
+			this(type, valA, valB, op, false);
+		}
+		
+		public SimpleBiOperatorValue(SimpleType type, SimpleValue valA, SimpleValue valB, Commands op, boolean swap) {
+			super(type, valA, valB);
+			this.op = op;
+			this.swap = swap;
+		}
+		
+		@Override
+		public long loadValue(int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos) {
+			RegisterData rd = new RegisterData(targetRegister + 1 >= 256 ? targetRegister - 1 : targetRegister + 1);
+			blockedRegisters[targetRegister] = true;
+			pos = findRegister(blockedRegisters, commands, pos, rd, rd.reg);
+			blockedRegisters[targetRegister] = false;
+			int reg0 = swap ? rd.reg : targetRegister;
+			int reg1 = swap ? targetRegister : rd.reg;
+			pos = valA.loadValue(reg0, blockedRegisters, commands, pos);
+			pos = valB.loadValue(reg1, blockedRegisters, commands, pos);
+			Command cmd = new Command(op, build(A_SR, reg0), build(A_SR, reg1));
+			pos += cmd.length();
+			commands.add(cmd);
+			pos = releaseRegister(commands, pos, rd, blockedRegisters);
+			return pos;
+		}
+		
+		@Override
+		public String toString() {
+			return switch (op) {
+			default -> op + " (" + valA + ") , (" + valB + ')';
+			};
+		}
+		
+	}
+	
+	public static class CastedNoConstValue extends SimpleValueNoConst {
+		
+		protected final SimpleValue val;
+		
+		public CastedNoConstValue(SimpleType type, SimpleValue val) {
+			super(type);
+			this.val = val;
+		}
+		
+		@Override
+		public long loadValue(int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos) {
+			return val.loadValue(targetRegister, blockedRegisters, commands, pos);
+		}
+		
+		@Override
+		public String toString() {
+			return "(" + t + ") (" + val.toString() + ')';
+		}
+		
+	}
+	
+	private static class NumberCastValue extends CastedNoConstValue {
+		
+		public NumberCastValue(SimpleType type, SimpleValue val) {
+			super(type, val);
+		}
+		
+		@Override
+		public long loadValue(int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos) {
+			int     oldByteCount;
+			boolean oldSigned;
+			boolean oldPntr;
+			int     newByteCount;
+			boolean newSigned;
+			boolean newPntr;
+			if (super.val.type().isPointerOrArray()) {
+				oldByteCount = 8;
+				oldSigned = false;
+				oldPntr = true;
+			} else {
+				oldByteCount = (int) super.val.type().byteCount();
+				oldSigned = ((SimpleTypePrimitive) super.val.type()).signed();
+				oldPntr = false;
+			}
+			if (super.val.type().isPointerOrArray()) {
+				newByteCount = 8;
+				newSigned = false;
+				newPntr = true;
+			} else {
+				newByteCount = (int) super.val.type().byteCount();
+				newSigned = ((SimpleTypePrimitive) super.val.type()).signed();
+				newPntr = false;
+			}
+			pos = super.val.loadValue(targetRegister, blockedRegisters, commands, pos);
+			if (newByteCount == oldByteCount && (oldSigned == newSigned || oldPntr || newPntr)) {
+				return pos;
+			}
+			if (newByteCount > oldByteCount && (!oldSigned || newSigned)) {
+				return pos;
+			}
+			int   minByteCount = Math.min(newByteCount, oldByteCount);
+			long  newOr        = switch (minByteCount) {
+								case 4 -> 0xFFFFFFFF00000000L;
+								case 2 -> 0xFFFFFFFFFFFF0000L;
+								case 1 -> 0xFFFFFFFFFFFFFF00L;
+								default -> throw new InternalError("unknown primitive byte count: " + newByteCount);
+								};
+			Param myReg        = build(A_SR, targetRegister);
+			if (newSigned) {
+				long    newTest = 1L << ((minByteCount << 3) - 1);
+				Command test    = new Command(Commands.CMD_CMPL, myReg, build(A_NUM, newTest));
+				pos += test.length();
+				commands.add(test);
+				Command jmpnb;
+				Command or     = new Command(Commands.CMD_OR, myReg, build(A_NUM, newOr));
+				Command jmp;
+				Command and    = new Command(Commands.CMD_AND, myReg, build(A_NUM, ~newOr));
+				long    jmpLen = and.length();
+				jmp = new Command(Commands.CMD_JMP, build(A_NUM, jmpLen), null);
+				jmpLen += jmp.length() + or.length();
+				jmpnb = new Command(Commands.CMD_JMPNB, build(A_NUM, jmpLen), null);
+				pos += jmpLen + jmpnb.length();
+				commands.add(jmpnb);
+				commands.add(or);
+				commands.add(jmp);
+				commands.add(and);
+			} else {
+				Command and = new Command(Commands.CMD_AND, myReg, build(A_NUM, ~newOr));
+				pos += and.length();
+				commands.add(and);
+			}
+			return pos;
+		}
+		
+	}
+	
+	private static final class FPNumberCastValue extends CastedNoConstValue {
+		
+		public FPNumberCastValue(SimpleType type, SimpleValue val) {
+			super(type, val);
+		}
+		
+		@Override
+		public long loadValue(int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos) {
+			pos = super.val.loadValue(targetRegister, blockedRegisters, commands, pos);
+			Commands c;
+			if (t == SimpleType.FPNUM) {
+				assert super.val.type() != SimpleType.FPNUM;
+				c = Commands.CMD_NTFP;
+			} else {
+				assert super.val.type() == SimpleType.FPNUM;
+				c = Commands.CMD_FPTN;
+			}
+			Command cmd = new Command(c, build(A_SR, targetRegister), null);
+			pos += cmd.length();
+			commands.add(cmd);
+			return pos;
+		}
+		
+	}
+	
+	private static final class PntrCastedValue extends CastedNoConstValue {
+		
+		public PntrCastedValue(SimpleType type, SimpleValue val) {
+			super(type, val);
+		}
+		
+		@Override
+		public long loadValue(int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos) {
+			pos = super.loadValue(targetRegister, blockedRegisters, commands, pos);
+			Param   reg = build(A_SR, targetRegister);
+			Command cmp = new Command(Commands.CMD_CMP, reg, build(A_NUM, t.isPointerOrArray() ? 0L : -1L));
+			pos += cmp.length();
+			commands.add(cmp);
+			Command jmpne;
+			Command xor = t.isPointerOrArray() ? new Command(Commands.CMD_MOV, reg, build(A_NUM, -1L))
+					: new Command(Commands.CMD_XOR, reg, reg);
+			jmpne = new Command(Commands.CMD_JMPNE, build(A_NUM, FORWARD_JMP_BASE_LEN + xor.length()), null);
+			pos += jmpne.length() + xor.length();
+			commands.add(jmpne);
+			commands.add(xor);
+			return pos;
+		}
+		
+	}
+	
+	@Override
+	public SimpleValueNoConst cast(SimpleType t) {
+		if (this.t == t) {
+			return this;
+		} else if (t.equals(this.t)) {
+			return new CastedNoConstValue(t, this);
+		} else if (this.t.isPointerOrArray()) {
+			if (t.isPointerOrArray()) {
+				return new CastedNoConstValue(t, this);
+			} else if (t.isPrimitive()) {
+				SimpleTypePrimitive p = (SimpleTypePrimitive) t;
+				return switch (p) {
+				case pt_fpnum -> throw cantCastExep(t);
+				case pt_byte, pt_dword, pt_ubyte, pt_udword, pt_uword, pt_word -> cast(SimpleType.NUM).cast(t);
+				case pt_bool, pt_num, pt_unum -> switch (this) { // @formatter:off
+					case SimpleValueConst c -> new SimpleNumberValue(t, c.getNumber() == -1L ? 0L : c.getNumber());
+					default -> new PntrCastedValue(t, this);
+				};// @formatter:on
+				case pt_inval, default -> throw new InternalError(p.name());
+				};
+			} else {
+				throw cantCastExep(t);
+			}
+		} else if (this.t.isPrimitive()) {
+			SimpleTypePrimitive p = (SimpleTypePrimitive) this.t;
+			return switch (p) {
+			case pt_fpnum -> {
+				if (!t.isPrimitive()) {
+					throw cantCastExep(t);
+				}
+				yield (switch (this) {
+				case SimpleValueConst c -> new SimpleNumberValue(SimpleType.NUM, (long) c.getFPNumber());
+				default -> new FPNumberCastValue(SimpleType.NUM, this);
+				}).cast(t);
+			}
+			case pt_num, pt_unum, pt_dword, pt_udword, pt_word, pt_uword, pt_byte, pt_ubyte -> {
+				if (t.isPointerOrArray()) {
+					yield new CastedNoConstValue(t, this);
+				} else if (!t.isPrimitive()) {
+					throw cantCastExep(t);
+				} else if (t == SimpleType.FPNUM) {
+					SimpleValue val = switch (p.bits()) {
+					case 64 -> this;
+					default -> cast(SimpleType.NUM);
+					};
+					yield switch (val) {
+					case SimpleValueConst c -> new SimpleFPNumberValue(c.getFPNumber());
+					default -> new FPNumberCastValue(t, val);
+					};
+				} else {
+					yield new NumberCastValue(t, this);
+				}
+			}
+			case pt_inval, default -> throw new InternalError(p.name());
+			};
+		} else {
+			throw new InternalError("unknown type: " + this.t.getClass() + " : " + this.t);
+		}
+	}
+	
+	private IllegalArgumentException cantCastExep(SimpleType t) {
+		return new IllegalArgumentException("can not cast from " + this.t + " to " + t);
+	}
+	
+	private IllegalArgumentException cantCastExep(SimpleValue other, SimpleType t, String msg) {
+		return new IllegalArgumentException(
+				"can not cast from " + this.t + "  " + other.type() + " to " + t + ": " + msg);
+	}
+	
 	@Override
 	public SimpleValue addExpCond(SimplePool pool, SimpleValue val, SimpleValue val2) {
-		return new SimpleConditionalValue(findType(val, val2), this, val, val2);
+		SimpleType type = findType(val, val2);
+		return new SimpleConditionalValue(type, cast(SimpleType.BOOL), val.cast(type), val2.cast(type));
 	}
 	
 	@Override
 	public SimpleValue addExpLOr(SimplePool pool, SimpleValue val) {
-		return new SimpleBiFunctionValue(findType(this, val), Commands.CMD_OR, this, val);
+		SimpleType type = findType(this, val);
+		if (type.isPointer() || type.isPrimitive() && type != SimpleType.FPNUM) {
+			return new SimpleBiOperatorValue(type, cast(type), val.cast(type), Commands.CMD_OR);
+		} else {
+			throw cantCastExep(val, type, "bitwise or");
+		}
 	}
 	
 	@Override
 	public SimpleValue addExpLAnd(SimplePool pool, SimpleValue val) {
-		return new SimpleBiFunctionValue(findType(this, val), Commands.CMD_AND, this, val);
+		SimpleType type = findType(this, val);
+		if (type.isPointer() || type.isPrimitive() && type != SimpleType.FPNUM) {
+			return new SimpleBiOperatorValue(type, cast(type), val.cast(type), Commands.CMD_AND);
+		} else {
+			throw cantCastExep(val, type, "bitwise and");
+		}
 	}
 	
 	@Override
 	public SimpleValue addExpOr(SimplePool pool, SimpleValue val) {
-		return addExpOr_addExpAnd(pool, val, false);
+		SimpleType type = findType(this, val);
+		if (type.isPointer() || type.isPrimitive() && type != SimpleType.FPNUM) {
+			return cast(type).addExpOrORaddExpAnd(val.cast(type), true);
+		} else {
+			throw cantCastExep(val, type, "logical or");
+		}
 	}
 	
 	@Override
 	public SimpleValue addExpXor(SimplePool pool, SimpleValue val) {
-		checkNumber(val);
-		return new SimpleBiFunctionValue(findType(this, val), Commands.CMD_XOR, this, val);
+		SimpleType type = findType(this, val);
+		if (type.isPointer() || type.isPrimitive() && type != SimpleType.FPNUM) {
+			return new SimpleBiOperatorValue(type, cast(type), val.cast(type), Commands.CMD_XOR);
+		} else {
+			throw cantCastExep(val, type, "bitiwse xor");
+		}
 	}
 	
 	@Override
 	public SimpleValue addExpAnd(SimplePool pool, SimpleValue val) {
-		return addExpOr_addExpAnd(pool, val, true);
-	}
-	
-	private SimpleValue addExpOr_addExpAnd(SimplePool pool, SimpleValue val, boolean and) {
-		checkNumber(val);
-		if (t == SimpleType.FPNUM ^ val.type() == SimpleType.FPNUM) {
-			if (t == SimpleType.FPNUM) {
-				return addExpOr_addExpAnd(pool, val.addExpCast(pool, SimpleType.FPNUM), and);
-			} else if (and) {
-				return addExpCast(pool, SimpleType.FPNUM).addExpAnd(pool, val);
-			} else {
-				return addExpCast(pool, SimpleType.FPNUM).addExpOr(pool, val);
-			}
+		SimpleType type = findType(this, val);
+		if (type.isPointer() || type.isPrimitive() && type != SimpleType.FPNUM) {
+			return cast(type).addExpOrORaddExpAnd(cast(type), false);
 		} else {
-			SimpleType type = //@formatter:off
-				(t == SimpleType.FPNUM)
-				? SimpleType.FPNUM
-				:	(t.isPointer() || val.type().isPointer() || ((SimpleTypePrimitive) t).signed() || ((SimpleTypePrimitive) val.type()).signed())
-					? SimpleType.NUM
-					: SimpleType.UNUM;//@formatter:on
-			return createBoolAndOrBoolOrValue(val, type, and);
+			throw cantCastExep(val, type, "logical and");
 		}
 	}
 	
-	private static final long JMP_EQ_NE_LEN = 16L;
+	// already casted
+	private SimpleValue addExpOrORaddExpAnd(SimpleValue val, boolean or) {
+		return new LogicalAndOROrValue(t, this, val, or);
+	}
+	
+	private static final long JMP_LEN = FORWARD_JMP_BASE_LEN;
 	
 	static {
-		if (JMP_EQ_NE_LEN != new Command(Commands.CMD_JMPEQ, Param.createLabel("--"), null).length()) {
+		if (JMP_LEN != new Command(Commands.CMD_JMPEQ, Param.createLabel("--"), null).length()) {
 			throw new InternalError();
 		}
-		if (JMP_EQ_NE_LEN != new Command(Commands.CMD_JMPEQ, build(A_NUM, 0L), null).length()) {
+		if (JMP_LEN != new Command(Commands.CMD_JMPEQ, build(A_NUM, 0L), null).length()) {
 			throw new InternalError();
 		}
-		if (JMP_EQ_NE_LEN != new Command(Commands.CMD_JMPNE, Param.createLabel("--"), null).length()) {
+		if (JMP_LEN != new Command(Commands.CMD_JMPNE, Param.createLabel("--"), null).length()) {
 			throw new InternalError();
 		}
-		if (JMP_EQ_NE_LEN != new Command(Commands.CMD_JMPNE, build(A_NUM, 0L), null).length()) {
+		if (JMP_LEN != new Command(Commands.CMD_JMPNE, build(A_NUM, 0L), null).length()) {
 			throw new InternalError();
 		}
 	}
 	
-	private SimpleValue createBoolAndOrBoolOrValue(SimpleValue val, SimpleType type, boolean and) {
-		final SimpleValueNoConst me = this;
-		Commands jmpcond = and ? Commands.CMD_JMPEQ : Commands.CMD_JMPNE;
-		return new SimpleValueNoConst(type) {
+	private static class LogicalAndOROrValue extends CalculatingBIValue {
+		
+		private final boolean doOr;
+		
+		public LogicalAndOROrValue(SimpleType type, SimpleValue valA, SimpleValue valB, boolean doOr) {
+			super(type, valA, valB);
+			this.doOr = doOr;
+		}
+		
+		@Override
+		public long loadValue(int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos) {
+			Param reg     = build(A_SR, targetRegister);
+			Param zero    = build(A_NUM, 0L);
+			Param notZero = build(A_NUM, 1L);
+			pos = valA.loadValue(targetRegister, blockedRegisters, commands, pos);
+			Command cmp = new Command(Commands.CMD_CMP, reg, zero);
+			pos += cmp.length();
+			commands.add(cmp);
+			Commands cond     = doOr ? Commands.CMD_JMPNE : Commands.CMD_JMPEQ;
+			Command  jmpc1;
+			long     jmpc1Pos = pos;
+			pos += JMP_LEN;
+			List<Command> sub = newList();
+			blockedRegisters[targetRegister] = false;
+			pos = valB.loadValue(targetRegister, blockedRegisters, sub, pos);
+			Command jmpc2;
+			long    jmpc2Pos = pos;
+			pos += JMP_LEN;
+			Command movNoJmp = new Command(Commands.CMD_MOV, reg, doOr ? zero : notZero);
+			pos += movNoJmp.length();
+			long    jmpAfterMovPos = pos;
+			Command jmpAfterMov;
+			pos += JMP_LEN;
+			jmpc1 = new Command(cond, build(A_NUM, jmpc1Pos - pos), null);
+			assert JMP_LEN == jmpc1.length();
+			commands.add(jmpc1);
+			commands.addAll(sub);
+			jmpc2 = new Command(cond, build(A_NUM, jmpc2Pos - pos), null);
+			assert JMP_LEN == jmpc2.length();
+			commands.add(jmpc2);
+			commands.add(movNoJmp);
+			Command movAfterJmp = new Command(Commands.CMD_MOV, reg, doOr ? notZero : zero);
+			pos += movAfterJmp.length();
+			jmpAfterMov = new Command(Commands.CMD_JMP, build(A_NUM, jmpAfterMovPos - pos), null);
+			assert JMP_LEN == jmpAfterMov.length();
+			commands.add(jmpAfterMov);
+			commands.add(movAfterJmp);
+			return pos;
+		}
+		
+		@Override
+		public String toString() {
+			return "(" + valA + ") " + (doOr ? "||" : "&&") + " (" + valB + ')';
+		}
+		
+	}
+	
+	private static class CompareValue extends CalculatingBIValue {
+		
+		private final Commands compare;
+		private final Commands jmpOnTrue;
+		
+		public CompareValue(SimpleType type, SimpleValue valA, SimpleValue valB, Commands cmp, Commands jmpOnTrue) {
+			super(type, valA, valB);
+			this.compare = cmp;
+			this.jmpOnTrue = jmpOnTrue;
+		}
+		
+		@Override
+		public long loadValue(int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos) {
+			Param targetReg = build(A_SR, targetRegister);
+			pos = valA.loadValue(targetRegister, blockedRegisters, commands, pos);
+			RegisterData rd = new RegisterData(targetRegister + 1);
+			pos = findRegister(blockedRegisters, commands, pos, rd,
+					targetRegister == 255 ? targetRegister - 1 : targetRegister + 1);
+			pos = valB.loadValue(rd.reg, blockedRegisters, commands, pos);
+			Command cmp = new Command(compare, targetReg, build(A_SR, rd.reg));
+			pos += cmp.length();
+			commands.add(cmp);
+			Command jmpTrue;
+			Command xor    = new Command(Commands.CMD_XOR, targetReg, targetReg);
+			Command jmpFalse;
+			Command movOne = new Command(Commands.CMD_MOV, targetReg, build(A_NUM, 1L));
+			jmpFalse = new Command(Commands.CMD_JMP, build(A_NUM, FORWARD_JMP_BASE_LEN + movOne.length()), null);
+			jmpTrue = new Command(jmpOnTrue, build(A_NUM, FORWARD_JMP_BASE_LEN + xor.length() + jmpFalse.length()),
+					null);
+			pos += jmpTrue.length();
+			commands.add(jmpTrue);
+			pos += xor.length();
+			commands.add(xor);
+			pos += jmpFalse.length();
+			commands.add(jmpFalse);
+			pos += movOne.length();
+			commands.add(movOne);
+			pos = releaseRegister(commands, pos, rd, blockedRegisters);
+			return pos;
 			
-			@Override
-			public long loadValue(int targetRegister, boolean[] blockedRegisters, List <Command> commands, long pos) {
-				pos = me.loadValue(targetRegister, blockedRegisters, commands, pos);
-				Param p1, p2;
-				p1 = build(A_SR, targetRegister);
-				p2 = build(A_NUM, 0L);
-				Command cmp = new Command(Commands.CMD_CMP, p1, p2);
-				pos += cmp.length();
-				long jmpc1Pos = pos;
-				List <Command> sub = newList();
-				pos += JMP_EQ_NE_LEN;
-				blockedRegisters[targetRegister] = false;
-				pos = val.loadValue(targetRegister, blockedRegisters, sub, pos);
-				pos += cmp.length();
-				long jmpc2Pos = pos;
-				pos += JMP_EQ_NE_LEN;
-				p2 = build(A_NUM, and ? 0L : 1L);
-				Command movj = new Command(Commands.CMD_MOV, p1, p2);
-				p2 = build(A_NUM, and ? 1L : 0L);
-				Command movnj = new Command(Commands.CMD_MOV, p1, p2);
-				pos += movnj.length();
-				p1 = build(A_NUM, pos - jmpc1Pos);
-				Command jmpc1 = new Command(jmpcond, p1, null);
-				p1 = build(A_NUM, pos - jmpc2Pos);
-				Command jmpc2 = new Command(jmpcond, p1, null);
-				final long movjlen = movj.length();
-				pos += movjlen;
-				p1 = build(A_NUM, movjlen);
-				Command jmp = new Command(Commands.CMD_JMP, p1, null);
-				commands.add(cmp);
-				commands.add(jmpc1);
-				commands.addAll(sub);
-				commands.add(cmp);
-				commands.add(jmpc2);
-				commands.add(movnj);
-				commands.add(jmp);
-				commands.add(movj);
-				return pos;
+		}
+		
+		@Override
+		public String toString() {
+			return "(" + valA + ") " + switch (jmpOnTrue) {
+			case CMD_JMPEQ -> "==";
+			case CMD_JMPNE -> "!=";
+			case CMD_JMPGE -> ">=";
+			case CMD_JMPGT -> ">";
+			case CMD_JMPLE -> "<=";
+			case CMD_JMPLT -> "<";
+			default -> "<" + compare + "  " + jmpOnTrue + ">";
+			} + " (" + valB + ')';
+		}
+		
+	}
+	
+	private SimpleValue compare(SimpleValue val, boolean equal, int type, boolean useFirst) {
+		if (this instanceof SimpleValueConst mc && val instanceof SimpleValueConst oc) {
+			boolean res;
+			if (t.isPointer()) {
+				res = constNumCmp(equal, type, useFirst, mc, oc);
+			} else if (t.isPrimitive()) {
+				res = switch ((SimpleTypePrimitive) t) {
+				case pt_fpnum -> constFPNumCmp(equal, type, useFirst, mc, oc);
+				case pt_unum, pt_num, pt_bool, pt_dword, pt_byte, pt_ubyte, pt_udword, pt_uword, pt_word ->
+					constNumCmp(equal, type, useFirst, mc, oc);
+				case pt_inval, default -> throw new InternalError(((SimpleTypePrimitive) t).name());
+				};
+			} else {
+				throw cantCastExep(val, t, "compare");
 			}
-			
-			@Override
-			public String toString() {
-				return "(" + me + " && " + val + ")";
+			return new SimpleNumberValue(SimpleType.BOOL, res ? 1L : 0L);
+		}
+		Commands cmp;
+		if (t == SimpleType.FPNUM) {
+			cmp = Commands.CMD_CMPFP;
+		} else if (t.isPointer()) {
+			cmp = Commands.CMD_CMP;
+		} else if (!t.isPrimitive()) {
+			throw new AssertionError("illegal compare type: " + t);
+		} else if (((SimpleTypePrimitive) t).signed()) {
+			cmp = Commands.CMD_CMP;
+		} else {
+			cmp = Commands.CMD_CMPU;
+		}
+		Commands jmpTrue;
+		if (useFirst) {
+			jmpTrue = equal ? Commands.CMD_JMPEQ : Commands.CMD_JMPNE;
+		} else {
+			jmpTrue = switch (type) {
+			case EXP_GREATHER -> Commands.CMD_JMPGT;
+			case EXP_GREATHER_EQUAL -> Commands.CMD_JMPGE;
+			case EXP_SMALLER_EQUAL -> Commands.CMD_JMPLE;
+			case EXP_SMALLER -> Commands.CMD_JMPLT;
+			default -> throw new AssertionError("illegal compare type: " + type);
+			};
+		}
+		return new CompareValue(t, this, val, cmp, jmpTrue);
+	}
+	
+	private static boolean constNumCmp(boolean equal, int type, boolean useFirst, SimpleValueConst mc,
+			SimpleValueConst oc) throws AssertionError {
+		if (useFirst) {
+			if (equal) {
+				return mc.getNumber() == oc.getNumber();
+			} else {
+				return mc.getNumber() != oc.getNumber();
 			}
-			
-		};
+		} else {
+			return switch (type) {
+			case EXP_GREATHER -> mc.getNumber() > oc.getNumber();
+			case EXP_GREATHER_EQUAL -> mc.getNumber() >= oc.getNumber();
+			case EXP_SMALLER_EQUAL -> mc.getNumber() <= oc.getNumber();
+			case EXP_SMALLER -> mc.getNumber() < oc.getNumber();
+			default -> throw new AssertionError("illegal compare type: " + type);
+			};
+		}
+	}
+	
+	private static boolean constFPNumCmp(boolean equal, int type, boolean useFirst, SimpleValueConst mc,
+			SimpleValueConst oc) throws AssertionError {
+		if (useFirst) {
+			if (equal) {
+				return mc.getFPNumber() == oc.getFPNumber();
+			} else {
+				return mc.getFPNumber() != oc.getFPNumber();
+			}
+		} else {
+			return switch (type) {
+			case EXP_GREATHER -> mc.getFPNumber() > oc.getFPNumber();
+			case EXP_GREATHER_EQUAL -> mc.getFPNumber() >= oc.getFPNumber();
+			case EXP_SMALLER_EQUAL -> mc.getFPNumber() <= oc.getFPNumber();
+			case EXP_SMALLER -> mc.getFPNumber() < oc.getFPNumber();
+			default -> throw new AssertionError("illegal compare type: " + type);
+			};
+		}
 	}
 	
 	@Override
 	public SimpleValue addExpEq(SimplePool pool, boolean equal, SimpleValue val) {
-		if (t.isStruct() || val.type().isStruct()) {
-			throw new IllegalStateException("structures can not be compared!");
-		}
-		if (t.isArray() || val.type().isArray()) {
-			throw new IllegalStateException("arrays can not be compared!");
-		}
-		if (t == SimpleType.FPNUM ^ val.type() == SimpleType.FPNUM) {
-			if (t == SimpleType.FPNUM) {
-				return addExpEq(pool, equal, val.addExpCast(pool, SimpleType.FPNUM));
-			} else {
-				return addExpCast(pool, SimpleType.FPNUM).addExpEq(pool, equal, val);
-			}
-		}
-		return createCompareValue(equal ? Commands.CMD_JMPEQ : Commands.CMD_JMPNE, val);
+		SimpleType type = findType(t, val.type());
+		return cast(type).compare(val.cast(type), equal, -1, true);
 	}
 	
 	@Override
 	public SimpleValue addExpRel(SimplePool pool, int type, SimpleValue val) {
-		if (t.isStruct() || val.type().isStruct()) {
-			throw new IllegalStateException("structures can not be compared!");
-		}
-		if (t.isArray() || val.type().isArray()) {
-			throw new IllegalStateException("arrays can not be compared!");
-		}
-		if (t == SimpleType.FPNUM ^ val.type() == SimpleType.FPNUM) {
-			if (t == SimpleType.FPNUM) {
-				return addExpCast(pool, SimpleType.FPNUM).addExpRel(pool, type, val);
-			} else {
-				return addExpRel(pool, type, val.addExpCast(pool, SimpleType.FPNUM));
-			}
-		}
-		switch (type) {
-		case EXP_GREATHER:
-			return createCompareValue(Commands.CMD_JMPGT, val);
-		case EXP_GREATHER_EQUAL:
-			return createCompareValue(Commands.CMD_JMPGE, val);
-		case EXP_SMALLER_EQUAL:
-			return createCompareValue(Commands.CMD_JMPLE, val);
-		case EXP_SMALLER:
-			return createCompareValue(Commands.CMD_JMPLT, val);
-		default:
-			throw new InternalError("unknown relative compare type: " + type);
-		}
+		SimpleType stype = findType(t, val.type());
+		return cast(stype).compare(val.cast(stype), false, type, false);
 	}
 	
-	private SimpleValueNoConst createCompareValue(Commands jmp, SimpleValue val) {
-		final SimpleValueNoConst me = this;
-		return new SimpleValueNoConst(SimpleType.NUM) {
-			
-			@Override
-			public long loadValue(int targetRegister, boolean[] blockedRegisters, List <Command> commands, long pos) {
-				me.loadValue(targetRegister, blockedRegisters, commands, pos);
-				RegisterData rd = new RegisterData(targetRegister + 1);
-				pos = findRegister(blockedRegisters, commands, pos, rd, fallbackRegister(targetRegister));
-				val.loadValue(rd.reg, blockedRegisters, commands, pos);
-				Command cmpCmd, jmpPosCmd, mov0Cmd, jmpCmd, mov1Cmd;
-				Param p1, p2;
-				ParamBuilder build = new ParamBuilder();
-				long relative;
-				build.art = A_SR;
-				build.v1 = targetRegister;
-				p1 = build.build();
-				build.art = A_NUM;
-				build.v1 = 1L;
-				p2 = build.build();
-				mov1Cmd = new Command(Commands.CMD_MOV, p1, p2);
-				relative = mov1Cmd.length();
-				build.v1 = 0L;
-				p2 = build.build();
-				mov0Cmd = new Command(Commands.CMD_MOV, p1, p2);
-				build.v1 = relative;
-				p1 = build.build();
-				jmpCmd = new Command(Commands.CMD_JMP, p1, null);
-				relative += mov0Cmd.length() + jmpCmd.length();
-				build.v1 = relative;
-				jmpPosCmd = new Command(jmp, p1, null);
-				pos += relative + jmpPosCmd.length();
-				build.art = A_SR;
-				build.v1 = targetRegister;
-				p1 = build.build();
-				build.v1 = rd.reg;
-				p2 = build.build();
-				cmpCmd = new Command(me.t == SimpleType.FPNUM ? Commands.CMD_CMPFP : Commands.CMD_CMP, p1, p2);
-				pos += cmpCmd.length();
-				commands.add(cmpCmd);
-				commands.add(jmpPosCmd);
-				commands.add(mov0Cmd);
-				commands.add(jmpCmd);
-				commands.add(mov1Cmd);
-				pos = releaseRegister(commands, pos, rd, blockedRegisters);
-				return pos;
-			}
-			
-			@Override
-			public String toString() {
-				switch (jmp) {
-				case CMD_JMPEQ:
-					return "(" + me + " == " + val + ")";
-				case CMD_JMPNE:
-					return "(" + me + " != " + val + ")";
-				case CMD_JMPGT:
-					return "(" + me + " > " + val + ")";
-				case CMD_JMPGE:
-					return "(" + me + " >= " + val + ")";
-				case CMD_JMPLE:
-					return "(" + me + " <= " + val + ")";
-				case CMD_JMPLT:
-					return "(" + me + " < " + val + ")";
-				default:
-					throw new InternalError("unknown jmp command for compare value: " + jmp);
-				}
-			}
-			
+	public SimpleValue shift(int type, SimpleValue val) {
+		if (!t.isPrimitive()) {
+			throw new IllegalArgumentException("illegal shift type: " + t);
+		}
+		switch ((SimpleTypePrimitive) t) {
+		case pt_num, pt_unum, pt_bool, pt_dword, pt_udword, pt_word, pt_uword, pt_ubyte, pt_byte:
+			break;
+		case pt_fpnum, pt_inval:
+			throw new IllegalArgumentException("illegal shift type: " + t);
+		default:
+			throw new AssertionError("unknown type: " + ((SimpleTypePrimitive) t).name());
+		}
+		Commands op = switch (type) {
+		case EXP_SHIFT_LEFT -> Commands.CMD_LSH;
+		case EXP_SHIFT_ARITMETIC_RIGTH -> Commands.CMD_RASH;
+		case EXP_SHIFT_LOGIC_RIGTH -> Commands.CMD_RLSH;
+		default -> throw new AssertionError("illegal type: " + type);
 		};
+		return new SimpleBiOperatorValue(t, this, val, op);
+		
 	}
 	
 	@Override
 	public SimpleValue addExpShift(SimplePool pool, int type, SimpleValue val) {
-		switch (type) {
-		case EXP_SHIFT_LEFT:
-			return new SimpleBiFunctionValue(findType(this, val), Commands.CMD_LSH, this, val);
-		case EXP_SHIFT_ARITMETIC_RIGTH:
-			return new SimpleBiFunctionValue(findType(this, val), Commands.CMD_RASH, this, val);
-		case EXP_SHIFT_LOGIC_RIGTH:
-			return new SimpleBiFunctionValue(findType(this, val), Commands.CMD_RLSH, this, val);
-		default:
-			throw new InternalError("unknown shift type: " + type);
+		SimpleType stype = findType(t, val.type());
+		return cast(stype).shift(type, val.cast(stype));
+	}
+	
+	private SimpleValue add(boolean add, SimpleValue val) {
+		if (!t.isPrimitive() && !t.isPointer()) {
+			throw new IllegalArgumentException("illegal add type: " + t);
+		}
+		if (!val.type().isPrimitive() && !val.type().isPointer()) {
+			throw new IllegalArgumentException("illegal add type: " + val.type());
+		}
+		if (t.isPointer()) {
+			return addPntr(add, this, val);
+		} else {
+			if (val.type().isPointer()) {
+				return addPntr(add, val, this);
+			} else if (t == SimpleType.FPNUM || val.type() == SimpleType.FPNUM) {
+				SimpleValue me   = cast(SimpleType.FPNUM);
+				SimpleValue val0 = val.cast(SimpleType.FPNUM);
+				if (me instanceof SimpleValueConst mc && val0 instanceof SimpleValueConst oc) {
+					double a = mc.getFPNumber();
+					double b = oc.getFPNumber();
+					if (!Double.isNaN(a) && !Double.isNaN(b)) {
+						return new SimpleFPNumberValue(a + b);
+					} // else will cause a runtime error
+				}
+				return new SimpleBiOperatorValue(t, me, val0, Commands.CMD_ADDFP);
+			} else {
+				SimpleTypePrimitive mpt      = (SimpleTypePrimitive) t;
+				SimpleTypePrimitive opt      = (SimpleTypePrimitive) val.type();
+				int                 bits     = Math.max(mpt.bits(), opt.bits());
+				boolean             isSigned = mpt.signed() || opt.signed();
+				SimpleType          type     = SimpleTypePrimitive.get(bits, isSigned);
+				SimpleValue         me       = cast(type);
+				SimpleValue         val0     = val.cast(type);
+				if (me instanceof SimpleValueConst mc && val0 instanceof SimpleValueConst oc) {
+					return new SimpleNumberValue(type, mc.getNumber() + oc.getNumber());
+				}
+				if (isSigned) {
+					return new SimpleBiOperatorValue(t, me, val0, Commands.CMD_ADD);
+				} else {
+					return new SimpleBiOperatorValue(t, me, val0, Commands.CMD_UADD);
+				}
+			}
+		}
+	}
+	
+	private static SimpleValue addPntr(boolean add, SimpleValue pntr, SimpleValue num) {
+		noPntrAndNoFP(num, pntr);
+		boolean     otherSigned = ((SimpleTypePrimitive) num.type()).signed();
+		SimpleValue val0        = otherSigned ? num.cast(SimpleType.NUM) : num.cast(SimpleType.UNUM);
+		Commands    addOp       = addOp(add, otherSigned);
+		long        mul         = ((SimpleTypePointer) pntr.type()).target.byteCount();
+		if (mul <= 1L) {
+			if (mul != 1L) {
+				throw new IllegalArgumentException("pointer targets size is too low: " + mul + " : " + pntr.type());
+			}
+			if (pntr instanceof SimpleValueConst mc && val0 instanceof SimpleValueConst oc) {
+				return new SimpleNumberValue(pntr.type(), mc.getNumber() + oc.getNumber());
+			} else {
+				return new SimpleBiOperatorValue(pntr.type(), pntr, val0, addOp);
+			}
+		} else if (val0 instanceof SimpleValueConst c) {
+			return new SimpleBiOperatorValue(pntr.type(), pntr, new SimpleNumberValue(num.type(), c.getNumber() * mul),
+					addOp);
+		} else {
+			SimpleValue mulVal = new SimpleNumberValue(SimpleType.UNUM, mul);
+			SimpleValue val1;
+			if (otherSigned) {
+				val1 = new SimpleBiOperatorValue(SimpleType.NUM, val0, mulVal, Commands.CMD_MUL);
+			} else {
+				val1 = new SimpleBiOperatorValue(SimpleType.NUM, val0, mulVal, Commands.CMD_UMUL);
+			}
+			return new SimpleBiOperatorValue(pntr.type(), pntr, val1, addOp);
+		}
+	}
+	
+	private static Commands addOp(boolean add, boolean signed) {
+		Commands addOp;
+		if (add) {
+			if (signed) {
+				addOp = Commands.CMD_ADD;
+			} else {
+				addOp = Commands.CMD_UADD;
+			}
+		} else if (signed) {
+			addOp = Commands.CMD_SUB;
+		} else {
+			addOp = Commands.CMD_USUB;
+		}
+		return addOp;
+	}
+	
+	private static void noPntrAndNoFP(SimpleValue val, SimpleValue other) {
+		if (val.type().isPointer()) {
+			throw new IllegalArgumentException("can't add two pointers: " + other + " " + val.type());
+		}
+		if (val.type() == SimpleType.FPNUM) {
+			throw new IllegalArgumentException("can't add a pointers with a fpnum: " + other + " " + val.type());
 		}
 	}
 	
 	@Override
 	public SimpleValue addExpAdd(SimplePool pool, boolean add, SimpleValue val) {
-		if (add) {
-			return new SimpleBiFunctionValue(findType(this, val), Commands.CMD_ADD, this, val);
-		} else {
-			return new SimpleBiFunctionValue(findType(this, val), Commands.CMD_SUB, this, val);
+		return add(add, val);
+	}
+	
+	private SimpleValue mul(int type, SimpleValue val) {
+		if (!t.isPrimitive()) {
+			throw new IllegalArgumentException("can only multiply/divide primitive values: " + t + " " + val.type());
 		}
+		if (this instanceof SimpleValueConst mc && val instanceof SimpleValueConst oc) {
+			SimpleValue res = constMul(type, mc, oc);
+			if (res != null) {
+				return res;
+			} // else will cause a run time error
+		}
+		Commands op = switch (type) {
+		case EXP_MULTIPLY -> {
+			if (t == SimpleType.FPNUM) {
+				yield Commands.CMD_MULFP;
+			} else if (((SimpleTypePrimitive) t).signed()) {
+				yield Commands.CMD_MUL;
+			} else {
+				yield Commands.CMD_UMUL;
+			}
+		}
+		case EXP_MODULO, EXP_DIVIDE -> {
+			if (t == SimpleType.FPNUM) {
+				if (type == EXP_MODULO) {
+					throw new IllegalArgumentException("modulo is not supported for floating point values");
+				}
+				yield Commands.CMD_DIVFP;
+			} else if (((SimpleTypePrimitive) t).signed()) {
+				yield Commands.CMD_DIV;
+			} else {
+				yield Commands.CMD_UDIV;
+			}
+		}
+		default -> throw new InternalError("unknown mul type: " + type);
+		};
+		return new SimpleBiOperatorValue(t, this, val, op, type == EXP_MODULO);
+	}
+
+	private SimpleValue constMul(int type, SimpleValueConst mc, SimpleValueConst oc) throws InternalError {
+		return switch (type) {
+		case EXP_MULTIPLY -> {
+			if (t == SimpleType.FPNUM) {
+				double a = mc.getFPNumber();
+				double b = oc.getFPNumber();
+				if (!Double.isNaN(a) && !Double.isNaN(b)) {
+					yield new SimpleFPNumberValue(a * b);
+				} else {
+					yield null;
+				}
+			} else {
+				yield new SimpleNumberValue(t, mc.getNumber() * oc.getNumber());
+			}
+		}
+		case EXP_MODULO -> {
+			if (t == SimpleType.FPNUM) {
+				throw new IllegalArgumentException("modulo is not supported for floating point values");
+			} else if (((SimpleTypePrimitive) t).signed()) {
+				yield new SimpleNumberValue(t, mc.getNumber() % oc.getNumber());
+			} else {
+				yield new SimpleNumberValue(t, Long.remainderUnsigned(mc.getNumber(), oc.getNumber()));
+			}
+		}
+		case EXP_DIVIDE -> {
+			if (t == SimpleType.FPNUM) {
+				double a = mc.getFPNumber();
+				double b = oc.getFPNumber();
+				if (!Double.isNaN(a) && !Double.isNaN(b)) {
+					yield new SimpleFPNumberValue(a / b);
+				} else {
+					yield null;
+				}
+			} else if (((SimpleTypePrimitive) t).signed()) {
+				yield new SimpleNumberValue(t, mc.getNumber() / oc.getNumber());
+			} else {
+				yield new SimpleNumberValue(t, Long.divideUnsigned(mc.getNumber(), oc.getNumber()));
+			}
+		}
+		default -> throw new InternalError("unknown mul type: " + type);
+		};
 	}
 	
 	@Override
 	public SimpleValue addExpMul(SimplePool pool, int type, SimpleValue val) {
-		switch (type) {
-		case EXP_MULTIPLY:
-			return new SimpleBiFunctionValue(findType(this, val), Commands.CMD_MUL, this, val);
-		case EXP_DIVIDE:
-			return new SimpleBiFunctionValue(findType(this, val), Commands.CMD_DIV, this, val);
-		case EXP_MODULO:
-			return new SimpleBiFunctionValue(findType(this, val), Commands.CMD_DIV, this, val);
-		default:
-			throw new InternalError("unknown mul type: " + type);
-		}
+		SimpleType stype = findType(t, val.type());
+		return cast(stype).mul(type, val.cast(stype));
 	}
 	
 	@Override
 	public SimpleValue addExpCast(SimplePool pool, SimpleType type) {
-		if (type == t) {
-			return this;
-		} else if (t.isStruct() ^ type.isStruct()) {
-			throw new IllegalStateException("can not cast from '" + t + "' to '" + type + "'");
-		} else if (type.isStruct() /* && t.isStruct() */) {
-			if (t.byteCount() == type.byteCount()) {
-				return castedValue(this, type);
-			} else {
-				throw new IllegalStateException("can not cast from '" + t + "' to '" + type + "'");
-			}
-		} else if (type.isPointerOrArray() ^ t.isPointerOrArray()) {
-			if (t == SimpleType.FPNUM || type == SimpleType.FPNUM) {
-				throw new IllegalStateException("can not cast from '" + t + "' to '" + type + "'");
-			} else if (t.isPointerOrArray()) {
-				return createPointerNumberCast(type, true);
-			} else {
-				return createPointerNumberCast(type, false);
-			}
-		} else if (type.isArray() && t.isPointer()) {
-			throw new IllegalStateException("can not cast from '" + t + "' to '" + type + "'");
-		} else if (type.isPointer() && t.isArray()) {
-			throw new IllegalStateException("can not cast from '" + t + "' to '" + type + "'");
-		} else if (type.isArray() /* && t.isArray() */) {
-			return castedValue(this, type);
-		} else if (type.isPointer() /* && t.isPointer() */) {
-			return castedValue(this, type);
-		} else if (t == SimpleType.FPNUM ^ type == SimpleType.FPNUM) {
-			if (t == SimpleType.FPNUM) {
-				return new SimpleUnFunctionValue(type, Commands.CMD_FPTN, this);
-			} else {
-				return new SimpleUnFunctionValue(type, Commands.CMD_NTFP, this);
-			}
-		} else if (t.isPrimitive() && type.isPrimitive()) {
-			return castedValue(this, type);
-		} else {
-			throw new InternalError("unknown cast!");
-		}
-	}
-	
-	private SimpleValueNoConst createPointerNumberCast(SimpleType type, boolean pointerToNumber) {
-		return new SimpleValueNoConst(type) {
-			
-			@Override
-			public long loadValue(int targetRegister, boolean[] blockedRegisters, List <Command> commands, long pos) {
-				pos = SimpleValueNoConst.this.loadValue(targetRegister, blockedRegisters, commands, pos);
-				Command cmpCmd, jmpneCmd, mov0Or_1Cmd;
-				Param p1, p2;
-				ParamBuilder build = new ParamBuilder();
-				build.art = A_SR;
-				build.v1 = targetRegister;
-				p1 = build.build();
-				build.art = A_NUM;
-				if (pointerToNumber) {
-					build.v1 = -1L;
-				} else {
-					build.v1 = 0L;
-				}
-				p2 = build.build();
-				cmpCmd = new Command(Commands.CMD_CMP, p1, p2);
-				pos += cmpCmd.length();
-				if (pointerToNumber) {
-					build.v1 = 0L;
-				} else {
-					build.v1 = -1L;
-				}
-				p2 = build.build();
-				mov0Or_1Cmd = new Command(Commands.CMD_MOV, p1, p2);
-				long mov0Len = mov0Or_1Cmd.length();
-				pos += mov0Len;
-				build.v1 = mov0Len;
-				p1 = build.build();
-				jmpneCmd = new Command(Commands.CMD_JMPNE, p1, null);
-				pos += jmpneCmd.length();
-				commands.add(cmpCmd);
-				commands.add(jmpneCmd);
-				commands.add(mov0Or_1Cmd);
-				return pos;
-			}
-			
-			@Override
-			public String toString() {
-				return "(" + type + ") (" + SimpleValueNoConst.this + ")";
-			}
-			
-		};
-	}
-	
-	private static SimpleValue castedValue(final SimpleValueNoConst value, SimpleType type) {
-		return new SimpleValueNoConst(type) {
-			
-			@Override
-			public long loadValue(int targetRegister, boolean[] blockedRegisters, List <Command> commands, long pos) {
-				return value.loadValue(targetRegister, blockedRegisters, commands, pos);
-			}
-			
-			@Override
-			public String toString() {
-				return "(" + t + ") (" + value.toString() + ")";
-			}
-			
-		};
+		return cast(type);
 	}
 	
 	@Override
 	public SimpleValue addExpUnary(SimplePool pool, int type) {
-		boolean isNumber = t.isPrimitive() || t.isPointer();
-		boolean isNoFPNumber = isNumber && t != SimpleType.FPNUM;
-		switch (type) {
-		case EXP_UNARY_AND:
-			return mkPointer(pool);
-		case EXP_UNARY_BITWISE_NOT:
-			if (isNoFPNumber) {
-				return new SimpleUnFunctionValue(t, Commands.CMD_NOT, this);
+		return switch (type) {
+		case EXP_UNARY_AND -> mkPointer(pool);
+		case EXP_UNARY_BITWISE_NOT -> {
+			if (t.isPrimitive() && t != SimpleType.FPNUM) {
+				yield new SimpleUnOperatorValue(t, this, Commands.CMD_NOT);
 			} else {
-				throw new IllegalStateException("plus/minus only possible on numbers (no fp nums)!");
+				throw new IllegalStateException("bitwise not only possible on numbers (no fp nums)!");
 			}
-		case EXP_UNARY_BOOLEAN_NOT:
-			if ( !isNumber) {
-				throw new IllegalStateException("plus/minus only possible on numbers (and fp nums)!");
-			}
-			return createUnaryBooleanNotValue();
-		case EXP_UNARY_MINUS:
-			if (isNumber) {
-				if (isNoFPNumber) {
-					return new SimpleUnFunctionValue(t, Commands.CMD_NEG, this);
-				} else {
-					return new SimpleBiFunctionValue(t, Commands.CMD_MULFP, this, new SimpleFPNumberValue( -1.0D));
-				}
-			} else {
-				throw new IllegalStateException("plus/minus only possible on numbers (and fp nums)!");
-			}
-		case EXP_UNARY_PLUS:
-			if (isNumber) {
-				return this;
-			} else {
-				throw new IllegalStateException("plus/minus only possible on numbers!");
-			}
-		case EXP_UNARY_NONE:
-			throw new InternalError("unary none is no valid type!");
-		default:
-			throw new InternalError("unknown unary type: " + type);
 		}
+		case EXP_UNARY_BOOLEAN_NOT -> {
+			if (t.isPointer()) { // negative pointers and the zero pointer become false
+				yield new CompareValue(t, this, new SimpleNumberValue(t, 0L), Commands.CMD_CMP, Commands.CMD_JMPLE);
+			} else if (!t.isPrimitive()) {
+				throw new IllegalStateException(
+						"logical (non bitwise) not only possible on numbers (and fp nums) and pointers!");
+			} else if (t == SimpleType.FPNUM) {
+				yield new CompareValue(t, this, new SimpleFPNumberValue(0.0D), Commands.CMD_CMPFP, Commands.CMD_JMPEQ);
+			} else {
+				// singed and bit count does not matter here
+				yield new CompareValue(t, this, new SimpleNumberValue(t, 0L), Commands.CMD_CMP, Commands.CMD_JMPEQ);
+			}
+		}
+		case EXP_UNARY_MINUS -> {
+			if (!t.isPrimitive()) {
+				throw new IllegalStateException("unary plus/minus only possible on numbers (and fp nums)!");
+			} else if (t == SimpleType.FPNUM) {
+				yield new SimpleUnOperatorValue(t, this, Commands.CMD_NEGFP);
+			} else {
+				yield new SimpleUnOperatorValue(t, this, Commands.CMD_NEG);
+			}
+		}
+		case EXP_UNARY_PLUS -> {
+			if (t.isPrimitive()) {
+				yield this;
+			} else {
+				throw new IllegalStateException("unary plus/minus only possible on numbers (and fp nums)!");
+			}
+		}
+		case EXP_UNARY_NONE -> throw new InternalError("unary none is no valid type!");
+		default -> throw new InternalError("unknown unary type: " + type);
+		};
 	}
 	
 	protected SimpleValue mkPointer(SimplePool pool) {
 		throw new IllegalStateException("can not make a pointer to this value (this: " + this + ")");
 	}
 	
-	private SimpleValueNoConst createUnaryBooleanNotValue() {
-		return new SimpleValueNoConst(SimpleType.NUM) {
-			
-			@Override
-			public long loadValue(int targetRegister, boolean[] blockedRegisters, List <Command> commands, long pos) {
-				pos = SimpleValueNoConst.this.loadValue(targetRegister, blockedRegisters, commands, pos);
-				Command cmpCmd, jmpneCmd, mov0Cmd, jmpCmd, mov1Cmd;
-				Param p1, p2;
-				ParamBuilder build = new ParamBuilder();
-				build.art = A_SR;
-				build.v1 = targetRegister;
-				p1 = build.build();
-				build.art = A_NUM;
-				build.v1 = 1;
-				p2 = build.build();
-				mov1Cmd = new Command(Commands.CMD_MOV, p1, p2);
-				long cmdLen = mov1Cmd.length();
-				pos += cmdLen;
-				long relative = cmdLen;
-				build.art = A_NUM;
-				build.v1 = relative;
-				p1 = build.build();
-				jmpCmd = new Command(Commands.CMD_JMP, p1, null);
-				cmdLen = jmpCmd.length();
-				pos += cmdLen;
-				relative += cmdLen;
-				build.art = A_SR;
-				build.v1 = targetRegister;
-				p1 = build.build();
-				build.art = A_NUM;
-				build.v1 = 0;
-				p2 = build.build();
-				mov0Cmd = new Command(Commands.CMD_MOV, p1, p2);
-				cmdLen = mov0Cmd.length();
-				pos += cmdLen;
-				relative += cmdLen;
-				build.art = A_NUM;
-				build.v1 = relative;
-				p1 = build.build();
-				jmpneCmd = new Command(Commands.CMD_JMPNE, p1, null);
-				cmdLen = jmpneCmd.length();
-				pos += cmdLen;
-				build.art = A_SR;
-				build.v1 = targetRegister;
-				p1 = build.build();
-				build.art = A_NUM;
-				Commands cmd = Commands.CMD_CMP;
-				if (SimpleValueNoConst.this.t == SimpleType.FPNUM) {
-					build.v1 = Double.doubleToRawLongBits(0.0D);
-					cmd = Commands.CMD_CMPFP;
-				} else if (SimpleValueNoConst.this.t.isPointer()) {
-					build.v1 = -1L;
-				} else {
-					build.v1 = 0L;
-				}
-				p2 = build.build();
-				cmpCmd = new Command(cmd, p1, p2);
-				cmdLen = cmpCmd.length();
-				pos += cmdLen;
-				commands.add(cmpCmd);
-				commands.add(jmpneCmd);
-				commands.add(mov0Cmd);
-				commands.add(jmpCmd);
-				commands.add(mov1Cmd);
-				return pos;
-			}
-			
-			@Override
-			public String toString() {
-				return "!(" + SimpleValueNoConst.this + ')';
-			}
-			
-		};
-	}
+	// TODO continue here
 	
 	@Override
 	public SimpleValue addExpDerefPointer(SimplePool pool) {
-		if ( !t.isPointer()) {
+		if (!t.isPointer()) {
 			throw new IllegalStateException("only a pointer can be dereferenced! (me: " + this + ")");
 		}
-		SimpleType target = ((SimpleTypePointer) t).target;
-		if (target == SimpleTypePrimitive.pt_inval) {
+		SimpleType targetType = ((SimpleTypePointer) t).target;
+		if (targetType == SimpleTypePrimitive.pt_inval) {
 			throw new IllegalStateException("this pointer has no valid target type! (me: " + this + ")");
 		}
-		if (target.isStruct() || target.isArray()) {
-			return castedValue(this, target);
+		if (targetType.isStruct() || targetType.isArray()) {
+			return new CastedNoConstValue(targetType, this);
 		}
 		final SimpleValueNoConst me = this;
-		return new SimpleValueNoConst(target) {
+		return new SimpleValueNoConst(targetType) {
 			
 			@Override
-			public long loadValue(int targetRegister, boolean[] blockedRegisters, List <Command> commands, long pos) {
+			public long loadValue(int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos) {
 				pos = me.loadValue(targetRegister, blockedRegisters, commands, pos);
-				Param p1, p2;
+				Param        p1, p2;
 				ParamBuilder build = new ParamBuilder();
 				build.art = A_SR;
 				build.v1 = targetRegister;
@@ -581,7 +955,7 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 	
 	@Override
 	public SimpleValue addExpArrayRef(SimplePool pool, final SimpleValue val) {
-		if ( !t.isPointerOrArray()) {
+		if (!t.isPointerOrArray()) {
 			throw new IllegalStateException("only a pointer and array can be indexed! (me: " + this + ")[" + val + "]");
 		}
 		if (val.type().isStruct()) {
@@ -595,17 +969,18 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		}
 		SimpleType target = ((SimpleTypePointer) t).target;
 		if (target == SimpleTypePrimitive.pt_inval) {
-			throw new IllegalStateException("this pointer/array has no valid target type! (me: " + this + ")[" + val + "]");
+			throw new IllegalStateException(
+					"this pointer/array has no valid target type! (me: " + this + ")[" + val + "]");
 		}
 		final SimpleValueNoConst me = this;
 		return new SimpleValueNoConst(target) {
 			
 			@Override
-			public long loadValue(int targetRegister, boolean[] blockedRegisters, List <Command> commands, long pos) {
+			public long loadValue(int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos) {
 				pos = me.loadValue(targetRegister, blockedRegisters, commands, pos);
-				Param p1, p2;
+				Param        p1, p2;
 				ParamBuilder build = new ParamBuilder();
-				RegisterData rd = null;
+				RegisterData rd    = null;
 				build.art = A_SR;
 				build.v1 = targetRegister;
 				p1 = build.build();
@@ -636,11 +1011,11 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		};
 	}
 	
-	public static long addMovCmd(SimpleType type, List <Command> commands, long pos, Param param1, Param param2) {
-		int bits = 64;
-		boolean signed = true;
-		Commands mov = Commands.CMD_MOV;
-		Command bcpCmd = null, jmpnbCmd = null, orCmd = null, jmpCmd = null, andCmd = null;
+	public static long addMovCmd(SimpleType type, List<Command> commands, long pos, Param param1, Param param2) {
+		int      bits   = 64;
+		boolean  signed = true;
+		Commands mov    = Commands.CMD_MOV;
+		Command  bcpCmd = null, jmpnbCmd = null, orCmd = null, jmpCmd = null, andCmd = null;
 		// only cmpCmd and andCmd when not signed
 		if (type.isPrimitive()) {
 			bits = ((SimpleTypePrimitive) type).bits();
@@ -707,11 +1082,11 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 	
 	@Override
 	public SimpleValue addExpNameRef(SimplePool pool, String text) {
-		if ( !t.isStruct()) {
+		if (!t.isStruct()) {
 			throw new IllegalStateException("name referencing is only possible on files!");
 		}
 		SimpleVariable target = null;
-		int off = 0;
+		int            off    = 0;
 		if (t.isFunc()) {
 			SimpleFuncType func = (SimpleFuncType) t;
 			for (SimpleVariable sv : func.arguments) {
@@ -742,16 +1117,17 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 			}
 		}
 		if (target == null) {
-			throw new IllegalStateException("this structure does not has a member with the name '" + text + "' ((func-)struct: " + t + ") (me: " + this + ")");
+			throw new IllegalStateException("this structure does not has a member with the name '" + text
+					+ "' ((func-)struct: " + t + ") (me: " + this + ")");
 		}
-		final int offset = off;
-		final SimpleValueNoConst me = this;
+		final int                offset = off;
+		final SimpleValueNoConst me     = this;
 		return new SimpleValueNoConst(target.type) {
 			
 			@Override
-			public long loadValue(int targetRegister, boolean[] blockedRegisters, List <Command> commands, long pos) {
+			public long loadValue(int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos) {
 				pos = me.loadValue(targetRegister, blockedRegisters, commands, pos);
-				Param p1, p2;
+				Param        p1, p2;
 				ParamBuilder build = new ParamBuilder();
 				build.art = A_SR;
 				build.v1 = targetRegister;
@@ -783,51 +1159,68 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 	@Override
 	public abstract String toString();
 	
+	/**
+	 * just invokes {@link #findType(SimpleType, SimpleType)} with the types of the two values
+	 * 
+	 * @param val  the first value
+	 * @param val2 the second value
+	 * 
+	 * @return the type which is most compatible to both arguments
+	 */
 	private static SimpleType findType(SimpleValue val, SimpleValue val2) {
 		return findType(val.type(), val2.type());
 	}
 	
+	/**
+	 * returns the type, which is at most compatible with both types. <br>
+	 * note that if the given types are not compatible, this method is allowed to return a type, which is only
+	 * compatible to one of the two argument
+	 * 
+	 * @param st1 the first type
+	 * @param st2 the second type
+	 * 
+	 * @return the type which is most compatible to both arguments
+	 */
 	private static SimpleType findType(SimpleType st1, SimpleType st2) {
 		if (st1.equals(st2)) {
-			return st1;
+			return st2;
 		} else if (st1 == SimpleType.FPNUM || st2 == SimpleType.FPNUM) {
 			return SimpleType.FPNUM;
-		} else if (st1.isStruct() || st2.isStruct()) {
-			throw new IllegalStateException("there is no fallback type for a structures with a diffrent type");
+		} else if (st1.isStruct() || st2.isStruct() || st1.isFunc() || st2.isFunc()) {
+			throw new IllegalStateException("there is no fallback type for a (func-)structs with a diffrent type");
 		} else if (st1.isPointerOrArray() && st2.isPointerOrArray()) {
 			SimpleType t;
 			try {
-				t = findType( ((SimpleTypePointer) st1).target, ((SimpleTypePointer) st2).target);
+				t = findType(((SimpleTypePointer) st1).target, ((SimpleTypePointer) st2).target);
 			} catch (IllegalStateException e) {
 				t = SimpleTypePrimitive.pt_inval;
 			}
 			return new SimpleTypePointer(t);
 		} else if (st1.isPointerOrArray() || st2.isPointerOrArray()) {
 			return SimpleType.NUM;
-		} else {
-			assert st1.isPrimitive();
-			assert st2.isPrimitive();
+		} else if (st1.isPrimitive() && st2.isPrimitive()) {
 			assert st1 != SimpleTypePrimitive.pt_inval;
 			assert st2 != SimpleTypePrimitive.pt_inval;
-			SimpleTypePrimitive pt1 = (SimpleTypePrimitive) st1,
-				pt2 = (SimpleTypePrimitive) st2;
-			boolean signed = pt1.signed() || pt2.signed();
-			int bits = Math.max(pt1.bits(), pt2.bits());
+			SimpleTypePrimitive pt1    = (SimpleTypePrimitive) st1, pt2 = (SimpleTypePrimitive) st2;
+			boolean             signed = pt1.signed() || pt2.signed();
+			int                 bits   = Math.max(pt1.bits(), pt2.bits());
 			return SimpleTypePrimitive.get(bits, signed);
+		} else {
+			throw new InternalError(
+					"unknown Simple types: " + st1.getClass() + " " + st2.getClass() + "  " + st1 + " " + st2);
 		}
 	}
 	
 	public static class SimpleConditionalValue extends SimpleValueNoConst {
 		
-		private static long JMP_LEN = 16L;
 		static {
 			Command jmpeqCmd = new Command(Commands.CMD_JMPEQ, Param.createLabel("label"), null);
-			long jmpeqLen = jmpeqCmd.length();
+			long    jmpeqLen = jmpeqCmd.length();
 			if (JMP_LEN != jmpeqLen) {
 				throw new AssertionError();
 			}
 			Command jmpCmd = new Command(Commands.CMD_JMP, Param.createLabel("label"), null);
-			long jmpLen = jmpCmd.length();
+			long    jmpLen = jmpCmd.length();
 			if (JMP_LEN != jmpLen) {
 				throw new AssertionError();
 			}
@@ -845,9 +1238,9 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		}
 		
 		@Override
-		public long loadValue(int targetRegister, boolean[] blockedRegisters, List <Command> commands, long pos) {
+		public long loadValue(int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos) {
 			pos = condition.loadValue(targetRegister, blockedRegisters, commands, pos);
-			Param p1, p2;
+			Param        p1, p2;
 			ParamBuilder build = new ParamBuilder();
 			build.art = A_SR;
 			build.v1 = targetRegister;
@@ -859,9 +1252,9 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 			pos += addCmd.length();
 			commands.add(addCmd);
 			pos += JMP_LEN;
-			List <Command> sub = newList();
+			List<Command> sub = newList();
 			blockedRegisters[targetRegister] = false;
-			long np = positive.loadValue(targetRegister, blockedRegisters, commands, pos);
+			long np       = positive.loadValue(targetRegister, blockedRegisters, commands, pos);
 			long relative = np + JMP_LEN - pos;
 			pos = np + JMP_LEN;
 			build.art = A_NUM;
@@ -888,104 +1281,30 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		
 	}
 	
-	protected List <Command> newList() {
-		return new LinkedList <>();
+	@SuppressWarnings("static-method")
+	protected List<Command> newList() {
+		return new LinkedList<>();
 	}
 	
-	private void checkNumber(SimpleValue val) {
-		if (t.isStruct() || val.type().isStruct()) {
-			throw new IllegalStateException("a structure is no number!");
+	private void checkAnyNumber(SimpleValue val) {
+		if (!t.isPrimitive()) {
+			throw new IllegalStateException("can't cast implicitly from " + t + " to an number");
 		}
-		if (t.isArray() || val.type().isArray()) {
-			throw new IllegalStateException("an arrays is no number!");
+		if (!val.type().isPrimitive()) {
+			throw new IllegalStateException("can't cast implicitly from " + t + " to an number");
 		}
 	}
 	
-	public static class SimpleUnFunctionValue extends SimpleValueNoConst {
-		
-		private final Commands    cmd;
-		private final SimpleValue param1;
-		
-		public SimpleUnFunctionValue(SimpleType type, Commands cmd, SimpleValue param1) {
-			super(type);
-			this.cmd = cmd;
-			this.param1 = param1;
-		}
-		
-		@Override
-		public long loadValue(int targetRegister, boolean[] blockedRegisters, List <Command> commands, long pos) {
-			pos = param1.loadValue(targetRegister, blockedRegisters, commands, pos);
-			Param p1;
-			ParamBuilder build = new ParamBuilder();
-			build.art = A_SR;
-			build.v1 = targetRegister;
-			p1 = build.build();
-			Command addCmd = new Command(cmd, p1, null);
-			pos += addCmd.length();
-			commands.add(addCmd);
-			return pos;
-		}
-		
-		@Override
-		public String toString() {
-			return cmd + " (" + param1 + ')';
-		}
-		
-	}
-	
-	public static class SimpleBiFunctionValue extends SimpleValueNoConst {
-		
-		private final Commands    cmd;
-		private final SimpleValue param1;
-		private final SimpleValue param2;
-		private final boolean     p2IsTarget;
-		
-		public SimpleBiFunctionValue(SimpleType type, Commands cmd, SimpleValue p1, SimpleValue p2) {
-			this(type, cmd, p1, p2, false);
-		}
-		
-		public SimpleBiFunctionValue(SimpleType type, Commands cmd, SimpleValue p1, SimpleValue p2, boolean p2IsTarget) {
-			super(type);
-			this.cmd = cmd;
-			this.param1 = p1;
-			this.param2 = p2;
-			this.p2IsTarget = p2IsTarget;
-		}
-		
-		@Override
-		public long loadValue(int targetRegister, boolean[] blockedRegisters, List <Command> commands, long pos) {
-			RegisterData rdp2 = new RegisterData(targetRegister + 1);
-			pos = findRegister(blockedRegisters, commands, pos, rdp2, fallbackRegister(targetRegister));
-			Param p1, p2;
-			ParamBuilder build = new ParamBuilder();
-			build.art = A_SR;
-			if (p2IsTarget) {
-				param2.loadValue(targetRegister, blockedRegisters, commands, pos);
-				param1.loadValue(rdp2.reg, blockedRegisters, commands, pos);
-				build.v1 = targetRegister;
-				p1 = build.build();
-				build.v1 = rdp2.reg;
-				p2 = build.build();
-			} else {
-				param1.loadValue(targetRegister, blockedRegisters, commands, pos);
-				param2.loadValue(rdp2.reg, blockedRegisters, commands, pos);
-				build.v1 = rdp2.reg;
-				p1 = build.build();
-				build.v1 = targetRegister;
-				p2 = build.build();
+	private void checkNumber(SimpleValue val, boolean allowFP) {
+		checkAnyNumber(val);
+		if (!allowFP) {
+			if (t == SimpleType.FPNUM) {
+				throw new IllegalStateException("can't cast implicitly from fpnum to no fp-number");
 			}
-			Command addCmd = new Command(cmd, p1, p2);
-			pos += addCmd.length();
-			commands.add(addCmd);
-			pos = releaseRegister(commands, pos, rdp2, blockedRegisters);
-			return pos;
+			if (val.type() == SimpleType.FPNUM) {
+				throw new IllegalStateException("can't cast implicitly from fpnum to no fp-number");
+			}
 		}
-		
-		@Override
-		public String toString() {
-			return cmd.toString() + " (" + param1 + "), (" + param2 + ")";
-		}
-		
 	}
 	
 	public static class RegisterData {
@@ -1009,11 +1328,12 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		}
 	}
 	
-	private static long findRegister(boolean[] blockedRegisters, List <Command> commands, long pos, RegisterData rd, int fallback) {
+	private static long findRegister(boolean[] blockedRegisters, List<Command> commands, long pos, RegisterData rd,
+			int fallback) {
 		int startRegister = rd.reg;
-		for (; rd.reg < 256 && blockedRegisters[rd.reg]; rd.reg ++ );
+		for (; rd.reg < 256 && blockedRegisters[rd.reg]; rd.reg++);
 		if (rd.reg >= 256) {
-			for (rd.reg = MIN_REGISTER; blockedRegisters[rd.reg] && rd.reg < startRegister; rd.reg ++ );
+			for (rd.reg = MIN_REGISTER; blockedRegisters[rd.reg] && rd.reg < startRegister; rd.reg++);
 			if (rd.reg >= startRegister) {
 				rd.pushPop = true;
 				blockedRegisters[fallback] = false;
@@ -1021,7 +1341,7 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 				ParamBuilder build = new ParamBuilder();
 				build.art = A_SR;
 				build.v1 = rd.reg;
-				Param p1 = build.build();
+				Param   p1     = build.build();
 				Command addCmd = new Command(Commands.CMD_PUSH, p1, null);
 				commands.add(addCmd);
 				pos += addCmd.length();
@@ -1030,13 +1350,13 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		return pos;
 	}
 	
-	private static long releaseRegister(List <Command> commands, long pos, RegisterData rd, boolean[] blockedRegisters) {
+	private static long releaseRegister(List<Command> commands, long pos, RegisterData rd, boolean[] blockedRegisters) {
 		if (rd.pushPop) {
 			blockedRegisters[rd.reg] = true;
 			ParamBuilder build = new ParamBuilder();
 			build.art = A_SR;
 			build.v1 = rd.reg;
-			Param p1 = build.build();
+			Param   p1     = build.build();
 			Command addCmd = new Command(Commands.CMD_POP, p1, null);
 			commands.add(addCmd);
 			pos += addCmd.length();
