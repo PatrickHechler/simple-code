@@ -2,16 +2,16 @@ package de.hechler.patrick.codesprachen.simple.compile.objects.commands;
 
 import de.hechler.patrick.codesprachen.simple.compile.objects.SimplePool;
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleValue;
-import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleVariable;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleVariable.SimpleFunctionVariable;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleType;
 
-public class SimpleCommandVarDecl extends SimpleVariable implements SimpleCommand {
+public class SimpleCommandVarDecl extends SimpleFunctionVariable implements SimpleCommand {
 	
 	public final SimplePool pool;
 	public SimpleValue      init = null;
 	
 	public SimpleCommandVarDecl(SimplePool pool, SimpleType type, String name) {
-		super(type, name, false);
+		super(type, name);
 		this.pool = pool;
 	}
 	

@@ -66,7 +66,7 @@ import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCom
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleValue;
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleValueDataPointer;
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleValueNoConst;
-import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleVariableValue;
+import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleDirectVariableValue;
 import de.hechler.patrick.pfs.exception.ElementLockedException;
 import de.hechler.patrick.pfs.interfaces.PatrFile;
 import de.hechler.patrick.pfs.utils.PatrFileSysConstants;
@@ -796,8 +796,8 @@ public class SimpleCompiler implements TriFunction<String, String, String, Simpl
 	
 	private void compileAssignCommand(CompileTarget target, SimpleFunction sf, boolean[] regs,
 			SimpleCommandAssign assignCmd) {
-		if (assignCmd.target.type().isPrimitive()) if (assignCmd.target instanceof SimpleVariableValue) {
-			assignVariable(target, sf, regs, ((SimpleVariableValue) assignCmd.target).sv, assignCmd.value);
+		if (assignCmd.target.type().isPrimitive()) if (assignCmd.target instanceof SimpleDirectVariableValue) {
+			assignVariable(target, sf, regs, ((SimpleDirectVariableValue) assignCmd.target).sv, assignCmd.value);
 		} else {
 			int         r1 = register(regs, MAX_COMPILER_REGISTER + 1);
 			boolean     o1 = makeRegUsable(regs, r1, sf.cmds, target);

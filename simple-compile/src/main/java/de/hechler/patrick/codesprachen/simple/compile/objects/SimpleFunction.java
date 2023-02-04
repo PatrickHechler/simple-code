@@ -5,12 +5,11 @@ import java.util.List;
 import de.hechler.patrick.codesprachen.primitive.assemble.objects.Command;
 import de.hechler.patrick.codesprachen.simple.compile.objects.SimpleFile.SimpleFuncPool;
 import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommandBlock;
-import de.hechler.patrick.codesprachen.simple.symbol.interfaces.SimpleExportable;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleFunctionSymbol;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleVariable;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleFuncType;
 
-public class SimpleFunction extends SimpleFunctionSymbol implements SimpleExportable {
+public class SimpleFunction extends SimpleFunctionSymbol {
 	
 	public boolean                  addrVars;
 	public int                      regVars = -1;

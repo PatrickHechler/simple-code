@@ -30,6 +30,9 @@ public interface SimpleValue {
 	public static final int EXP_UNARY_AND             = 14;
 	public static final int EXP_UNARY_BITWISE_NOT     = 15;
 	public static final int EXP_UNARY_BOOLEAN_NOT     = 16;
+
+	public static final SimpleValue ZERO = new SimpleNumberValue(SimpleType.NUM, 0L);
+	public static final SimpleValue ONE = new SimpleNumberValue(SimpleType.NUM, 1L);
 	
 	/**
 	 * adds a command sequence which loads the runtime value of this {@link SimpleValue} to the

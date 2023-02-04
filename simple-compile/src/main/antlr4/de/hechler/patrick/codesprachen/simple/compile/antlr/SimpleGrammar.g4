@@ -486,8 +486,8 @@ typePrim returns [SimpleType t]:
 ;
 
 typeStruct [SimplePool pool] returns [SimpleStructType t]:
-	STRUCT NAME
-	{$t = pool.getStructure($NAME.getText());}
+	STRUCT t1 = NAME ( COLON t2 = NAME )?
+	{$t = pool.getStructure($t1.getText(), $t2.getText());}
 ;
 
 typeFunc [SimplePool pool] returns [SimpleType t]:
@@ -498,6 +498,9 @@ typeFunc [SimplePool pool] returns [SimpleType t]:
 		{results = $res.list;}
 	)?
 	{$t = new SimpleFuncType($args.list, results);}
+	|
+	FUNC t1 = NAME ( COLON t2 = NAME )?
+	{$t = pool.getFuncType($t1.getText(), $t2.getText());}
 ;
 
 namedTypeList [SimplePool pool] returns [List<SimpleVariable> list]:

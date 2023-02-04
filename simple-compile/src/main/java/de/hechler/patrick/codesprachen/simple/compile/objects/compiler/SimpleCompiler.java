@@ -39,14 +39,15 @@ import de.hechler.patrick.zeugs.pfs.interfaces.File;
 public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 	
 	// X00 .. X0F are reserved for interrupts and asm blocks
-	// X10 .. X1F are reserved for special compiler registers
-	// X20 .. XCF are reserved for variables
+	// X10 .. X2F are reserved for special compiler registers
+	// X30 .. X2F are reserved for variables (there are not variable registers
+	// supported yet)
 	// XD0 .. XF9 are reserved for temporary values
 	public static final int MIN_COMPILER_REGISTER = X_ADD + 0x10;
 	public static final int REG_METHOD_STRUCT     = MIN_COMPILER_REGISTER;
 	public static final int REG_VAR_PNTR          = X_ADD + 0x11;
-	public static final int MIN_VAR_REGISTER      = X_ADD + 0x20;
-	public static final int MAX_VAR_REGISTER      = X_ADD + 0xCF;
+	public static final int MIN_VAR_REGISTER      = X_ADD + 0x30;
+	public static final int MAX_VAR_REGISTER      = X_ADD + 0x2F;
 	public static final int MIN_TMP_VAL_REG       = MAX_VAR_REGISTER + 1;
 	
 	public static final Map<String, SimpleConstant> DEFAULT_CONSTANTS;
@@ -69,7 +70,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 	private final Path[]  lockups;
 	
 	public SimpleCompiler(Charset cs, Path srcRoot, Path[] lockups) {
-		this.cs = cs;
+		this.cs      = cs;
 		this.srcRoot = srcRoot;
 		this.lockups = lockups.clone();
 	}
@@ -88,7 +89,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 			CommonTokenStream   toks   = new CommonTokenStream(lexer);
 			SimpleGrammarParser parser = new SimpleGrammarParser(toks);
 			parser.setErrorHandler(new BailErrorStrategy());
-			tu.sf = new SimpleFile(tu);
+			tu.sf      = new SimpleFile(tu);
 			tu.context = parser.simpleFile(tu.sf);
 		}
 	}
@@ -124,14 +125,10 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		@Override
 		public SimpleExportable get(String name) {
 			SimpleTU stu = SimpleCompiler.super.tus.get(dependency);
-			if (stu == null) {
-				throw new NoSuchElementException(
-						"the dependency " + depend + ": '" + dependency + "' could not be found");
-			}
+			if (stu == null) { throw new NoSuchElementException("the dependency " + depend + ": '" + dependency + "' could not be found"); }
 			SimpleNameable named = stu.named.get(name);
 			if (!(named instanceof SimpleExportable se) || !se.isExport()) {
-				throw new NoSuchElementException(
-						"the dependency " + depend + ": does not export anything with the given " + name);
+				throw new NoSuchElementException("the dependency " + depend + ": does not export anything with the given " + name);
 			}
 			return se;
 		}
@@ -145,6 +142,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		public boolean equals(Object obj) {
 			return super.equals(obj);
 		}
+		
 	}
 	
 	public static class SimpleSymbolDependency extends SimpleDependency {
@@ -216,20 +214,16 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 						break;
 					}
 				}
-				if (res == null) {
-					throw new NoSuchElementException(
-							"could not find the dependency " + name + "; '" + compileDepend + "'");
-				}
+				if (res == null) { throw new NoSuchElementException("could not find the dependency " + name + "; '" + compileDepend + "'"); }
 			}
-			if (named.put(name, res) != null) {
-				throw new IllegalStateException("the name " + name + " is already used!");
-			}
+			if (named.put(name, res) != null) { throw new IllegalStateException("the name " + name + " is already used!"); }
 			return res;
 		}
 		
 	}
 	
-	// this is used by antlr, can't be done in the SimpleConstant class because the SimpleValue class is not known there
+	// this is used by antlr, can't be done in the SimpleConstant class because the
+	// SimpleValue class is not known there
 	/**
 	 * creates a new {@link SimpleConstant}
 	 * 
@@ -240,16 +234,12 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 	 * @return the newly created constant
 	 */
 	public static SimpleConstant createConstant(String name, SimpleValue val, boolean export) {
-		if (!(val instanceof SimpleValueConst c)) {
-			throw new IllegalArgumentException("a constant needs a constant value (val: " + val + ')');
-		}
+		if (!(val instanceof SimpleValueConst c)) { throw new IllegalArgumentException("a constant needs a constant value (val: " + val + ')'); }
 		return new SimpleConstant(name, c.getNumber(), export);
 	}
 	
 	public static SimpleType createArray(SimpleType t, SimpleValue val) {
-		if (val == null) {
-			return new SimpleTypeArray(t, -1L);
-		}
+		if (val == null) { return new SimpleTypeArray(t, -1L); }
 		if (!(val instanceof SimpleValueConst c)) {
 			throw new IllegalArgumentException("the length of an array needs to be constant (val: " + val + ')');
 		}
