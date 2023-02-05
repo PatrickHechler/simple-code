@@ -19,4 +19,3 @@ public class UsedData implements Cloneable {
 	}
 	
 }
-

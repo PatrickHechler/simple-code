@@ -5,6 +5,7 @@ import java.util.List;
 import de.hechler.patrick.codesprachen.primitive.assemble.objects.Command;
 import de.hechler.patrick.codesprachen.simple.compile.objects.SimplePool;
 import de.hechler.patrick.codesprachen.simple.compile.objects.compiler.SimpleCompiler;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleVariable.SimpleFunctionVariable;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleType;
 
 public interface SimpleValue {
@@ -13,6 +14,7 @@ public interface SimpleValue {
 	 * the minimum register number which is allowed to be used when a value should load its value to a register
 	 */
 	public static final int MIN_REGISTER = SimpleCompiler.MIN_TMP_VAL_REG;
+	public static final int MAX_REGISTER = SimpleCompiler.MIN_TMP_VAL_REG;
 	
 	public static final int EXP_MULTIPLY              = 1;
 	public static final int EXP_DIVIDE                = 2;
@@ -33,6 +35,47 @@ public interface SimpleValue {
 
 	public static final SimpleValue ZERO = new SimpleNumberValue(SimpleType.NUM, 0L);
 	public static final SimpleValue ONE = new SimpleNumberValue(SimpleType.NUM, 1L);
+	
+	public static interface VarLoader {
+		
+		long loadVar(long pos, int targetRegister, List<Command> commands, SimpleFunctionVariable sv);
+		
+		long loadVarPntr(long pos, int targetRegister, List<Command> commands, SimpleFunctionVariable sv);
+		
+	}
+	
+	public static class StackUseListener {
+		
+		private boolean allowed = false;
+		
+		private long size = 0;
+		
+		public void setForbidden() {
+			allowed = true;
+		}
+		
+		public long size() {
+			return size;
+		}
+		
+		public void grow(long value) {
+			if (!allowed) {
+				throw new IllegalStateException("stack grow is forbidden!");
+			}
+			if (value <= 0L) {
+				throw new AssertionError(value);
+			}
+			size += value;
+		}
+		
+		public void shrink(long value) {
+			if (value <= 0L) {
+				throw new AssertionError(value);
+			}
+			size -= value;
+		}
+		
+	}
 	
 	/**
 	 * adds a command sequence which loads the runtime value of this {@link SimpleValue} to the
@@ -62,7 +105,7 @@ public interface SimpleValue {
 	 * @param commands         the list of commands, where the commands should be added
 	 * @param pos              the current length of current the binary in bytes
 	 */
-	long loadValue(int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos);
+	long loadValue(int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader, StackUseListener sul);
 	
 	SimpleType type();
 	
@@ -101,5 +144,7 @@ public interface SimpleValue {
 	SimpleValue addExpNameRef(SimplePool pool, String text);
 	
 	SimpleValue cast(SimpleType t);
+
+	SimpleValue mkPointer(SimplePool pool);
 	
 }

@@ -19,6 +19,7 @@ import de.hechler.patrick.codesprachen.simple.compile.objects.commands.*;
 import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommandAsm.*;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.*;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.*;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleVariable.SimpleOffsetVariable;
 }
 
 @parser::members {
@@ -100,7 +101,7 @@ dependency returns [String name, String depend, String runtime]:
 	)?
 	SEMI
 ;
-variable [SimplePool pool] returns [SimpleVariable vari]:
+variable [SimplePool pool] returns [SimpleOffsetVariable vari]:
 	{boolean export = false;}
 	VAR
 	(
@@ -108,7 +109,7 @@ variable [SimplePool pool] returns [SimpleVariable vari]:
 		{export = true;}
 	)?
 	type [pool] NAME SEMI
-	{$vari = new SimpleVariable($type.t, $NAME.getText(), export);}
+	{$vari = new SimpleOffsetVariable($type.t, $NAME.getText(), export);}
 ;
 structure [SimplePool pool] returns [SimpleStructType struct]:
 	STRUCT
@@ -123,7 +124,7 @@ structure [SimplePool pool] returns [SimpleStructType struct]:
 ;
 function [SimpleFile file] returns [SimpleFunction func]:
 	{
-		List<SimpleVariable> results = null;
+		List<SimpleOffsetVariable> results = null;
 		boolean export = false;
 		boolean main = false;
 	}
@@ -491,7 +492,7 @@ typeStruct [SimplePool pool] returns [SimpleStructType t]:
 ;
 
 typeFunc [SimplePool pool] returns [SimpleType t]:
-	{List<SimpleVariable> results = null;}
+	{List<SimpleOffsetVariable> results = null;}
 	OPEN_SMALL_BLOCK args = namedTypeList [pool] CLOSE_SMALL_BLOCK
 	(
 		ARROW_RIGTH SMALLER res = namedTypeList [pool] GREATHER
@@ -503,14 +504,14 @@ typeFunc [SimplePool pool] returns [SimpleType t]:
 	{$t = pool.getFuncType($t1.getText(), $t2.getText());}
 ;
 
-namedTypeList [SimplePool pool] returns [List<SimpleVariable> list]:
+namedTypeList [SimplePool pool] returns [List<SimpleOffsetVariable> list]:
 	{$list = new ArrayList<>();}
 	(
 		ft = type [pool] fn =  NAME
-		{$list.add(new SimpleVariable($ft.t, $fn.getText(), false));}
+		{$list.add(new SimpleOffsetVariable($ft.t, $fn.getText()));}
 		(
 			COMMA ots = type [pool] ons = NAME
-			{$list.add(new SimpleVariable($ots.t, $ons.getText(), false));}
+			{$list.add(new SimpleOffsetVariable($ots.t, $ons.getText()));}
 		)*
 		COMMA?
 	)?

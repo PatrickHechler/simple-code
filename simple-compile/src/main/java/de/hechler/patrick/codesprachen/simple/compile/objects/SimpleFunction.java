@@ -2,24 +2,20 @@ package de.hechler.patrick.codesprachen.simple.compile.objects;
 
 import java.util.List;
 
-import de.hechler.patrick.codesprachen.primitive.assemble.objects.Command;
 import de.hechler.patrick.codesprachen.simple.compile.objects.SimpleFile.SimpleFuncPool;
 import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommandBlock;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleFunctionSymbol;
-import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleVariable;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleVariable.SimpleOffsetVariable;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleFuncType;
 
 public class SimpleFunction extends SimpleFunctionSymbol {
 	
-	public boolean                  addrVars;
-	public int                      regVars = -1;
-	public List<Command>            cmds    = null;
 	public final boolean            main;
 	public final SimpleCommandBlock body;
 	public final SimpleFuncPool     pool;
 	
-	public SimpleFunction(boolean export, boolean main, String name, List<SimpleVariable> args,
-			List<SimpleVariable> results, SimpleCommandBlock cmd, SimpleFuncPool pool) {
+	public SimpleFunction(boolean export, boolean main, String name, List<SimpleOffsetVariable> args,
+			List<SimpleOffsetVariable> results, SimpleCommandBlock cmd, SimpleFuncPool pool) {
 		this(-1L, export, main, name, new SimpleFuncType(args, results), cmd, pool);
 	}
 	
@@ -50,12 +46,9 @@ public class SimpleFunction extends SimpleFunctionSymbol {
 		if (!export) {
 			throw new IllegalStateException("this is not marked as export!");
 		}
-		if (address == -1L) {
-			throw new IllegalStateException("address is not initilized!");
-		}
 		StringBuilder b = new StringBuilder();
 		b.append(FUNC);
-		b.append(Long.toHexString(this.address).toUpperCase());
+		b.append(Long.toHexString(super.address()).toUpperCase());
 		b.append(FUNC);
 		b.append(this.name);
 		type.appendToExportStr(b);

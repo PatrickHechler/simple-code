@@ -14,11 +14,13 @@ import de.hechler.patrick.zeugs.pfs.interfaces.File;
 public abstract class StepCompiler<T extends TranslationUnit> implements Compiler {
 	
 	/**
-	 * this map saves all translation units with their {@link TranslationUnit#source source} path as key
+	 * this map saves all translation units with their {@link TranslationUnit#source
+	 * source} path as key
 	 */
 	private final Map<Path, T>   wtus = new HashMap<>();
 	/**
-	 * this map is a read only map of all translation units currently saved in {@link #wtus}
+	 * this map is a read only map of all translation units currently saved in
+	 * {@link #wtus}
 	 */
 	protected final Map<Path, T> tus  = Collections.unmodifiableMap(wtus);
 	
@@ -28,9 +30,15 @@ public abstract class StepCompiler<T extends TranslationUnit> implements Compile
 	}
 	
 	public void compile() throws IOException {
-		compileUnordered(this::init);
-		compileUnordered(this::precompile);
-		compileOrdered(this::compile);
+		if (!this.skipInit()) {
+			compileUnordered(this::init);
+		}
+		if (!this.skipPrecompile()) {
+			compileUnordered(this::precompile);
+		}
+		if (!this.skipCompile()) {
+			compileOrdered(this::compile);
+		}
 		compileUnordered(t -> {
 			try (t.target) {
 				finish(t);
@@ -86,7 +94,8 @@ public abstract class StepCompiler<T extends TranslationUnit> implements Compile
 	}
 	
 	/**
-	 * creates a {@link TranslationUnit} for the given {@codes source} and {@code target}.
+	 * creates a {@link TranslationUnit} for the given {@codes source} and
+	 * {@code target}.
 	 * 
 	 * @param source the source of the {@link TranslationUnit}
 	 * @param target the target of the {@link TranslationUnit}
@@ -96,9 +105,23 @@ public abstract class StepCompiler<T extends TranslationUnit> implements Compile
 	protected abstract T createTU(Path source, File target);
 	
 	/**
+	 * this method can be overwritten when the implementation of the
+	 * {@link StepCompiler} does not need the initialization phase
+	 * <p>
+	 * the default implementation returns <code>false</code>
+	 * 
+	 * @return <code>true</code> if the initialization phase should be skipped
+	 */
+	@SuppressWarnings("static-method")
+	protected boolean skipInit() {
+		return false;
+	}
+	
+	/**
 	 * Initializes the given translation unit
 	 * <p>
-	 * this method may be called, while an other thread initilises a different {@link TranslationUnit}
+	 * this method may be called, while an other thread initilises a different
+	 * {@link TranslationUnit}
 	 * 
 	 * @param tu the {@link TranslationUnit} to initialize
 	 * 
@@ -107,9 +130,23 @@ public abstract class StepCompiler<T extends TranslationUnit> implements Compile
 	protected abstract void init(T tu) throws IOException;
 	
 	/**
+	 * this method can be overwritten when the implementation of the
+	 * {@link StepCompiler} does not need the PreCompile phase
+	 * <p>
+	 * the default implementation returns <code>false</code>
+	 * 
+	 * @return <code>true</code> if the PreCompile phase should be skipped
+	 */
+	@SuppressWarnings("static-method")
+	protected boolean skipPrecompile() {
+		return false;
+	}
+	
+	/**
 	 * precompiles the given Translation Unit
 	 * <p>
-	 * this method may be called, while an other thread precompiles a different {@link TranslationUnit}
+	 * this method may be called, while an other thread precompiles a different
+	 * {@link TranslationUnit}
 	 * <p>
 	 * it is ensured, that all translation units are initilised at this point
 	 * 
@@ -120,11 +157,26 @@ public abstract class StepCompiler<T extends TranslationUnit> implements Compile
 	protected abstract void precompile(T tu) throws IOException;
 	
 	/**
+	 * this method can be overwritten when the implementation of the
+	 * {@link StepCompiler} does not need the compile phase
+	 * <p>
+	 * the default implementation returns <code>false</code>
+	 * 
+	 * @return <code>true</code> if the compile phase should be skipped
+	 */
+	@SuppressWarnings("static-method")
+	protected boolean skipCompile() {
+		return false;
+	}
+	
+	/**
 	 * compiles the given Translation Unit
 	 * <p>
-	 * this method may not be called, while an other thread compiles a different {@link TranslationUnit}
+	 * this method may not be called, while an other thread compiles a different
+	 * {@link TranslationUnit}
 	 * <p>
-	 * it is ensured, that all translation units are initilised and precompiled at this point
+	 * it is ensured, that all translation units are initilised and precompiled at
+	 * this point
 	 * 
 	 * @param tu the {@link TranslationUnit} to compile
 	 * 
@@ -135,14 +187,22 @@ public abstract class StepCompiler<T extends TranslationUnit> implements Compile
 	/**
 	 * finishes the translation of the given Translation Unit
 	 * <p>
-	 * this method may be called, while an other thread finishes a different {@link TranslationUnit}
+	 * this method may be called, while an other thread finishes a different
+	 * {@link TranslationUnit}
 	 * <p>
 	 * it is ensured, that all translation units are compiled at this point
 	 * <p>
-	 * this method is intended to do the remaining io and other stuff, because {@link #compile(TranslationUnit)} is not
+	 * this method is intended to do the remaining io and other stuff, because
+	 * {@link #compile(TranslationUnit)} is not
 	 * asyncronos <br>
-	 * after this method finished the {@link TranslationUnit#target} file of the passed TranslationUnit is automatically
+	 * after this method finished the {@link TranslationUnit#target} file of the
+	 * passed TranslationUnit is automatically
 	 * closed.
+	 * <p>
+	 * note that there is no skipFinish() method, because the {@link StepCompiler}
+	 * {@link File#close() closes} the {@link TranslationUnit#target target} file,
+	 * if there is nothing more needed the implementation can just make a this
+	 * method return directly
 	 * 
 	 * @param tu the {@link TranslationUnit} to precompile
 	 * 

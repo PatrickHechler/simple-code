@@ -16,7 +16,6 @@ import de.hechler.patrick.codesprachen.simple.compile.objects.SimplePool;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleVariable;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleVariable.SimpleFunctionVariable;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleVariable.SimpleOffsetVariable;
-import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleType;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleTypePointer;
 
 public class SimpleDirectVariableValue extends SimpleValueNoConst {
@@ -29,9 +28,15 @@ public class SimpleDirectVariableValue extends SimpleValueNoConst {
 	}
 	
 	@Override
-	public long loadValue(int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos) {
+	public long loadValue(int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader, StackUseListener sul) {
 		Param reg = blockRegister(targetRegister, blockedRegisters);
 		if (sv instanceof SimpleFunctionVariable v) {
+			if (loader != null) {
+				long np = loader.loadVar(pos, targetRegister, commands, v);
+				if (np != -1) {
+					return np;
+				}
+			}
 			if (t.isPrimitive() || t.isPointer()) {
 				Param p;
 				if (v.hasOffset()) {
@@ -56,9 +61,9 @@ public class SimpleDirectVariableValue extends SimpleValueNoConst {
 			}
 		} else if (sv instanceof SimpleOffsetVariable v) { // offset is from file-start
 			if (t.isPrimitive() || t.isPointer()) {
-				pos = addMovCmd(t, commands, pos, lambdaPos -> build(A_SR | B_NUM, PrimAsmConstants.IP, v.addr() - lambdaPos), reg);
+				pos = addMovCmd(t, commands, pos, lambdaPos -> build(A_SR | B_NUM, PrimAsmConstants.IP, v.offset() - lambdaPos), reg);
 			} else if (t.isStruct() || t.isArray()) {
-				Command leaCmd = new Command(Commands.CMD_LEA, reg, build(A_NUM, v.addr() - pos));
+				Command leaCmd = new Command(Commands.CMD_LEA, reg, build(A_NUM, v.offset() - pos));
 				pos += leaCmd.length();
 				commands.add(leaCmd);
 			} else {
@@ -94,17 +99,23 @@ public class SimpleDirectVariableValue extends SimpleValueNoConst {
 		}
 		
 		@Override
-		public long loadValue(int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos) {
+		public long loadValue(int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader, StackUseListener sul) {
 			Param   reg = blockRegister(targetRegister, blockedRegisters);
 			Command cmd;
 			if (sv instanceof SimpleFunctionVariable v) {
+				if (loader != null) {
+					long np = loader.loadVarPntr(pos, targetRegister, commands, v);
+					if (np != -1L) {
+						return np;
+					}
+				}
 				if (v.hasOffset()) {
 					cmd = new Command(Commands.CMD_MVAD, reg, build(A_SR, v.reg()), build(A_NUM, v.offset()));
 				} else {
 					cmd = new Command(Commands.CMD_MOV, reg, build(A_NUM, PrimAsmPreDefines.REGISTER_MEMORY_START + (v.reg() << 3)));
 				}
 			} else if (sv instanceof SimpleOffsetVariable v) {
-				cmd = new Command(Commands.CMD_LEA, reg, build(A_NUM, v.addr() - pos));
+				cmd = new Command(Commands.CMD_LEA, reg, build(A_NUM, v.offset() - pos));
 			} else {
 				throw new AssertionError(sv.getClass() + " : " + sv);
 			}

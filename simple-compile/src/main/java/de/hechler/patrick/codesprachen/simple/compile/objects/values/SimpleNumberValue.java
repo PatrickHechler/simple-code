@@ -1,11 +1,13 @@
 package de.hechler.patrick.codesprachen.simple.compile.objects.values;
 
+import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.A_NUM;
+import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.build;
+
 import java.util.List;
 
 import de.hechler.patrick.codesprachen.primitive.assemble.enums.Commands;
 import de.hechler.patrick.codesprachen.primitive.assemble.objects.Command;
 import de.hechler.patrick.codesprachen.primitive.assemble.objects.Param;
-import de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleType;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleTypePrimitive;
 
@@ -105,22 +107,13 @@ public class SimpleNumberValue extends SimpleValueConst {
 	}
 	
 	@Override
-	public long loadValue(int targetRegister, boolean[] blockedRegisters, List <Command> commands, long pos) {
+	public long loadValue(int targetRegister, boolean[] blockedRegisters, List <Command> commands, long pos, VarLoader loader, StackUseListener sul) {
 		return loadValue(getNumber(), targetRegister, blockedRegisters, commands, pos);
 	}
 	
 	public static long loadValue(long value, int targetRegister, boolean[] blockedRegisters, List <Command> commands, long pos) throws InternalError {
-		assert !blockedRegisters[targetRegister];
-		blockedRegisters[targetRegister] = true;
-		Param p1, p2;
-		ParamBuilder build = new ParamBuilder();
-		build.art = ParamBuilder.A_SR;
-		build.v1 = targetRegister;
-		p1 = build.build();
-		build.art = ParamBuilder.B_NUM;
-		build.v2 = value;
-		p2 = build.build();
-		Command addCmd = new Command(Commands.CMD_MOV, p1, p2);
+		Param reg = SimpleValueNoConst.blockRegister(targetRegister, blockedRegisters);
+		Command addCmd = new Command(Commands.CMD_MOV, reg, build(A_NUM, value));
 		commands.add(addCmd);
 		return pos + addCmd.length();
 	}

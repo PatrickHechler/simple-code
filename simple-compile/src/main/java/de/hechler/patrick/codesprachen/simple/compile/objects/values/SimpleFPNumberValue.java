@@ -15,7 +15,7 @@ public class SimpleFPNumberValue extends SimpleValueConst {
 	}
 	
 	@Override
-	public long loadValue(int targetRegister, boolean[] blockedRegisters, List <Command> commands, long pos) {
+	public long loadValue(int targetRegister, boolean[] blockedRegisters, List <Command> commands, long pos, VarLoader loader, StackUseListener sul) {
 		return SimpleNumberValue.loadValue(Double.doubleToRawLongBits(value), targetRegister, blockedRegisters, commands, pos);
 	}
 	

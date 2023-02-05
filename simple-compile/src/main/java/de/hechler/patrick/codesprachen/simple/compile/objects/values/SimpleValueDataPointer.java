@@ -1,11 +1,13 @@
 package de.hechler.patrick.codesprachen.simple.compile.objects.values;
 
+import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.A_NUM;
+import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.build;
+
 import java.util.List;
 
 import de.hechler.patrick.codesprachen.primitive.assemble.enums.Commands;
 import de.hechler.patrick.codesprachen.primitive.assemble.objects.Command;
 import de.hechler.patrick.codesprachen.primitive.assemble.objects.Param;
-import de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder;
 import de.hechler.patrick.codesprachen.simple.compile.objects.SimplePool;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleType;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleTypeArray;
@@ -20,39 +22,47 @@ public abstract class SimpleValueDataPointer extends SimpleValueNoConst {
 	/**
 	 * this value is only allowed to be set once (twice when the -1 at the start counts) by the compiler!
 	 */
-	public long         addr = -1L;
+	private long         addr = -1L;
 	
 	public SimpleValueDataPointer(SimpleType mytype, byte[] data) {
 		super(mytype);
 		this.data = data;
 	}
 	
+	public void init(long addr) {
+		if (this.addr != -1L) {
+			throw new AssertionError("already initilized");
+		}
+		this.addr = addr;
+	}
+	
+	public long addr() {
+		if (this.addr == -1L) {
+			throw new AssertionError("not yet initilized");
+		}
+		return this.addr;
+	}
+	
 	@Override
-	public long loadValue(int targetRegister, boolean[] blockedRegisters, List <Command> commands, long pos) {
-		assert !blockedRegisters[targetRegister];
-		blockedRegisters[targetRegister] = true;
-		assert this.addr != -1L;
-		Param p1, p2;
-		ParamBuilder build = new ParamBuilder();
-		build.art = ParamBuilder.A_SR;
-		build.v1 = targetRegister;
-		p1 = build.build();
-		build.art = ParamBuilder.A_NUM;
-		build.v1 = pos - addr;
-		p2 = build.build();
-		Command addCmd = new Command(Commands.CMD_LEA, p1, p2);
-		pos += addCmd.length();
-		commands.add(addCmd);
+	public long loadValue(int targetRegister, boolean[] blockedRegisters, List <Command> commands, long pos, VarLoader loader) {
+		Param reg = blockRegister(targetRegister, blockedRegisters);
+		if (this.addr == -1L) {
+			throw new AssertionError("not yet initilized");
+		}
+		Command leaCmd = new Command(Commands.CMD_LEA, reg, build(A_NUM, addr - pos));
+		pos += leaCmd.length();
+		commands.add(leaCmd);
 		return pos;
 	}
 	
 	@Override
-	protected SimpleValue mkPointer(SimplePool pool) {
+	public SimpleValue mkPointer(SimplePool pool) {
 		if (t.isArray()) {
 			return new SimpleCastedDataValue(new SimpleTypePointer( ((SimpleTypeArray) t).target));
-		} else {
-			assert t.isPointer();
+		} else if (!t.isPointer()) {
 			return super.mkPointer(pool);
+		} else {
+			throw new AssertionError();
 		}
 	}
 	
@@ -79,12 +89,12 @@ public abstract class SimpleValueDataPointer extends SimpleValueNoConst {
 		}
 		
 		@Override
-		public long loadValue(int targetRegister, boolean[] blockedRegisters, List <Command> commands, long pos) {
-			return SimpleValueDataPointer.this.loadValue(targetRegister, blockedRegisters, commands, pos);
+		public long loadValue(int targetRegister, boolean[] blockedRegisters, List <Command> commands, long pos, VarLoader loader) {
+			return SimpleValueDataPointer.this.loadValue(targetRegister, blockedRegisters, commands, pos, loader);
 		}
 		
 		@Override
-		protected SimpleValue mkPointer(SimplePool pool) {
+		public SimpleValue mkPointer(SimplePool pool) {
 			if (t.isArray()) {
 				return new SimpleCastedDataValue(new SimpleTypePointer( ((SimpleTypeArray) t).target));
 			} else {

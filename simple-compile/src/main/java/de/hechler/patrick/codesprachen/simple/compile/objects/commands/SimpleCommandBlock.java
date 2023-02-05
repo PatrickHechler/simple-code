@@ -4,24 +4,18 @@ import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 
+import de.hechler.patrick.codesprachen.simple.compile.objects.SimpleFile.SimpleSubPool;
 import de.hechler.patrick.codesprachen.simple.compile.objects.SimplePool;
 
 public class SimpleCommandBlock implements SimpleCommand {
 	
-	// used by the compiler
-	public long primitiveVariableCount = -1;
-	// used by the compiler
-	public long structuresByteCount = -1;
-	
-	public final SimplePool            pool;
-	private final List <SimpleCommand> cmds;
-	public final List <SimpleCommand>  commands;
-	private boolean                    sealed = false;
+	public final SimplePool           pool;
+	private final List<SimpleCommand> cmds     = new LinkedList<>();
+	public final List<SimpleCommand>  commands = Collections.unmodifiableList(this.cmds);
+	private boolean                   sealed   = false;
 	
 	public SimpleCommandBlock(SimplePool pool) {
 		this.pool = pool;
-		this.cmds = new LinkedList <>();
-		this.commands = Collections.unmodifiableList(this.cmds);
 	}
 	
 	@Override
@@ -30,17 +24,20 @@ public class SimpleCommandBlock implements SimpleCommand {
 	}
 	
 	public void addCmd(SimpleCommand cmd) {
-		if (sealed) {
-			throw new IllegalStateException("already sealed");
-		}
+		if (sealed) { throw new IllegalStateException("already sealed"); }
 		cmds.add(cmd);
 	}
 	
 	public void seal() {
-		if (sealed) {
-			throw new IllegalStateException("already sealed");
-		}
+		if (sealed) { throw new IllegalStateException("already sealed"); }
 		sealed = true;
+	}
+	
+	public SimpleCommandBlock snapshot(SimpleSubPool snapshotPool) {
+		SimpleCommandBlock res = new SimpleCommandBlock(snapshotPool);
+		res.cmds.addAll(this.cmds);
+		res.sealed = true;
+		return res;
 	}
 	
 }

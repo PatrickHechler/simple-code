@@ -83,11 +83,11 @@ a constant can be used like a value of type `num`
     * `fpnum` : a 64-bit floating point number
     * `dword` : a 32-bit number
     * `udword` : an unsigned 32-bit number
-    * `word` : a 16-bit character/number
-    * `uword` : an unsigned 16-bit character/number
-    * `char` : same as `uword`
+    * `word` : a 16-bit number
+    * `uword` : an unsigned 16-bit number
     * `byte` : a 8-bit number
-    * `ubyte` : an unsigned 8-bit number
+    * `ubyte` : an unsigned 8-bit number/character
+    * `char` : same as `ubyte`
     * `struct [NAME]` : a structure of types
     * `[TYPE] #` : a pointer to a type
     * `[TYPE] \[ [VALUE]? \]` : a array of a type

@@ -37,7 +37,7 @@ public class SimpleFile implements SimplePool {
 	
 	private final TriFunction<String, String, String, SimpleDependency> dependencyProvider;
 	private final Map<String, SimpleDependency>                         dependencies = new HashMap<>();
-	private final Map<String, SimpleVariable>                           vars         = new LinkedHashMap<>();
+	private final Map<String, SimpleOffsetVariable>                     vars         = new LinkedHashMap<>();
 	private final Map<String, SimpleStructType>                         structs      = new HashMap<>();
 	private final Map<String, SimpleFunction>                           funcs        = new LinkedHashMap<>();
 	private final Map<String, SimpleConstant>                           consts       = new HashMap<>(SimpleCompiler.DEFAULT_CONSTANTS);
@@ -61,7 +61,7 @@ public class SimpleFile implements SimplePool {
 		dependencies.put(name, dependencyProvider.apply(name, depend, runtime));
 	}
 	
-	public void addVariable(SimpleVariable vari) {
+	public void addVariable(SimpleOffsetVariable vari) {
 		checkName(vari.name);
 		vars.put(vari.name, vari);
 		if (vari.export) {
@@ -118,16 +118,20 @@ public class SimpleFile implements SimplePool {
 		return result;
 	}
 	
-	public SimpleFuncPool newFuncPool(List<? extends SimpleVariable> args, List<? extends SimpleVariable> results) {
-		@SuppressWarnings("unchecked")
-		SimpleFuncType         type     = new SimpleFuncType((List<SimpleOffsetVariable>) args, (List<SimpleOffsetVariable>) results);
-		SimpleOffsetVariable[] funcargs = type.arguments.clone();
+	public SimpleFuncPool newFuncPool(List<SimpleOffsetVariable> args, List<SimpleOffsetVariable> results) {
+		SimpleFuncType           type     = new SimpleFuncType(args, results);
+		SimpleFunctionVariable[] funcargs = new SimpleFunctionVariable[type.arguments.length];
 		for (int i = 0; i < funcargs.length; i++) {
-			funcargs[i] = new SimpleOffsetVariable(funcargs[i].type, funcargs[i].name);
+			funcargs[i] = new SimpleFunctionVariable(type.arguments[i].type, type.arguments[i].name);
 		}
 		UsedData used = new UsedData();
 		count(used, Arrays.asList(funcargs));
-		return new SimpleFuncPool(type, funcargs, used);
+		SimpleFunctionVariable[] funcres = new SimpleFunctionVariable[type.results.length];
+		for (int i = 0; i < funcargs.length; i++) {
+			funcres[i] = new SimpleFunctionVariable(type.results[i].type, type.results[i].name);
+			funcres[i].init(type.results[i].offset(), SimpleCompiler.REG_METHOD_STRUCT);
+		}
+		return new SimpleFuncPool(funcargs, funcres, used);
 	}
 	
 	public static void count(UsedData used, Iterable<?> countTarget) {
@@ -175,7 +179,7 @@ public class SimpleFile implements SimplePool {
 		}
 	}
 	
-	public Collection<SimpleVariable> vars() {
+	public Collection<SimpleOffsetVariable> vars() {
 		return vars.values();
 	}
 	
@@ -227,11 +231,17 @@ public class SimpleFile implements SimplePool {
 	public Iterator<SimpleExportable> exportsIter() {
 		return new FilteringIter<>(
 				new MultiIter<>(consts.values().iterator(), funcs.values().iterator(), structs.values().iterator(), vars.values().iterator()),
-				se -> se.isExport());
+				SimpleExportable::isExport);
 	}
 	
 	@Override
 	public Map<String, SimpleConstant> getConstants() { return consts; }
+	
+	@Override
+	public Map<String, SimpleStructType> getStructures() { return structs; }
+	
+	@Override
+	public Map<String, SimpleVariable> getVariables() { return new HashMap<>(vars); }
 	
 	@Override
 	public void addCmd(SimpleCommand add) {
@@ -245,14 +255,15 @@ public class SimpleFile implements SimplePool {
 	
 	public class SimpleFuncPool implements SimplePool {
 		
-		private final SimpleFuncType  func;
-		public final SimpleVariable[] myargs;
-		private final UsedData        used;
+		// these arrays are not allowed to be modified
+		public final SimpleFunctionVariable[] myargs;
+		public final SimpleFunctionVariable[] myresults;
+		private final UsedData                used;
 		
-		public SimpleFuncPool(SimpleFuncType func, SimpleVariable[] myargs, UsedData used) {
-			this.func   = func;
-			this.myargs = myargs;
-			this.used   = used;
+		private SimpleFuncPool(SimpleFunctionVariable[] myargs, SimpleFunctionVariable[] myresults, UsedData used) {
+			this.myargs    = myargs;
+			this.myresults = myresults;
+			this.used      = used;
 		}
 		
 		public UsedData used() {
@@ -271,10 +282,10 @@ public class SimpleFile implements SimplePool {
 		
 		@Override
 		public SimpleValue newNameUseValue(String name) {
-			for (SimpleVariable sv : myargs) {
+			for (SimpleFunctionVariable sv : myargs) {
 				if (sv.name.equals(name)) { return new SimpleDirectVariableValue(sv); }
 			}
-			for (SimpleVariable sv : func.results) {
+			for (SimpleFunctionVariable sv : myresults) {
 				if (sv.name.equals(name)) { return new SimpleDirectVariableValue(sv); }
 			}
 			return SimpleFile.this.newNameUseValue(name);
@@ -299,6 +310,21 @@ public class SimpleFile implements SimplePool {
 		public Map<String, SimpleConstant> getConstants() { return SimpleFile.this.getConstants(); }
 		
 		@Override
+		public Map<String, SimpleStructType> getStructures() { return SimpleFile.this.getStructures(); }
+		
+		@Override
+		public Map<String, SimpleVariable> getVariables() {
+			Map<String, SimpleVariable> res = SimpleFile.this.getVariables();
+			for (SimpleFunctionVariable sv : myargs) {
+				res.put(sv.name, sv);
+			}
+			for (SimpleFunctionVariable sv : myresults) {
+				res.put(sv.name, sv);
+			}
+			return res;
+		}
+		
+		@Override
 		public void addCmd(SimpleCommand add) {
 			throw new UnsupportedOperationException("only block pools can add commands (this is a function pool)!");
 		}
@@ -310,7 +336,7 @@ public class SimpleFile implements SimplePool {
 		
 	}
 	
-	public static class SimpleSubPool implements SimplePool {
+	public static class SimpleSubPool implements SimplePool, Cloneable {
 		
 		public final SimplePool         parent;
 		public final SimpleCommandBlock block;
@@ -318,6 +344,11 @@ public class SimpleFile implements SimplePool {
 		public SimpleSubPool(SimplePool parent) {
 			this.parent = parent;
 			this.block  = new SimpleCommandBlock(this);
+		}
+		
+		public SimpleSubPool(SimplePool parent, SimpleCommandBlock block) {
+			this.parent = parent;
+			this.block  = block.snapshot(this);
 		}
 		
 		private SimplePool p() {
@@ -335,14 +366,13 @@ public class SimpleFile implements SimplePool {
 		
 		@Override
 		public SimpleSubPool newSubPool() {
-			return new SimpleSubPool(this);
+			return new SimpleSubPool(new SimpleSubPool(parent, block));
 		}
 		
 		@Override
 		public SimpleValue newNameUseValue(String name) {
 			for (SimpleCommand cmd : block.commands) {
-				if (cmd instanceof SimpleCommandVarDecl) {
-					SimpleCommandVarDecl vd = (SimpleCommandVarDecl) cmd;
+				if (cmd instanceof SimpleCommandVarDecl vd) {
 					if (vd.name.equals(name)) { return new SimpleDirectVariableValue(vd); }
 				}
 			}
@@ -376,6 +406,12 @@ public class SimpleFile implements SimplePool {
 		
 		@Override
 		public Map<String, SimpleConstant> getConstants() { return p().getConstants(); }
+		
+		@Override
+		public Map<String, SimpleStructType> getStructures() { return p().getStructures(); }
+		
+		@Override
+		public Map<String, SimpleVariable> getVariables() { return parent.getVariables(); }
 		
 	}
 	
@@ -430,6 +466,11 @@ public class SimpleFile implements SimplePool {
 			if (getClass() != obj.getClass()) return false;
 			SimpleDependency other = (SimpleDependency) obj;
 			return depend.equals(other.depend);
+		}
+		
+		@Override
+		public String toExportString() throws IllegalStateException {
+			throw new AssertionError("this is a dependnecy (toExportString() was called)");
 		}
 		
 	}

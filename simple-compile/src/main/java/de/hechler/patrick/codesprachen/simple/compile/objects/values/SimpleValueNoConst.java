@@ -16,11 +16,13 @@ import de.hechler.patrick.codesprachen.primitive.assemble.objects.Command;
 import de.hechler.patrick.codesprachen.primitive.assemble.objects.Param;
 import de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder;
 import de.hechler.patrick.codesprachen.simple.compile.objects.SimpleFile.SimpleDependency;
+import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleValue.StackUseListener;
 import de.hechler.patrick.codesprachen.simple.compile.objects.SimplePool;
 import de.hechler.patrick.codesprachen.simple.symbol.interfaces.SimpleExportable;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleConstant;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleFunctionSymbol;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleVariable;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleVariable.SimpleOffsetVariable;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleFuncType;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleStructType;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleType;
@@ -54,7 +56,7 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 	}
 	
 	public static Param blockRegister(int targetRegister, boolean[] blockedRegisters) throws AssertionError {
-		if (blockedRegisters[targetRegister]) { throw new AssertionError(targetRegister + " : " + tbs(blockedRegisters, '_', '#')); }
+		if (blockedRegisters[targetRegister]) { throw new AssertionError(targetRegister + " : " + tbs(blockedRegisters, '-', '#')); }
 		blockedRegisters[targetRegister] = true;
 		return build(A_SR, targetRegister);
 	}
@@ -202,8 +204,8 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		}
 		
 		@Override
-		public long loadValue(int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos) {
-			pos = valA.loadValue(targetRegister, blockedRegisters, commands, pos);
+		public long loadValue(int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader) {
+			pos = valA.loadValue(targetRegister, blockedRegisters, commands, pos, loader);
 			long mul = t.byteCount();
 			if (mul < 1L) { throw new AssertionError("target type is too small! valA: " + valA.type()); }
 			if (valB instanceof SimpleValueConst c) {
@@ -225,9 +227,9 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 					commands.add(add);
 				}
 			} else {
-				RegisterData rd = new RegisterData(targetRegister);
-				pos = findRegister(blockedRegisters, commands, pos, rd, targetRegister == 255 ? targetRegister - 1 : targetRegister + 1);
-				pos = valB.loadValue(rd.reg, blockedRegisters, commands, pos);
+				RegisterData rd = new RegisterData(fallbackRegister(targetRegister));
+				pos = findRegister(blockedRegisters, commands, pos, rd, rd.reg);
+				pos = valB.loadValue(rd.reg, blockedRegisters, commands, pos, loader);
 				if (mul != 1L) { // byte arrays don't need this
 					Command mulCmd = new Command(Commands.CMD_MUL, build(A_SR, rd.reg), build(A_NUM, mul));
 					pos += mulCmd.length();
@@ -312,8 +314,8 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		}
 		
 		@Override
-		public long loadValue(int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos) {
-			pos = val.loadValue(targetRegister, blockedRegisters, commands, pos);
+		public long loadValue(int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader) {
+			pos = val.loadValue(targetRegister, blockedRegisters, commands, pos, loader);
 			Command cmd = new Command(op, build(A_SR, targetRegister), null);
 			pos += cmd.length();
 			commands.add(cmd);
@@ -345,15 +347,15 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		}
 		
 		@Override
-		public long loadValue(int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos) {
-			RegisterData rd = new RegisterData(targetRegister + 1 >= 256 ? targetRegister - 1 : targetRegister + 1);
+		public long loadValue(int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader) {
+			RegisterData rd = new RegisterData(fallbackRegister(targetRegister));
 			blockedRegisters[targetRegister] = true;
 			pos                              = findRegister(blockedRegisters, commands, pos, rd, rd.reg);
 			blockedRegisters[targetRegister] = false;
 			int reg0 = swap ? rd.reg : targetRegister;
 			int reg1 = swap ? targetRegister : rd.reg;
-			pos = valA.loadValue(reg0, blockedRegisters, commands, pos);
-			pos = valB.loadValue(reg1, blockedRegisters, commands, pos);
+			pos = valA.loadValue(reg0, blockedRegisters, commands, pos, loader);
+			pos = valB.loadValue(reg1, blockedRegisters, commands, pos, loader);
 			Command cmd = new Command(op, build(A_SR, reg0), build(A_SR, reg1));
 			pos += cmd.length();
 			commands.add(cmd);
@@ -380,8 +382,8 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		}
 		
 		@Override
-		public long loadValue(int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos) {
-			return val.loadValue(targetRegister, blockedRegisters, commands, pos);
+		public long loadValue(int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader) {
+			return val.loadValue(targetRegister, blockedRegisters, commands, pos, loader);
 		}
 		
 		@Override
@@ -398,7 +400,7 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		}
 		
 		@Override
-		public long loadValue(int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos) {
+		public long loadValue(int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader) {
 			int     oldByteCount;
 			boolean oldSigned;
 			boolean oldPntr;
@@ -423,7 +425,7 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 				newSigned    = ((SimpleTypePrimitive) super.val.type()).signed();
 				newPntr      = false;
 			}
-			pos = super.val.loadValue(targetRegister, blockedRegisters, commands, pos);
+			pos = super.val.loadValue(targetRegister, blockedRegisters, commands, pos, loader);
 			if (newByteCount == oldByteCount && (oldSigned == newSigned || oldPntr || newPntr)) { return pos; }
 			if (newByteCount > oldByteCount && (!oldSigned || newSigned)) { return pos; }
 			int   minByteCount = Math.min(newByteCount, oldByteCount);
@@ -469,8 +471,8 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		}
 		
 		@Override
-		public long loadValue(int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos) {
-			pos = super.val.loadValue(targetRegister, blockedRegisters, commands, pos);
+		public long loadValue(int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader) {
+			pos = super.val.loadValue(targetRegister, blockedRegisters, commands, pos, loader);
 			Commands c;
 			if (t == SimpleType.FPNUM) {
 				assert super.val.type() != SimpleType.FPNUM;
@@ -494,8 +496,8 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		}
 		
 		@Override
-		public long loadValue(int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos) {
-			pos = super.loadValue(targetRegister, blockedRegisters, commands, pos);
+		public long loadValue(int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader) {
+			pos = super.loadValue(targetRegister, blockedRegisters, commands, pos, loader);
 			Param   reg = build(A_SR, targetRegister);
 			Command cmp = new Command(Commands.CMD_CMP, reg, build(A_NUM, t.isPointerOrArray() ? 0L : -1L));
 			pos += cmp.length();
@@ -690,11 +692,11 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		}
 		
 		@Override
-		public long loadValue(int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos) {
+		public long loadValue(int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader) {
 			Param reg     = build(A_SR, targetRegister);
 			Param zero    = build(A_NUM, 0L);
 			Param notZero = build(A_NUM, 1L);
-			pos = valA.loadValue(targetRegister, blockedRegisters, commands, pos);
+			pos = valA.loadValue(targetRegister, blockedRegisters, commands, pos, loader);
 			Command cmp = new Command(Commands.CMD_CMP, reg, zero);
 			pos += cmp.length();
 			commands.add(cmp);
@@ -704,7 +706,7 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 			pos += JMP_LEN;
 			List<Command> sub = newList();
 			blockedRegisters[targetRegister] = false;
-			pos                              = valB.loadValue(targetRegister, blockedRegisters, sub, pos);
+			pos                              = valB.loadValue(targetRegister, blockedRegisters, sub, pos, loader);
 			Command jmpc2;
 			long    jmpc2Pos = pos;
 			pos += JMP_LEN;
@@ -761,32 +763,32 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		}
 		
 		@Override
-		public long loadValue(int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos) {
+		public long loadValue(int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader) {
 			Param targetReg = build(A_SR, targetRegister);
-			pos = valA.loadValue(targetRegister, blockedRegisters, commands, pos);
-			RegisterData rd = new RegisterData(targetRegister + 1);
-			pos = findRegister(blockedRegisters, commands, pos, rd, targetRegister == 255 ? targetRegister - 1 : targetRegister + 1);
-			pos = valB.loadValue(rd.reg, blockedRegisters, commands, pos);
-			Command cmp = new Command(compare, targetReg, build(A_SR, rd.reg));
-			pos += cmp.length();
+			pos = valA.loadValue(targetRegister, blockedRegisters, commands, pos, loader);
+			RegisterData rd = new RegisterData(fallbackRegister(targetRegister));
+			pos = findRegister(blockedRegisters, commands, pos, rd, rd.reg);
+			pos = valB.loadValue(rd.reg, blockedRegisters, commands, pos, loader);
+			Command cmpCmd = new Command(compare, targetReg, build(A_SR, rd.reg));
+			pos += cmpCmd.length();
 			long    jmpTruePos = pos;
-			Command jmpTrue;
+			Command jmpTrueCmd;
 			pos += JMP_LEN;
 			List<Command> loadFalse = newList();
 			blockedRegisters[targetRegister] = false;
-			pos                              = falseValue.loadValue(targetRegister, blockedRegisters, loadFalse, pos);
+			pos                              = falseValue.loadValue(targetRegister, blockedRegisters, loadFalse, pos, loader);
 			long    jmpEndPos = pos;
-			Command jmpEnd;
-			pos     += JMP_LEN;
-			jmpTrue  = new Command(jmpOnTrue, build(A_NUM, pos - jmpTruePos), null);
+			Command jmpEndCmd;
+			pos        += JMP_LEN;
+			jmpTrueCmd  = new Command(jmpOnTrue, build(A_NUM, jmpTruePos - pos), null);
 			List<Command> loadTrue = newList();
 			blockedRegisters[targetRegister] = false;
-			pos                              = trueValue.loadValue(targetRegister, blockedRegisters, loadTrue, pos);
-			jmpEnd                           = new Command(Commands.CMD_JMP, build(A_NUM, pos - jmpEndPos), null);
-			commands.add(cmp);
-			commands.add(jmpTrue);
+			pos                              = trueValue.loadValue(targetRegister, blockedRegisters, loadTrue, pos, loader);
+			jmpEndCmd                        = new Command(Commands.CMD_JMP, build(A_NUM, jmpEndPos - pos), null);
+			commands.add(cmpCmd);
+			commands.add(jmpTrueCmd);
 			commands.addAll(loadFalse);
-			commands.add(jmpEnd);
+			commands.add(jmpEndCmd);
 			commands.addAll(loadTrue);
 			return pos;
 		}
@@ -801,7 +803,7 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 			case CMD_JMPLE -> "<=";
 			case CMD_JMPLT -> "<";
 			default -> "<" + compare + "  " + jmpOnTrue + ">";
-			} + " (" + valB + ')';
+			} + " (" + valA + ") (" + valB + ')';
 		}
 		
 	}
@@ -1152,7 +1154,8 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		};
 	}
 	
-	protected SimpleValue mkPointer(SimplePool pool) {
+	@Override
+	public SimpleValue mkPointer(SimplePool pool) {
 		throw new IllegalStateException("can not make a pointer to this value (this: " + this + ")");
 	}
 	
@@ -1168,8 +1171,8 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		return new SimpleValueNoConst(targetType) {
 			
 			@Override
-			public long loadValue(int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos) {
-				pos = me.loadValue(targetRegister, blockedRegisters, commands, pos);
+			public long loadValue(int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader, StackUseListener sul) {
+				pos = me.loadValue(targetRegister, blockedRegisters, commands, pos, loader, sul);
 				addMovCmd(t, commands, pos, build(A_SR, targetRegister), build(A_SR | B_REG, targetRegister));
 				return pos;
 			}
@@ -1182,10 +1185,6 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		};
 	}
 	
-	private static SimpleValue arrayRef(SimpleValue array, SimpleValue index) {
-		return new ArrayIndexValue(array, index);
-	}
-	
 	@Override
 	public SimpleValue addExpArrayRef(SimplePool pool, final SimpleValue val) {
 		if (!t.isPointerOrArray()) { throw new IllegalStateException("only a pointer and array can be indexed! (me: " + this + ")[" + val + "]"); }
@@ -1195,40 +1194,27 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		if (target == SimpleTypePrimitive.pt_inval) {
 			throw new IllegalStateException("this pointer/array has no valid target type! (me: " + this + ")[" + val + "]");
 		}
-		return arrayRef(this, val.cast(SimpleType.NUM));
+		return new ArrayIndexValue(this, val.cast(SimpleType.NUM));
 	}
 	
 	@Override
 	public SimpleValue addExpNameRef(SimplePool pool, String text) {
-		if (!t.isStruct()) { // also returns true for function structures
-			throw new IllegalStateException("name referencing is only possible on (function) structures!");
+		if (!t.isStruct()) { // also returns true for function structures and dependencies
+			throw new IllegalStateException("name referencing is only possible on (function) structures and dependencies!");
 		}
-		SimpleVariable target = null;
-		int            off    = 0;
+		SimpleOffsetVariable target = null;
 		if (t.isFunc()) {
 			SimpleFuncType func = (SimpleFuncType) t;
-			for (SimpleVariable sv : func.arguments) {
-				if (sv.name.equals(text)) {
-					target = sv;
-					break;
-				}
-				off += sv.type.byteCount();
-			}
-			if (target == null) {
-				off = 0;
-				for (SimpleVariable sv : func.arguments) {
-					if (sv.name.equals(text)) {
-						target = sv;
-						break;
-					}
-					off += sv.type.byteCount();
-				}
-			}
+			target = func.member(text);
+		} else if (t.isStruct()) {
+			SimpleStructType struct = (SimpleStructType) t;
+			target = struct.member(text);
 		} else if (this instanceof SimpleDirectVariableValue vv && vv.sv instanceof SimpleDependency dep) {
 			SimpleExportable exp = dep.get(text);
 			if (exp instanceof SimpleConstant c) {
 				return new SimpleNumberValue(SimpleType.NUM, c.value());
-			} else if (exp instanceof SimpleFunctionSymbol f) { // TODO change when in future function pointers are supported
+			} else if (exp instanceof SimpleFunctionSymbol f) {
+				// TODO change when in future function pointers are supported
 				throw new IllegalArgumentException(dep.name + ':' + f.name + " is a function address, no value!");
 			} else if (exp instanceof SimpleStructType s) {
 				throw new IllegalArgumentException(dep.name + ':' + s.name + " is a structure, no value!");
@@ -1238,53 +1224,13 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 				throw new AssertionError("unknown export: " + exp.getClass() + " :  " + exp);
 			}
 		} else {
-			SimpleStructType struct = (SimpleStructType) t;
-			for (SimpleVariable sv : struct.members) {
-				if (sv.name.equals(text)) {
-					target = sv;
-					break;
-				}
-				off += sv.type.byteCount();
-			}
+			throw new AssertionError("unknown variable use type: " + getClass() + "  " + toString());
 		}
 		if (target == null) {
 			throw new IllegalStateException(
 					"this structure does not has a member with the name '" + text + "' ((func-)struct: " + t + ") (me: " + this + ")");
 		}
-		final int                offset = off;
-		final SimpleValueNoConst me     = this;
-		return new SimpleValueNoConst(target.type) {
-			
-			@Override
-			public long loadValue(int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos) {
-				pos = me.loadValue(targetRegister, blockedRegisters, commands, pos);
-				Param        p1, p2;
-				ParamBuilder build = new ParamBuilder();
-				build.art = A_SR;
-				build.v1  = targetRegister;
-				p1        = build.build();
-				if (t.isStruct() || t.isArray()) {
-					build.art = A_NUM;
-					build.v2  = offset;
-					p2        = build.build();
-					Command addCmd = new Command(Commands.CMD_ADD, p1, p2);
-					pos += addCmd.length();
-					commands.add(addCmd);
-				} else {
-					build.art = A_SR | B_NUM;
-					build.v2  = offset;
-					p2        = build.build();
-					addMovCmd(t, commands, pos, p1, p2);
-				}
-				return pos;
-			}
-			
-			@Override
-			public String toString() {
-				return "(" + me + "):" + text;
-			}
-			
-		};
+		return new SimpleNonDirectVariableValue(this, target);
 	}
 	
 	@Override
@@ -1338,9 +1284,8 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 			}
 			return SimpleType.NUM;
 		} else if (st1.isPrimitive() && st2.isPrimitive()) {
-			assert st1 != SimpleTypePrimitive.pt_inval;
-			assert st2 != SimpleTypePrimitive.pt_inval;
-			SimpleTypePrimitive pt1    = (SimpleTypePrimitive) st1, pt2 = (SimpleTypePrimitive) st2;
+			SimpleTypePrimitive pt1    = (SimpleTypePrimitive) st1;
+			SimpleTypePrimitive pt2    = (SimpleTypePrimitive) st2;
 			boolean             signed = pt1.signed() || pt2.signed();
 			int                 bits   = Math.max(pt1.bits(), pt2.bits());
 			return SimpleTypePrimitive.get(bits, signed);
@@ -1354,33 +1299,56 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		return new LinkedList<>();
 	}
 	
-	public static class RegisterData {
+	protected static class RegisterData {
 		
-		public boolean pushPop = false;
-		public int     reg;
+		private boolean pushPop = false;
+		private int     reg;
 		
 		public RegisterData(int reg) {
 			this.reg = reg;
 		}
 		
+		public int reg() {
+			return reg;
+		}
+		
 	}
 	
-	private static int fallbackRegister(int register) {
+	protected static int fallbackRegister(int register) {
 		if (register < MIN_REGISTER) {
 			return MIN_REGISTER;
-		} else if (register + 1 < 256) {
+		} else if (register + 1 <= MAX_REGISTER) {
 			return register + 1;
+		} else if (register - 1 < MIN_REGISTER) {
+			throw new AssertionError("WHY IS THIS HAPPENING TO ME?!");
 		} else {
 			return register - 1;
 		}
 	}
 	
-	private static long findRegister(boolean[] blockedRegisters, List<Command> commands, long pos, RegisterData rd, int fallback) {
+	protected static int fallbackRegister(int... register) {
+		for (int reg = MIN_REGISTER; reg <= MAX_REGISTER; reg++) {
+			boolean found = false;
+			for (int i = 0; i < register.length; i++) {
+				if (register[i] == reg) {
+					found = true;
+					break;
+				}
+			}
+			if (found) { return reg; }
+		}
+		throw new IllegalStateException("there is no register available!");
+	}
+	
+	protected static long findRegister(boolean[] blockedRegisters, List<Command> commands, long pos, RegisterData rd, int fallback, StackUseListener sul) {
 		int startRegister = rd.reg;
 		for (; rd.reg < 256 && blockedRegisters[rd.reg]; rd.reg++);
 		if (rd.reg >= 256) {
 			for (rd.reg = MIN_REGISTER; blockedRegisters[rd.reg] && rd.reg < startRegister; rd.reg++);
 			if (rd.reg >= startRegister) {
+				if (sul != null) {
+					sul.grow(8);
+				}
 				rd.pushPop                 = true;
 				blockedRegisters[fallback] = false;
 				rd.reg                     = fallback;
@@ -1396,8 +1364,11 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		return pos;
 	}
 	
-	private static long releaseRegister(List<Command> commands, long pos, RegisterData rd, boolean[] blockedRegisters) {
+	protected static long releaseRegister(List<Command> commands, long pos, RegisterData rd, boolean[] blockedRegisters, StackUseListener sul) {
 		if (rd.pushPop) {
+			if (sul != null)  {
+				sul.shrink(8);
+			}
 			blockedRegisters[rd.reg] = true;
 			ParamBuilder build = new ParamBuilder();
 			build.art = A_SR;
