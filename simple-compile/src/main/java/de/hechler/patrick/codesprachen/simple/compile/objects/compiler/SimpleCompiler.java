@@ -98,9 +98,8 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 	
 	// when changed the compilers main call has most likely to be changed too
 	public static final SimpleFuncType MAIN_TYPE   = new SimpleFuncType(
-			List.of(new SimpleOffsetVariable(SimpleType.NUM, "argc"),
-					new SimpleOffsetVariable(new SimpleTypePointer(new SimpleTypePointer(SimpleType.BYTE)), "argv")),
-			List.of(new SimpleOffsetVariable(SimpleType.NUM, "exitnum")));
+		List.of(new SimpleOffsetVariable(SimpleType.NUM, "argc"), new SimpleOffsetVariable(new SimpleTypePointer(new SimpleTypePointer(SimpleType.BYTE)), "argv")),
+		List.of(new SimpleOffsetVariable(SimpleType.NUM, "exitnum")));
 	private static final long          MAIN_LENGTH = 16L;
 	
 	static {
@@ -112,10 +111,10 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		}
 		defConsts.put("INT_ERR_OUT_OF_MEM", new SimpleConstant("INT_ERR_OUT_OF_MEM", INT_ERR_OUT_OF_MEM, false));
 		defConsts.put("INTERRUPT_COUNT", new SimpleConstant("INTERRUPT_COUNT", INTERRUPT_COUNT, false));
-		defConstsPrim.put("INT_ERR_OUT_OF_MEM", new PrimitiveConstant("INT_ERR_OUT_OF_MEM", "|: called when there is not enugh memory",
-				INT_ERR_OUT_OF_MEM, PrimAsmConstants.START_CONSTANTS_PATH, -1));
-		defConstsPrim.put("INTERRUPT_COUNT", new PrimitiveConstant("INTERRUPT_COUNT", defConstsPrim.get("INTERRUPT_COUNT").comment(), INTERRUPT_COUNT,
-				PrimAsmConstants.START_CONSTANTS_PATH, -1));
+		defConstsPrim.put("INT_ERR_OUT_OF_MEM",
+			new PrimitiveConstant("INT_ERR_OUT_OF_MEM", "|: called when there is not enugh memory", INT_ERR_OUT_OF_MEM, PrimAsmConstants.START_CONSTANTS_PATH, -1));
+		defConstsPrim.put("INTERRUPT_COUNT",
+			new PrimitiveConstant("INTERRUPT_COUNT", defConstsPrim.get("INTERRUPT_COUNT").comment(), INTERRUPT_COUNT, PrimAsmConstants.START_CONSTANTS_PATH, -1));
 		DEFAULT_CONSTANTS      = Collections.unmodifiableMap(defConsts);
 		DEFAULT_CONSTANTS_PRIM = Collections.unmodifiableMap(defConstsPrim);
 	}
@@ -239,8 +238,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 			StackUseListener sul = new StackUseListener();
 			tu.pos = arg.value.loadValue(arg.register, blockedRegs, tu.commands, tu.pos, new VarLoaderImpl(minMax, sul), sul);
 		}
-		ParseContext context = PREASSEMBLER.preassemble(tu.source, new ANTLRInputStream(c.asmCode.substring(2, c.asmCode.length() - 2)), consts(tu, c),
-				tu.pos);
+		ParseContext context = PREASSEMBLER.preassemble(tu.source, new ANTLRInputStream(c.asmCode.substring(2, c.asmCode.length() - 2)), consts(tu, c), tu.pos);
 		tu.pos = context.pos;
 		
 		pop(tu, minMax);
@@ -403,8 +401,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 					movDstAddrCmd = new Command(Commands.CMD_MOV, build(A_SR, X_ADD), build(A_SR, dstReg));
 				}
 			} else {
-				movDstAddrCmd = new Command(Commands.CMD_MOV, build(A_SR, X_ADD),
-						build(A_NUM, PrimAsmPreDefines.REGISTER_MEMORY_START + (dstReg << 3)));
+				movDstAddrCmd = new Command(Commands.CMD_MOV, build(A_SR, X_ADD), build(A_NUM, PrimAsmPreDefines.REGISTER_MEMORY_START + (dstReg << 3)));
 			}
 			add(tu, movDstAddrCmd);
 			Command movSrcAddrCmd;
@@ -471,8 +468,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 			sv.init(tu.pos);
 			int len = (int) sv.type.byteCount();
 			if (len != sv.type.byteCount()) {
-				throw new IllegalArgumentException(
-						"the variable needs too much memory! (the compiler supports only variables with max (2^31)-1 bytes)");
+				throw new IllegalArgumentException("the variable needs too much memory! (the compiler supports only variables with max (2^31)-1 bytes)");
 			}
 			cp.addBytes(new byte[len]);
 			tu.commands.add(cp);
@@ -529,8 +525,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 	
 	private static void addMainCall(SimpleTU tu, SimpleFunction main) {
 		if (!MAIN_TYPE.equals(main.type)) {
-			throw new IllegalArgumentException(
-					"main function type is invalid: expected '" + MAIN_TYPE + "' got '" + main.type + "' ('" + main + "')");
+			throw new IllegalArgumentException("main function type is invalid: expected '" + MAIN_TYPE + "' got '" + main.type + "' ('" + main + "')");
 		}
 		if (tu.pos != 0L) { throw new AssertionError(tu.pos); }
 		Command backupArgcCmd = new Command(Commands.CMD_MOV, build(A_SR, X_ADD + 2L), build(A_SR, X_ADD));
@@ -565,10 +560,10 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		Path   export = switch (FileTypes.getTypeFromName(name, FileTypes.PRIMITIVE_MASHINE_CODE)) {
 						case SIMPLE_SOURCE_CODE ->
 							tu.source.resolveSibling(name.substring(0, name.lastIndexOf('.')) + FileTypes.SIMPLE_SYMBOL_FILE.getExtensionWithDot());
-						default -> tu.source.resolveSibling(name + FileTypes.SIMPLE_SYMBOL_FILE.getExtensionWithDot());
+						case PRIMITIVE_MASHINE_CODE, PRIMITIVE_SOURCE_CODE, PRIMITIVE_SYMBOL_FILE, SIMPLE_SYMBOL_FILE ->
+							tu.source.resolveSibling(name + FileTypes.SIMPLE_SYMBOL_FILE.getExtensionWithDot());
 						};
-		try (Writer out = Files.newBufferedWriter(export, StandardOpenOption.WRITE, StandardOpenOption.CREATE,
-				StandardOpenOption.TRUNCATE_EXISTING)) {
+		try (Writer out = Files.newBufferedWriter(export, StandardOpenOption.WRITE, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
 			while (iter.hasNext()) {
 				SimpleExportable se = iter.next();
 				out.write(se.toExportString());

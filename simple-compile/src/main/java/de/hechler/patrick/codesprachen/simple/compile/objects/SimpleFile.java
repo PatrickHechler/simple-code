@@ -50,8 +50,7 @@ public class SimpleFile implements SimplePool {
 	}
 	
 	private void checkName(String name) {
-		if (dependencies.containsKey(name) || vars.containsKey(name) || structs.containsKey(name) || funcs.containsKey(name)
-				|| consts.containsKey(name)) {
+		if (dependencies.containsKey(name) || vars.containsKey(name) || structs.containsKey(name) || funcs.containsKey(name) || consts.containsKey(name)) {
 			throw new IllegalArgumentException("name already in use! name: '" + name + "'");
 		}
 	}
@@ -76,9 +75,9 @@ public class SimpleFile implements SimplePool {
 	}
 	
 	private static final SimpleFuncType MAIN_TYPE = new SimpleFuncType(
-			Arrays.asList(new SimpleOffsetVariable(SimpleType.NUM, "argc"),
-					new SimpleOffsetVariable(new SimpleTypePointer(new SimpleTypePointer(SimpleType.UWORD)), "argv")),
-			Arrays.asList(new SimpleOffsetVariable(SimpleType.NUM, "exitnum")));
+		Arrays.asList(new SimpleOffsetVariable(SimpleType.NUM, "argc"),
+			new SimpleOffsetVariable(new SimpleTypePointer(new SimpleTypePointer(SimpleType.UWORD)), "argv")),
+		Arrays.asList(new SimpleOffsetVariable(SimpleType.NUM, "exitnum")));
 	
 	public void addFunction(SimpleFunction func) {
 		checkName(func.name);
@@ -229,9 +228,8 @@ public class SimpleFile implements SimplePool {
 	}
 	
 	public Iterator<SimpleExportable> exportsIter() {
-		return new FilteringIter<>(
-				new MultiIter<>(consts.values().iterator(), funcs.values().iterator(), structs.values().iterator(), vars.values().iterator()),
-				SimpleExportable::isExport);
+		return new FilteringIter<>(new MultiIter<>(consts.values().iterator(), funcs.values().iterator(), structs.values().iterator(), vars.values().iterator()),
+			SimpleExportable::isExport);
 	}
 	
 	@Override
@@ -444,11 +442,9 @@ public class SimpleFile implements SimplePool {
 		
 		public static String runtimeName(String compileDepend) {
 			return switch (FileTypes.getTypeFromName(compileDepend, FileTypes.PRIMITIVE_MASHINE_CODE)) {
-			case PRIMITIVE_SYMBOL_FILE ->
-				compileDepend.substring(0, compileDepend.length() - FileTypes.PRIMITIVE_SOURCE_CODE.getExtensionWithDot().length());
-			case SIMPLE_SYMBOL_FILE ->
-				compileDepend.substring(0, compileDepend.length() - FileTypes.PRIMITIVE_SOURCE_CODE.getExtensionWithDot().length());
-			default -> compileDepend;
+			case PRIMITIVE_SYMBOL_FILE -> compileDepend.substring(0, compileDepend.length() - FileTypes.PRIMITIVE_SOURCE_CODE.getExtensionWithDot().length());
+			case SIMPLE_SYMBOL_FILE -> compileDepend.substring(0, compileDepend.length() - FileTypes.PRIMITIVE_SOURCE_CODE.getExtensionWithDot().length());
+			case PRIMITIVE_MASHINE_CODE, PRIMITIVE_SOURCE_CODE, SIMPLE_SOURCE_CODE -> compileDepend;
 			};
 		}
 		
