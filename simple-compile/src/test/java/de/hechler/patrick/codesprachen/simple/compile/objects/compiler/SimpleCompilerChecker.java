@@ -69,17 +69,24 @@ public class SimpleCompilerChecker {
 	private static final String ADD2_PFS = "./testout/add2.pfs";
 	private static final String ADD2_RES = "/de/hechler/patrick/codesprachen/simple/compile/programs/add2.ssc";
 	
+	private static final String HW_PMF = "/hello-world";
+	private static final String HW_PFS = "./testout/hello-world.pfs";
+	private static final String HW_RES = "/de/hechler/patrick/codesprachen/simple/compile/programs/hello-world.ssc";
+	
 	@Check
 	private void checkAdd() throws IOException, InterruptedException, URISyntaxException {
 		try (FS fs = this.patrFsProv.loadFS(new PatrFSOptions(ADD_PFS, true, 4096L, 1024))) {
 			System.out.println("opened fs, compile now");
 			SimpleCompiler compiler = new SimpleCompiler(StandardCharsets.UTF_8, Path.of(getClass().getResource(SRC_RES).toURI()), new Path[0]);
 			fs.stream(ADD_PMF, new StreamOpenOptions(false, true, false, ElementType.FILE, true, true)).close();
-			File file = fs.file(ADD_PMF);
-			file.flag(FSElement.FLAG_EXECUTABLE, 0);
-			compiler.addTranslationUnit(Path.of(getClass().getResource(ADD_RES).toURI()), file);
-			compiler.compile();
-			System.out.println("finished compile, close now fs");
+			try (File file = fs.file(ADD_PMF)) {
+				file.flag(FSElement.FLAG_EXECUTABLE, 0);
+				compiler.addTranslationUnit(Path.of(getClass().getResource(ADD_RES).toURI()), file);
+				compiler.compile();
+			}
+			try (File file = fs.file(ADD_PMF)) {
+				System.out.println("finished compile, close now fs, binary-length: " + file.length());
+			}
 		}
 		System.out.println("execute now the program");
 		execute(ADD_PFS, ADD_PMF, 9, EMPTY_BARR, EMPTY_BARR, EMPTY_BARR);
@@ -99,6 +106,22 @@ public class SimpleCompilerChecker {
 		}
 		System.out.println("execute now the program");
 		execute(ADD2_PFS, ADD2_PMF, 0, EMPTY_BARR, "5 + 4 = 9".getBytes(StandardCharsets.UTF_8), EMPTY_BARR);
+	}
+	
+	@Check(disabled = true)
+	private void checkHelloWorld() throws IOException, URISyntaxException, InterruptedException {
+		try (FS fs = this.patrFsProv.loadFS(new PatrFSOptions(HW_PFS, true, 4096L, 1024))) {
+			System.out.println("opened fs, compile now");
+			SimpleCompiler compiler = new SimpleCompiler(StandardCharsets.UTF_8, Path.of(getClass().getResource(SRC_RES).toURI()), new Path[0]);
+			fs.stream(HW_PMF, new StreamOpenOptions(false, true, false, ElementType.FILE, true, true)).close();
+			File file = fs.file(HW_PMF);
+			file.flag(FSElement.FLAG_EXECUTABLE, 0);
+			compiler.addTranslationUnit(Path.of(getClass().getResource(HW_RES).toURI()), file);
+			compiler.compile();
+			System.out.println("finished compile, close now fs");
+		}
+		System.out.println("execute now the program");
+		execute(HW_PFS, HW_PMF, 0, EMPTY_BARR, "hello world\n".getBytes(StandardCharsets.UTF_8), EMPTY_BARR);
 	}
 	
 	protected void execute(String pfsFile, String pmfFile, int exitCode, byte[] stdin, byte[] stdout, byte[] stderr, String... programArgs)

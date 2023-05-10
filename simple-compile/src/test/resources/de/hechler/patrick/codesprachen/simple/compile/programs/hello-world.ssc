@@ -1,0 +1,12 @@
+// this function prints hello world and exits with 0 if the print was successful
+func main hello_world_main(num argc, char## argv) --> <num exitnum> {
+	var (num id, num len, ubyte# data) --> <num id, wrote> writeArg;
+	var (char# data) --> <num len> strLenArg;
+	writeArg:id <-- std:out;
+	writeArg:data <-- "hello world\n";
+	strLenArg:data <-- writeArg:data;
+	call std:strLen strLenArg;
+	writeArg:len <-- strLenArg:len;
+	call std:write writeArg;
+	exitnum <-- writeArg:wrote == strLenArg:len ? 0 : 1;
+}

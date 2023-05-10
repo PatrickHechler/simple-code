@@ -759,7 +759,6 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		long dleMsg1Len = cp.length() - dleMsg1Pos;
 		add(tu, cp);
 		align(tu, 8L, cp);
-		tu.outOfMem = tu.pos;
 		oomHandler(tu, oomMsgPos, oomMsgLen);
 		dleHandler(tu, dleMsg0Pos, dleMsg0Len, dleMsg1Pos, dleMsg1Len);
 	}
@@ -791,6 +790,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 	 * </pre>
 	 */
 	private static void dleHandler(SimpleTU tu, long dleMsg0Pos, long dleMsg0Len, long dleMsg1Pos, long dleMsg1Len) {
+		tu.depLoad = tu.pos;
 		label(tu, "DEPENDENCY_LOAD_ERROR");
 		Param   x00             = build(A_SR, X_ADD);
 		Param   x01             = build(A_SR, X_ADD + 1);
@@ -817,6 +817,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 	}
 	
 	private static void oomHandler(SimpleTU tu, long oomMsgPos, long oomMsgLen) throws AssertionError {
+		tu.outOfMem = tu.pos;
 		label(tu, "OUT_OF_MEMORY");
 		Command movIDCmd = new Command(Commands.CMD_MOV, build(A_SR, X_ADD), build(A_NUM, PrimAsmPreDefines.STD_LOG));
 		add(tu, movIDCmd);
