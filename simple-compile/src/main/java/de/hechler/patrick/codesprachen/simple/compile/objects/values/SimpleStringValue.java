@@ -7,6 +7,7 @@ import java.util.List;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleType;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleTypeArray;
 
+@SuppressWarnings("javadoc")
 public class SimpleStringValue extends SimpleValueDataPointer {
 	
 	private static final Charset CHARSET = StandardCharsets.UTF_8;
@@ -20,7 +21,7 @@ public class SimpleStringValue extends SimpleValueDataPointer {
 	}
 	
 	public SimpleStringValue(byte[] data) {
-		super(new SimpleTypeArray(SimpleType.UBYTE, data.length), data);
+		super(new SimpleTypeArray(SimpleType.UBYTE, data.length), data, 1);
 	}
 	
 	private static final byte[] data(List<String> strs) {
@@ -45,7 +46,7 @@ public class SimpleStringValue extends SimpleValueDataPointer {
 	
 	@Override
 	public String toString() {
-		return "\"" + new String(data, CHARSET).replace("\\", "\\\\").replace("\r", "\\r").replace("\n", "\\n")
+		return "\"" + new String(this.data, CHARSET).replace("\\", "\\\\").replace("\r", "\\r").replace("\n", "\\n")
 				.replace("\t", "\\t").replace("\0", "\\0") + "\"";
 	}
 	

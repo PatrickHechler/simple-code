@@ -3,6 +3,7 @@ package de.hechler.patrick.codesprachen.simple.compile.objects.commands;
 import de.hechler.patrick.codesprachen.simple.compile.objects.SimplePool;
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleValue;
 
+@SuppressWarnings("javadoc")
 public class SimpleCommandFuncCall implements SimpleCommand {
 	
 	public final SimplePool  pool;
@@ -26,7 +27,7 @@ public class SimpleCommandFuncCall implements SimpleCommand {
 	
 	@Override
 	public SimplePool pool() {
-		return pool;
+		return this.pool;
 	}
 	
 }

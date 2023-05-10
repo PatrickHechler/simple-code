@@ -18,7 +18,7 @@ import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCom
 import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommandBlock;
 import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommandVarDecl;
 import de.hechler.patrick.codesprachen.simple.compile.objects.compiler.SimpleCompiler;
-import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleDirectVariableValue;
+import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleVariableValue;
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleNumberValue;
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleStringValue;
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleValue;
@@ -33,6 +33,7 @@ import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleStructT
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleType;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleTypePointer;
 
+@SuppressWarnings({ "javadoc", "unqualified-field-access" })
 public class SimpleFile implements SimplePool {
 	
 	private final TriFunction<String, String, String, SimpleDependency> dependencyProvider;
@@ -50,19 +51,20 @@ public class SimpleFile implements SimplePool {
 	}
 	
 	private void checkName(String name) {
-		if (dependencies.containsKey(name) || vars.containsKey(name) || structs.containsKey(name) || funcs.containsKey(name) || consts.containsKey(name)) {
+		if (this.dependencies.containsKey(name) || this.vars.containsKey(name) || this.structs.containsKey(name) || this.funcs.containsKey(name)
+			|| this.consts.containsKey(name)) {
 			throw new IllegalArgumentException("name already in use! name: '" + name + "'");
 		}
 	}
 	
 	public void addDependency(String name, String depend, String runtime) {
 		checkName(name);
-		dependencies.put(name, dependencyProvider.apply(name, depend, runtime));
+		this.dependencies.put(name, this.dependencyProvider.apply(name, depend, runtime));
 	}
 	
 	public void addVariable(SimpleOffsetVariable vari) {
 		checkName(vari.name);
-		vars.put(vari.name, vari);
+		this.vars.put(vari.name, vari);
 		if (vari.export) {
 			this.exports.add(vari);
 		}
@@ -70,7 +72,7 @@ public class SimpleFile implements SimplePool {
 	
 	public void addStructure(SimpleStructType struct) {
 		checkName(struct.name);
-		SimpleStructType old = structs.put(struct.name, struct);
+		SimpleStructType old = this.structs.put(struct.name, struct);
 		if (old != null) { throw new IllegalStateException("structure already exist: name: " + struct.name); }
 	}
 	
@@ -88,7 +90,7 @@ public class SimpleFile implements SimplePool {
 			}
 			this.main = func;
 		}
-		SimpleFunction old = funcs.put(func.name, func);
+		SimpleFunction old = this.funcs.put(func.name, func);
 		if (old != null) { throw new IllegalStateException("function already exist: name: " + func.name); }
 		if (func.export) {
 			this.exports.add(func);
@@ -97,11 +99,15 @@ public class SimpleFile implements SimplePool {
 	
 	public void addConstant(SimpleConstant constant) {
 		checkName(constant.name());
-		consts.put(constant.name(), constant);
+		this.consts.put(constant.name(), constant);
 	}
 	
 	public Collection<SimpleFunction> functions() {
 		return this.funcs.values();
+	}
+	
+	public Collection<SimpleDependency> dependencies() {
+		return this.dependencies.values();
 	}
 	
 	public SimpleFunction mainFunction() {
@@ -128,32 +134,38 @@ public class SimpleFile implements SimplePool {
 		SimpleFunctionVariable[] funcres = new SimpleFunctionVariable[type.results.length];
 		for (int i = 0; i < funcargs.length; i++) {
 			funcres[i] = new SimpleFunctionVariable(type.results[i].type, type.results[i].name);
-			funcres[i].init(type.results[i].offset(), SimpleCompiler.REG_METHOD_STRUCT);
+			funcres[i].init(type.results[i].offset(), SimpleCompiler.REG_FUNC_STRUCT);
 		}
 		return new SimpleFuncPool(funcargs, funcres, used);
 	}
 	
-	public static void count(UsedData used, Iterable<?> countTarget) {
+	public static void count(UsedData used, Iterable<SimpleFunctionVariable> countTarget) {
+		count(used, countTarget, null);
+	}
+	
+	public static void count(UsedData used, SimpleCommandBlock countTarget) {
+		count(used, countTarget.commands, countTarget);
+	}
+	
+	public static void count(UsedData used, Iterable<?> countTarget, SimpleCommandBlock blk) {
 		final int  startRegs = used.regs;
 		final long startAddr = used.currentaddr;
 		for (Object obj : countTarget) {
 			if (obj instanceof SimpleCommandBlock scb) {
-				count(used, scb.commands);
+				count(used, scb);
 			} else if (obj instanceof SimpleFunctionVariable sv) {
 				long regLen = (sv.type.byteCount() >>> 3) + ((sv.type.byteCount() & 7) != 0 ? 1 : 0);
 				if (used.regs < SimpleCompiler.MAX_VAR_REGISTER - regLen && !sv.watsPointer()) {
 					sv.init(-1L, used.regs);
 					used.regs += regLen;
-					// this will currently never be executed (MIN_VAR_REGISTER is above MAX)
-					throw new AssertionError();
 				} else {
 					long bc = sv.type.byteCount();
 					used.currentaddr = align(used.currentaddr, bc);
 					sv.init(used.currentaddr, SimpleCompiler.REG_VAR_PNTR);
 					used.currentaddr += bc;
 				}
-			} else if (obj instanceof SimpleCommand) {
-				// do nothing
+			} else if (obj instanceof SimpleCommand sc) {
+				sc.pool().initRegMax(used.regs);
 			} else {
 				throw new AssertionError("unknown class: '" + obj.getClass().getName() + "' of object: '" + obj + "'");
 			}
@@ -190,9 +202,9 @@ public class SimpleFile implements SimplePool {
 	@Override
 	public SimpleValue newNameUseValue(String name) {
 		SimpleVariable vari = vars.get(name);
-		if (vari != null) { return new SimpleDirectVariableValue(vari); }
+		if (vari != null) { return new SimpleVariableValue(vari); }
 		SimpleDependency dep = dependencies.get(name);
-		if (dep != null) { return new SimpleDirectVariableValue(dep); }
+		if (dep != null) { return new SimpleVariableValue(dep); }
 		SimpleConstant constant = consts.get(name);
 		if (constant != null) { return new SimpleNumberValue(SimpleType.NUM, constant.value()); }
 		throw new IllegalArgumentException("there is nothign with the given name! (name='" + name + "')");
@@ -201,7 +213,7 @@ public class SimpleFile implements SimplePool {
 	@Override
 	public SimpleDependency getDependency(String name) {
 		SimpleDependency dep = dependencies.get(name);
-		if (dep == null) { throw new NoSuchElementException("there is no dependency with the name '" + name + "'"); }
+		if (dep == null) throw new NoSuchElementException("there is no dependency with the name '" + name + "'");
 		return dep;
 	}
 	
@@ -242,13 +254,23 @@ public class SimpleFile implements SimplePool {
 	public Map<String, SimpleVariable> getVariables() { return new HashMap<>(vars); }
 	
 	@Override
-	public void addCmd(SimpleCommand add) {
+	public void addCmd(@SuppressWarnings("unused") SimpleCommand add) {
 		throw new UnsupportedOperationException("only block pools can add commands (this is a file pool)!");
 	}
 	
 	@Override
 	public void seal() {
 		throw new UnsupportedOperationException("only block pools can be sealed (this is a file pool)!");
+	}
+	
+	@Override
+	public void initRegMax(@SuppressWarnings("unused") int regMax) {
+		throw new UnsupportedOperationException("only block pools can initilize their regMax (this is a file pool)!");
+	}
+	
+	@Override
+	public int regMax() {
+		throw new UnsupportedOperationException("only block pools can have a regMax (this is a file pool)!");
 	}
 	
 	public class SimpleFuncPool implements SimplePool {
@@ -281,10 +303,10 @@ public class SimpleFile implements SimplePool {
 		@Override
 		public SimpleValue newNameUseValue(String name) {
 			for (SimpleFunctionVariable sv : myargs) {
-				if (sv.name.equals(name)) { return new SimpleDirectVariableValue(sv); }
+				if (sv.name.equals(name)) { return new SimpleVariableValue(sv); }
 			}
 			for (SimpleFunctionVariable sv : myresults) {
-				if (sv.name.equals(name)) { return new SimpleDirectVariableValue(sv); }
+				if (sv.name.equals(name)) { return new SimpleVariableValue(sv); }
 			}
 			return SimpleFile.this.newNameUseValue(name);
 		}
@@ -332,6 +354,16 @@ public class SimpleFile implements SimplePool {
 			throw new UnsupportedOperationException("only block pools can be sealed (this is a function pool)!");
 		}
 		
+		@Override
+		public void initRegMax(@SuppressWarnings("unused") int size) {
+			throw new UnsupportedOperationException("only block pools can initilize their regMax (this is a function pool)!");
+		}
+		
+		@Override
+		public int regMax() {
+			throw new UnsupportedOperationException("only block pools can have a regMax (this is a function pool)!");
+		}
+		
 	}
 	
 	public static class SimpleSubPool implements SimplePool, Cloneable {
@@ -370,8 +402,8 @@ public class SimpleFile implements SimplePool {
 		@Override
 		public SimpleValue newNameUseValue(String name) {
 			for (SimpleCommand cmd : block.commands) {
-				if (cmd instanceof SimpleCommandVarDecl vd) {
-					if (vd.name.equals(name)) { return new SimpleDirectVariableValue(vd); }
+				if (cmd instanceof SimpleCommandVarDecl vd && vd.name.equals(name)) {
+					return new SimpleVariableValue(vd);
 				}
 			}
 			return parent.newNameUseValue(name);
@@ -385,6 +417,16 @@ public class SimpleFile implements SimplePool {
 		@Override
 		public void seal() {
 			block.seal();
+		}
+		
+		@Override
+		public void initRegMax(int regMax) {
+			block.initRegMax(regMax);
+		}
+		
+		@Override
+		public int regMax() {
+			return block.regMax();
 		}
 		
 		@Override

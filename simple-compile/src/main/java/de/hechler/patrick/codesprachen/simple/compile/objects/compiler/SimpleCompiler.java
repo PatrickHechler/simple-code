@@ -18,10 +18,10 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -58,6 +58,7 @@ import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCom
 import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommandIf;
 import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommandVarDecl;
 import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommandWhile;
+import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleVariableValue;
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleValue;
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleValue.StackUseListener;
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleValue.VarLoader;
@@ -70,11 +71,13 @@ import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleConstant;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleVariable.SimpleFunctionVariable;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleVariable.SimpleOffsetVariable;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleFuncType;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleStructType;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleType;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleTypeArray;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleTypePointer;
 import de.hechler.patrick.zeugs.pfs.interfaces.File;
 
+@SuppressWarnings({ "javadoc", "unqualified-field-access" })
 public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 	
 	// X00 .. X1F are reserved for interrupts and asm blocks
@@ -83,10 +86,10 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 	// supported yet)
 	// X40 .. XF9 are reserved for temporary values
 	public static final int MIN_COMPILER_REGISTER = X_ADD + 0x20;
-	public static final int REG_METHOD_STRUCT     = MIN_COMPILER_REGISTER;
+	public static final int REG_FUNC_STRUCT       = MIN_COMPILER_REGISTER;
 	public static final int REG_VAR_PNTR          = X_ADD + 0x21;
 	public static final int MIN_VAR_REGISTER      = X_ADD + 0x40;
-	public static final int MAX_VAR_REGISTER      = X_ADD + 0x3F;
+	public static final int MAX_VAR_REGISTER      = X_ADD + 0x60;
 	public static final int MIN_TMP_VAL_REG       = MAX_VAR_REGISTER + 1;
 	public static final int MAX_TMP_VAL_REG       = 0xFF;
 	
@@ -154,7 +157,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		if (main != null) {
 			addMainCall(tu, main);
 		}
-		addErrorHandlers(tu, main);
+		addErrorHandlers(tu);
 		addDataValues(tu);
 		addVariables(tu);
 		addFunction(tu);
@@ -163,18 +166,18 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 	
 	private static void addFunction(SimpleTU tu) {
 		for (SimpleFunction sf : tu.sf.functions()) {
-			align(tu, 8, null);
 			addFunc(tu, sf);
 		}
 	}
 	
 	private static void addFunc(SimpleTU tu, SimpleFunction sf) {
 		align(tu, 8L, null);
+		put(tu, sf.name);
 		sf.init(tu.pos);
 		UsedData ud = sf.pool.used();
 		ud.currentaddr = ud.maxaddr;
 		ud.regs        = ud.maxregs;
-		SimpleFile.count(ud, sf.body.commands);
+		SimpleFile.count(ud, sf.body);
 		if (ud.maxaddr != 0L) {
 			Command movSizeCmd = new Command(Commands.CMD_MOV, build(A_SR, X_ADD), build(X_ADD, ud.maxaddr));
 			add(tu, movSizeCmd);
@@ -190,25 +193,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 			long bc  = sf.type.arguments[i].type.byteCount();
 			copyArgument(tu, sf.pool.myargs[i], off, bc);
 		}
-		for (SimpleCommand cmd : sf.body.commands) {
-			if (cmd instanceof SimpleCommandAsm c) {
-				addCmdAsm(tu, c);
-			} else if (cmd instanceof SimpleCommandAssign c) {
-				addCmdAssign(tu, c);
-			} else if (cmd instanceof SimpleCommandBlock c) {
-				addCmdBlock(tu, c);
-			} else if (cmd instanceof SimpleCommandFuncCall c) {
-				addCmdFuncCall(tu, c);
-			} else if (cmd instanceof SimpleCommandIf c) {
-				addCmdIf(tu, c);
-			} else if (cmd instanceof SimpleCommandVarDecl c) {
-				addCmdVarDecl(tu, c);
-			} else if (cmd instanceof SimpleCommandWhile c) {
-				addCmdWhile(tu, c);
-			} else {
-				throw new AssertionError(cmd.getClass() + " :  " + cmd);
-			}
-		}
+		addCmdBlock(tu, sf.body);
 		if (ud.maxaddr != 0L) {
 			Command movFromReg = new Command(Commands.CMD_MOV, build(A_SR, REG_VAR_PNTR), build(A_SR, X_ADD));
 			add(tu, movFromReg);
@@ -219,7 +204,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		add(tu, ret);
 	}
 	
-	// only used for preassembleing asm blocks
+	// only used to preassemble asm blocks
 	private static final PrimitiveAssembler PREASSEMBLER = new PrimitiveAssembler(null, null, null, false, true);
 	
 	private static void addCmdAsm(SimpleTU tu, SimpleCommandAsm c) {
@@ -234,9 +219,10 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		for (int i = minMax.b + 1; i < 256; i++) {
 			blockedRegs[i] = true;
 		}
+		StackUseListener sul       = new StackUseListener();
+		VarLoaderImpl    varLoader = new VarLoaderImpl(minMax, sul);
 		for (AsmParam arg : c.asmArguments) {
-			StackUseListener sul = new StackUseListener();
-			tu.pos = arg.value.loadValue(arg.register, blockedRegs, tu.commands, tu.pos, new VarLoaderImpl(minMax, sul), sul);
+			tu.pos = arg.value.loadValue(arg.register, blockedRegs, tu.commands, tu.pos, varLoader, sul);
 		}
 		ParseContext context = PREASSEMBLER.preassemble(tu.source, new ANTLRInputStream(c.asmCode.substring(2, c.asmCode.length() - 2)), consts(tu, c), tu.pos);
 		tu.pos = context.pos;
@@ -252,7 +238,11 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		for (SimpleConstant sc : c.pool.getConstants().values()) {
 			SimpleExportable.ImportHelp.convertConst(res, null, sc, tu.source);
 		}
-		// TODO add other constants
+		for (SimpleDependency sd : tu.sf.dependencies()) {
+			String depName = SimpleExportable.ImportHelp.DEPENDENCY_PREFIX + sd.name;
+			String comment = "dependency: " + sd.name + "\ndata: " + sd.path;
+			res.put(depName, new PrimitiveConstant(depName, comment, sd.path.addr(), tu.source, -1));
+		}
 		return res;
 	}
 	
@@ -292,8 +282,10 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		
 		@Override
 		public long loadVar(long pos, int targetRegister, List<Command> commands, SimpleFunctionVariable sv) {
-			if (sv.reg() < minMax.a || sv.reg() > minMax.b) { return -1L; }
-			long  off = (-(minMax.b - (sv.reg() << 3))) - 8L;
+			if (sv.reg() < minMax.a || sv.reg() > minMax.b) return -1L;
+			long off = minMax.b;
+			off -= sv.reg() << 3;
+			off  = -off - 8L;
 			Param reg = build(A_SR, targetRegister);
 			if (sv.type.isPrimitive() || sv.type.isPointer()) {
 				Commands op         = switch ((int) sv.type.byteCount()) {
@@ -363,16 +355,136 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		}
 	}
 	
+	@SuppressWarnings("preview")
 	private static void addCmdAssign(SimpleTU tu, SimpleCommandAssign c) {
-		// TODO Auto-generated method stub
+		if (!c.target.type().isPrimitive() && !c.target.type().isPointer()) {
+			throw new IllegalStateException("can not assign with array/structure values! (command: " + c + ")");
+		}
+		if (!c.target.type().equals(c.value.type())) {
+			throw new IllegalStateException("target and value type are different (command: " + c + ")");
+		}
+		boolean[] blockedRegs = new boolean[256];
+		if (c.target instanceof SimpleVariableValue svv) {
+			switch (svv.sv) {
+			case SimpleOffsetVariable sov -> {
+				Commands mov = mov(c, (int) c.target.type().byteCount());
+				tu.pos = c.value.loadValue(MIN_TMP_VAL_REG, blockedRegs, tu.commands, tu.pos, null, null);
+				// MOV [IP + (offset - pos)], value
+				Command cmd = new Command(mov, build(A_SR | B_NUM, PrimAsmConstants.IP, sov.offset() - tu.pos), build(A_SR, MIN_TMP_VAL_REG));
+				add(tu, cmd);
+			}
+			case SimpleFunctionVariable sfv when sfv.hasOffset() -> {
+				Commands mov = mov(c, (int) c.target.type().byteCount());
+				tu.pos = c.value.loadValue(MIN_TMP_VAL_REG, blockedRegs, tu.commands, tu.pos, null, null);
+				// MOV [sfv.reg + offset], value
+				Command cmd = new Command(mov, build(A_SR | B_NUM, sfv.reg(), sfv.offset()), build(A_SR, MIN_TMP_VAL_REG));
+				add(tu, cmd);
+			}
+			case SimpleFunctionVariable sfv -> {
+				tu.pos = c.value.loadValue(sfv.reg(), blockedRegs, tu.commands, tu.pos, null, null);
+			}
+			default -> throw new AssertionError("unknown variable type: " + svv.sv.getClass());
+			}
+		} else {
+			Commands    mov = mov(c, (int) c.target.type().byteCount());
+			SimpleValue t   = c.target.mkPointer(c.pool);
+			tu.pos = t.loadValue(MIN_TMP_VAL_REG, blockedRegs, tu.commands, tu.pos, null, null);
+			tu.pos = c.value.loadValue(MIN_TMP_VAL_REG + 1, blockedRegs, tu.commands, tu.pos, null, null);
+			// MOV [TMP0], TMP1
+			Command cmd = new Command(mov, build(A_SR | B_REG, MIN_TMP_VAL_REG), build(A_SR, MIN_TMP_VAL_REG + 1L));
+			add(tu, cmd);
+		}
 	}
 	
-	private static void addCmdBlock(SimpleTU tu, SimpleCommandBlock c) {
-		// TODO Auto-generated method stub
+	private static Commands mov(SimpleCommandAssign c, int bc) throws AssertionError {
+		return switch (bc) {
+		case 1 -> Commands.CMD_MVB;
+		case 2 -> Commands.CMD_MVW;
+		case 4 -> Commands.CMD_MVDW;
+		case 8 -> Commands.CMD_MOV;
+		default -> throw new AssertionError("invalid byte cont type: " + c.target.type());
+		};
+	}
+	
+	private static void addCmdBlock(SimpleTU tu, SimpleCommandBlock blk) {
+		for (SimpleCommand cmd : blk.commands) {
+			switch (cmd) {
+			case @SuppressWarnings("preview") SimpleCommandAsm c -> addCmdAsm(tu, c);
+			case @SuppressWarnings("preview") SimpleCommandAssign c -> addCmdAssign(tu, c);
+			case @SuppressWarnings("preview") SimpleCommandBlock c -> addCmdBlock(tu, c);
+			case @SuppressWarnings("preview") SimpleCommandFuncCall c -> addCmdFuncCall(tu, c);
+			case @SuppressWarnings("preview") SimpleCommandIf c -> addCmdIf(tu, c);
+			case @SuppressWarnings("preview") SimpleCommandVarDecl c -> addCmdVarDecl(tu, c);
+			case @SuppressWarnings("preview") SimpleCommandWhile c -> addCmdWhile(tu, c);
+			default -> throw new AssertionError(cmd.getClass() + " :  " + cmd);
+			}
+		}
 	}
 	
 	private static void addCmdFuncCall(SimpleTU tu, SimpleCommandFuncCall c) {
-		// TODO Auto-generated method stub
+		// load value before pushing to stack, so when modifying values are supported, the changes are saved
+		tu.pos = c.function.loadValue(MIN_TMP_VAL_REG, new boolean[256], tu.commands, tu.pos, null, null);
+		int min    = MIN_COMPILER_REGISTER;
+		int max    = c.pool.regMax();
+		int regLen = max - min + 1;
+		if (regLen <= 4) {
+			for (int i = min; i <= max; i++) {
+				Command cmd = new Command(Commands.CMD_PUSH, build(A_SR, i), null);
+				add(tu, cmd);
+			}
+		} else {
+			Command cmd = new Command(Commands.CMD_PUSHBLK, build(A_NUM, PrimAsmPreDefines.REGISTER_MEMORY_START + (min << 3)), build(A_NUM, regLen << 3));
+			add(tu, cmd);
+		}
+		if (c.secondName == null) {
+			SimpleFunction func = tu.sf.getFunction(c.firstName);
+			if (!func.type.equals(c.function.type())) {
+				throw new IllegalArgumentException(
+					"the function call argument needs to have the same type as the functions type! (arg-type: " + c.function.type() + " func: " + func.type + ")");
+			}
+			// MOV FUNC, TMP0
+			// CALL func.name
+			Command mov = new Command(Commands.CMD_MOV, build(A_SR, REG_FUNC_STRUCT), build(A_SR, MIN_TMP_VAL_REG));
+			add(tu, mov);
+			Command call = new Command(Commands.CMD_CALL, Param.createLabel(func.name), null);
+			add(tu, call);
+		} else {
+			SimpleDependency dep = tu.sf.getDependency(c.firstName);
+			SimpleExportable exp = dep.get(c.secondName);
+			if (!(exp instanceof SimpleFunction func)) {
+				throw new IllegalArgumentException("the export " + c.firstName + ':' + c.secondName + " is no function: " + exp);
+			}
+			if (!func.type.equals(c.function.type())) {
+				throw new IllegalArgumentException(
+					"the function call argument needs to have the same type as the functions type! (arg-type: " + c.function.type() + " func: " + func.type + ")");
+			}
+			// LEA X00, (dep.pos - tu.pos)
+			// INT INT_LOAD_LIB
+			// JMPERR LOAD_ERROR
+			// MOV FUNC, TMP0
+			// CALO X00, func.off
+			Command cmd = new Command(Commands.CMD_LEA, build(A_SR, X_ADD), build(A_NUM, dep.path.addr() - tu.pos));
+			add(tu, cmd);
+			cmd = new Command(Commands.CMD_MOV, build(A_SR, X_ADD + 3L), build(A_SR, X_ADD));
+			add(tu, cmd);
+			cmd = new Command(Commands.CMD_INT, build(A_NUM, PrimAsmPreDefines.INT_LOAD_LIB), null);
+			add(tu, cmd);
+			cmd = new Command(Commands.CMD_JMPERR, build(A_NUM, tu.depLoad - tu.pos), null);
+			add(tu, cmd);
+			cmd = new Command(Commands.CMD_MOV, build(A_SR, REG_FUNC_STRUCT), build(A_SR, MIN_TMP_VAL_REG));
+			add(tu, cmd);
+			cmd = new Command(Commands.CMD_CALO, build(A_SR, X_ADD), build(A_NUM, func.address()));
+			add(tu, cmd);
+		}
+		if (regLen <= 4) {
+			for (int i = max; i >= min; i--) {
+				Command cmd = new Command(Commands.CMD_POP, build(A_SR, i), null);
+				add(tu, cmd);
+			}
+		} else {
+			Command cmd = new Command(Commands.CMD_POPBLK, build(A_NUM, PrimAsmPreDefines.REGISTER_MEMORY_START + (min << 3)), build(A_NUM, regLen << 3));
+			add(tu, cmd);
+		}
 	}
 	
 	private static void addCmdIf(SimpleTU tu, SimpleCommandIf c) {
@@ -406,9 +518,9 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 			add(tu, movDstAddrCmd);
 			Command movSrcAddrCmd;
 			if (srcOff != 0L) {
-				movSrcAddrCmd = new Command(Commands.CMD_MVAD, build(A_SR, X_ADD + 1L), build(A_SR, REG_METHOD_STRUCT), build(A_NUM, srcOff));
+				movSrcAddrCmd = new Command(Commands.CMD_MVAD, build(A_SR, X_ADD + 1L), build(A_SR, REG_FUNC_STRUCT), build(A_NUM, srcOff));
 			} else {
-				movSrcAddrCmd = new Command(Commands.CMD_MOV, build(A_SR, X_ADD + 1L), build(A_SR, REG_METHOD_STRUCT));
+				movSrcAddrCmd = new Command(Commands.CMD_MOV, build(A_SR, X_ADD + 1L), build(A_SR, REG_FUNC_STRUCT));
 			}
 			add(tu, movSrcAddrCmd);
 			Command movLenCmd = new Command(Commands.CMD_MOV, build(A_SR, X_ADD + 2L), build(A_NUM, byteCount));
@@ -422,9 +534,9 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		while (remain > 0L) {
 			Param from;
 			if (srcOff != 0L || add != 0L) {
-				from = build(A_SR | B_NUM, REG_METHOD_STRUCT, srcOff + add);
+				from = build(A_SR | B_NUM, REG_FUNC_STRUCT, srcOff + add);
 			} else {
-				from = build(A_SR | B_REG, REG_METHOD_STRUCT);
+				from = build(A_SR | B_REG, REG_FUNC_STRUCT);
 			}
 			Param to;
 			int   reg = dstReg;
@@ -502,32 +614,80 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		}
 	}
 	
-	private static void addErrorHandlers(SimpleTU tu, SimpleFunction main) {
+	/**
+	 * adds the error handlers:
+	 * 
+	 * <pre>
+	 * <code>
+	 * :
+	 *     CHARS 'UTF-8' "error: out of memory\n"
+	 * >
+	 * |> align
+	 * OUT_OF_MEMORY:
+	 *   MOV X00, STD_LOG
+	 *   MOV X01, MSG_LENGTH
+	 *   LEA X02, RELATIVE_MSG_POS
+	 *   INT INT_STREAMS_WRITE
+	 *   MOV X00, 8
+	 *   INT INT_EXIT
+	 * </code>
+	 * </pre>
+	 * 
+	 * @param tu the translation unit
+	 */
+	private static void addErrorHandlers(SimpleTU tu) {
 		ConstantPoolCommand outOfMemMsgCP = new ConstantPoolCommand();
 		outOfMemMsgCP.addBytes("error: out of memory\n".getBytes(StandardCharsets.UTF_8));
 		long msgPos = tu.pos;
 		add(tu, outOfMemMsgCP);
 		align(tu, 8L, outOfMemMsgCP);
 		tu.outOfMem = tu.pos;
+		put(tu, "OUT_OF_MEMORY_ERROR");
 		Command movIDCmd = new Command(Commands.CMD_MOV, build(A_SR, X_ADD), build(A_NUM, PrimAsmPreDefines.STD_LOG));
 		add(tu, movIDCmd);
-		Command movStrLen = new Command(Commands.CMD_MOV, build(A_SR, X_ADD + 1), build(A_NUM, outOfMemMsgCP.length()));
+		Command movStrLen = new Command(Commands.CMD_MOV, build(A_SR, X_ADD + 1L), build(A_NUM, outOfMemMsgCP.length()));
 		add(tu, movStrLen);
-		Command leaAddrCmd = new Command(Commands.CMD_LEA, build(A_SR, X_ADD + 2), build(A_NUM, msgPos - tu.pos));
+		Command leaAddrCmd = new Command(Commands.CMD_LEA, build(A_SR, X_ADD + 2L), build(A_NUM, msgPos - tu.pos));
 		add(tu, leaAddrCmd);
 		Command intOutOfMemErrCmd = new Command(Commands.CMD_INT, build(A_NUM, PrimAsmPreDefines.INT_STREAMS_WRITE), null);
 		add(tu, intOutOfMemErrCmd);
-		Command movExitNumCmd = new Command(Commands.CMD_MOV, build(A_SR, X_ADD), build(A_NUM, 1L));
+		Command movExitNumCmd = new Command(Commands.CMD_MOV, build(A_SR, X_ADD), build(A_NUM, 8L));
 		add(tu, movExitNumCmd);
 		Command intExitCmd = new Command(Commands.CMD_INT, build(A_NUM, PrimAsmPreDefines.INT_EXIT), null);
 		add(tu, intExitCmd);
 	}
 	
+	private static void put(SimpleTU tu, String key) throws AssertionError {
+		if (tu.labels.put(key, Long.valueOf(tu.pos)) != null) {
+			throw new AssertionError("multiple " + key + " labels");
+		}
+	}
+	
+	/**
+	 * the main call will look like:
+	 * 
+	 * <pre>
+	 * <code>
+	 * MOV X02, X00
+	 * MOV X00, MAIN_LENGTH
+	 * INT INT_MEMORY_ALLOC
+	 * MOV [X00], X02
+	 * MOV [X00 + 8], X01
+	 * MOV REG_METHOD_STRUCT, X00
+	 * CALL main
+	 * MOV X00, [X00]
+	 * INT INT_EXIT
+	 * </code>
+	 * </pre>
+	 * 
+	 * @param tu   the translation unit
+	 * @param main the main function
+	 */
 	private static void addMainCall(SimpleTU tu, SimpleFunction main) {
 		if (!MAIN_TYPE.equals(main.type)) {
 			throw new IllegalArgumentException("main function type is invalid: expected '" + MAIN_TYPE + "' got '" + main.type + "' ('" + main + "')");
 		}
-		if (tu.pos != 0L) { throw new AssertionError(tu.pos); }
+		if (tu.pos != 0L) throw new AssertionError(tu.pos);
 		Command backupArgcCmd = new Command(Commands.CMD_MOV, build(A_SR, X_ADD + 2L), build(A_SR, X_ADD));
 		add(tu, backupArgcCmd);
 		Command movSizeCmd = new Command(Commands.CMD_MOV, build(A_SR, X_ADD), build(A_NUM, MAIN_LENGTH));
@@ -538,24 +698,25 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		add(tu, movArgcCmd);
 		Command movArgvCmd = new Command(Commands.CMD_MOV, build(A_SR | B_NUM, X_ADD, 8), build(A_SR, X_ADD + 1L));
 		add(tu, movArgvCmd);
-		Command movFuncCmd = new Command(Commands.CMD_MOV, build(A_SR, REG_METHOD_STRUCT), build(A_SR, X_ADD));
+		Command movFuncCmd = new Command(Commands.CMD_MOV, build(A_SR, REG_FUNC_STRUCT), build(A_SR, X_ADD));
 		add(tu, movFuncCmd);
 		Command callCmd = new Command(Commands.CMD_CALL, Param.createLabel(main.name), null);
 		add(tu, callCmd);
-		Command movExitNumCmd = new Command(Commands.CMD_MOV, build(A_SR, X_ADD), build(A_SR | B_REG, REG_METHOD_STRUCT));
+		Command movExitNumCmd = new Command(Commands.CMD_MOV, build(A_SR, X_ADD), build(A_SR | B_REG, REG_FUNC_STRUCT));
 		add(tu, movExitNumCmd);
 		Command intExitCmd = new Command(Commands.CMD_INT, build(A_NUM, PrimAsmPreDefines.INT_EXIT), null);
 		add(tu, intExitCmd);
 	}
 	
 	private static void add(SimpleTU tu, Command cmd) {
+		if (tu.pos == -1L) throw new AssertionError();
 		tu.pos += cmd.length();
 		tu.commands.add(cmd);
 	}
 	
-	public static void writeExports(SimpleTU tu) throws IOException {
+	private static void writeExports(SimpleTU tu) throws IOException {
 		Iterator<SimpleExportable> iter = tu.sf.exportsIter();
-		if (!iter.hasNext()) { return; }
+		if (!iter.hasNext()) return;
 		String name   = tu.source.getFileName().toString();
 		Path   export = switch (FileTypes.getTypeFromName(name, FileTypes.PRIMITIVE_MASHINE_CODE)) {
 						case SIMPLE_SOURCE_CODE ->
@@ -572,16 +733,29 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		}
 	}
 	
-	
+	// no need for an ordered/single-threaded step
 	@Override
 	protected boolean skipCompile() { return true; }
 	
 	@Override
-	protected void compile(SimpleTU tu) throws IOException {/* skip compile */}
+	protected void compile(@SuppressWarnings("unused") SimpleTU tu) throws IOException {/* skip compile */}
 	
 	@Override
 	protected void finish(SimpleTU tu) throws IOException {
-		// TODO Auto-generated method stub
+		List<SimpleExportable> later = new ArrayList<>();
+		for (Iterator<SimpleExportable> iter = tu.sf.exportsIter(); iter.hasNext();) {
+			SimpleExportable se = iter.next();
+			if (!(se instanceof SimpleStructType)) {
+				later.add(se);
+				continue;
+			}
+			tu.expOut.append(se.toExportString()).append('\n');
+		}
+		for (SimpleExportable se : later) {
+			tu.expOut.append(se.toExportString()).append('\n');
+		}
+		PrimitiveAssembler asm = new PrimitiveAssembler(tu.target.openWrite().asOutputStream(), null, new Path[0], false, false);
+		asm.assemble(tu.commands, tu.labels);
 	}
 	
 	public static long align(long addr, int bc) {
@@ -660,10 +834,12 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 	
 	public class SimpleTU extends TranslationUnit implements TriFunction<String, String, String, SimpleDependency> {
 		
-		private final List<Command> commands = new LinkedList<>();
-		private final SimpleFile    sf       = new SimpleFile(this);
+		private final List<Command>     commands = new ArrayList<>();
+		private final Map<String, Long> labels   = new HashMap<>();
+		private final SimpleFile        sf       = new SimpleFile(this);
 		
 		private long   outOfMem;
+		private long   depLoad;
 		private long   pos;
 		private Writer expOut;
 		
@@ -698,7 +874,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		
 	}
 	
-	// this method is used by antlr, can't be done in the SimpleConstant class
+	// this method is used by ANTLR, can't be done in the SimpleConstant class
 	// because the SimpleValue class is not known there
 	/**
 	 * creates a new {@link SimpleConstant}

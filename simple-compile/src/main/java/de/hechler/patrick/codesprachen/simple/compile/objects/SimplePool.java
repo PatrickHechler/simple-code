@@ -49,6 +49,10 @@ public interface SimplePool {
 	
 	void seal();
 	
+	void initRegMax(int max);
+	
+	int regMax();
+	
 	default SimpleType getFuncType(String first, String second) {
 		if (second == null) {
 			return getFunction(first).type;

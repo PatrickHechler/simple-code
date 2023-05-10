@@ -2,6 +2,7 @@ package de.hechler.patrick.codesprachen.simple.compile.objects;
 
 import de.hechler.patrick.codesprachen.simple.compile.objects.compiler.SimpleCompiler;
 
+@SuppressWarnings("javadoc")
 public class UsedData implements Cloneable {
 	
 	public int  regs        = SimpleCompiler.MIN_VAR_REGISTER;
@@ -14,7 +15,7 @@ public class UsedData implements Cloneable {
 		try {
 			return (UsedData) super.clone();
 		} catch (CloneNotSupportedException e) {
-			throw new InternalError();
+			throw new InternalError(e);
 		}
 	}
 	

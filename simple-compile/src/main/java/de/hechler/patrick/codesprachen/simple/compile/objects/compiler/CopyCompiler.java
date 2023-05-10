@@ -2,8 +2,8 @@ package de.hechler.patrick.codesprachen.simple.compile.objects.compiler;
 
 import java.io.IOError;
 import java.io.IOException;
+import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
-import java.lang.foreign.MemorySession;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.file.Files;
@@ -16,11 +16,12 @@ import de.hechler.patrick.zeugs.pfs.interfaces.WriteStream;
 
 public class CopyCompiler extends PerFileCompiler {
 	
+	/** {@inheritDoc} */
 	@Override
 	protected void compile(Path source, File target) {
 		try (SeekableByteChannel read = Files.newByteChannel(source, StandardOpenOption.READ);
 				WriteStream write = target.openWrite();
-				MemorySession ses = MemorySession.openConfined()) {
+				Arena ses = Arena.openConfined()) {
 			MemorySegment mem  = ses.allocate(1024L);
 			ByteBuffer    bbuf = mem.asByteBuffer();
 			while (true) {

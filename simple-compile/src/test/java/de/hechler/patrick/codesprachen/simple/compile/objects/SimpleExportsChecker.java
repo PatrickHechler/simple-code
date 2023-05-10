@@ -9,15 +9,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
-import de.hechler.patrick.codesprachen.simple.compile.interfaces.SimpleExportable;
 import de.hechler.patrick.codesprachen.simple.compile.interfaces.TriFunction;
 import de.hechler.patrick.codesprachen.simple.compile.objects.SimpleFile.SimpleDependency;
 import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommandBlock;
-import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleFuncType;
-import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleStructType;
-import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleType;
-import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleTypePointer;
-import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleTypePrimitive;
+import de.hechler.patrick.codesprachen.simple.symbol.interfaces.SimpleExportable;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleVariable.SimpleOffsetVariable;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleFuncType;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleStructType;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleType;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleTypePointer;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleTypePrimitive;
 import de.hechler.patrick.zeugs.check.anotations.Check;
 import de.hechler.patrick.zeugs.check.anotations.CheckClass;
 import de.hechler.patrick.zeugs.check.anotations.End;
@@ -38,7 +39,9 @@ public class SimpleExportsChecker {
 		rnd = null;
 	}
 	
-	private static final TriFunction <String, String, String, SimpleDependency> NO_DEP_PROV = (n, d, r) -> { throw new UnsupportedOperationException(); };
+	private static final TriFunction<String, String, String, SimpleDependency> NO_DEP_PROV = (n, d, r) -> {
+		throw new UnsupportedOperationException();
+	};
 	
 	@Check
 	private void constant() {
@@ -57,35 +60,32 @@ public class SimpleExportsChecker {
 	
 	@Check
 	private void variable() {
-		SimpleVariable sv = new SimpleVariable(SimpleType.NUM, "variable_name", true);
-		sv.addr = rnd.nextLong();
+		SimpleOffsetVariable sv = sv(SimpleType.NUM, "variable_name", true);
+		sv.init(0x7FFFFFFFFFFFFFFFL & rnd.nextLong());
 		checkExport(sv, null, sv.type);
 		sv = sv(SimpleType.UBYTE, "variable_name", true);
-		sv.addr = rnd.nextLong();
+		sv.init(0x7FFFFFFFFFFFFFFFL & rnd.nextLong());
 		checkExport(sv, null, sv.type);
 		sv = sv(new SimpleFuncType(svs(), svs()), "otherVariableName", true);
-		sv.addr = rnd.nextLong();
+		sv.init(0x7FFFFFFFFFFFFFFFL & rnd.nextLong());
 		checkExport(sv, null, sv.type);
-		sv = sv(new SimpleFuncType(svs(new SimpleVariable(SimpleType.NUM, "arg1", false)), svs()), "otherVariableName", true);
-		sv.addr = rnd.nextLong();
+		sv = sv(new SimpleFuncType(svs(new SimpleOffsetVariable(SimpleType.NUM, "arg1", false)), svs()), "otherVariableName", true);
+		sv.init(0x7FFFFFFFFFFFFFFFL & rnd.nextLong());
 		checkExport(sv, null, sv.type);
-		sv = sv(new SimpleFuncType(svs(), svs(new SimpleVariable(SimpleType.NUM, "arg1", false))), "otherVariableName", true);
-		sv.addr = rnd.nextLong();
+		sv = sv(new SimpleFuncType(svs(), svs(new SimpleOffsetVariable(SimpleType.NUM, "arg1", false))), "otherVariableName", true);
+		sv.init(0x7FFFFFFFFFFFFFFFL & rnd.nextLong());
 		checkExport(sv, null, sv.type);
-		sv = sv(
-			new SimpleFuncType(
-				svs(sv(new SimpleTypePointer(new SimpleStructType("my_EMPTY_structure", true, svs())), "", false)),
-				svs(new SimpleVariable(SimpleType.NUM, "arg1", false))),
-			"otherVariableName", true);
-		sv.addr = rnd.nextLong();
+		sv = sv(new SimpleFuncType(svs(sv(new SimpleTypePointer(new SimpleStructType("my_EMPTY_structure", true, svs())), "", false)),
+			svs(new SimpleOffsetVariable(SimpleType.NUM, "arg1", false))), "otherVariableName", true);
+		sv.init(0x7FFFFFFFFFFFFFFFL & rnd.nextLong());
 		checkExport(sv, null, new SimpleStructType("my_EMPTY_structure", true, svs()), sv.type);
 	}
 	
-	private SimpleVariable sv(SimpleType type, String name, boolean export) {
-		return new SimpleVariable(type, name, export);
+	private static SimpleOffsetVariable sv(SimpleType type, String name, boolean export) {
+		return new SimpleOffsetVariable(type, name, export);
 	}
 	
-	private List <SimpleVariable> svs(SimpleVariable... result) {
+	private static List<SimpleOffsetVariable> svs(SimpleOffsetVariable... result) {
 		return Arrays.asList(result);
 	}
 	
@@ -96,8 +96,8 @@ public class SimpleExportsChecker {
 		if (types2 != null) {
 			export(b, types2);
 		}
-		Map <String, SimpleExportable> exports = SimpleExportable.readExports(new StringReader(b.toString()));
-		SimpleExportable imp = exports.get(se.name());
+		Map<String, SimpleExportable> exports = SimpleExportable.readExports(new StringReader(b.toString()));
+		SimpleExportable              imp     = exports.get(se.name());
 		assertEquals(se, imp);
 	}
 	
@@ -105,22 +105,23 @@ public class SimpleExportsChecker {
 		export(b, (Object[]) types);
 	}
 	
-	private void export(StringBuilder b, SimpleVariable... types) {
+	private void export(StringBuilder b, SimpleOffsetVariable... types) {
 		export(b, (Object[]) types);
 	}
 	
 	private void export(StringBuilder b, Object... types) {
-		for (int i = 0; i < types.length; i ++ ) {
+		for (int i = 0; i < types.length; i++) {
 			SimpleType t = getType(types[i]);
 			if (t instanceof SimpleTypePrimitive) {
 				// NOP
-			} else if (t instanceof SimpleTypePointer) {
-				export(b, ((SimpleTypePointer) t).target);
-			} else if (t instanceof SimpleFuncType) {
-				export(b, ((SimpleFuncType) t).arguments);
-				export(b, ((SimpleFuncType) t).results);
-			} else if (t instanceof SimpleStructType) {
-				
+			} else if (t instanceof SimpleTypePointer pt) {
+				export(b, pt.target);
+			} else if (t instanceof SimpleFuncType ft) {
+				export(b, ft.arguments);
+				export(b, ft.results);
+			} else if (t instanceof SimpleStructType st) {
+				export(b, st.members);
+				b.append(st.toExportString()).append('\n');
 			} else {
 				fail("unknown type: " + t.getClass());
 			}
@@ -128,20 +129,14 @@ public class SimpleExportsChecker {
 		
 	}
 	
-	private SimpleType getType(Object obj) throws InternalError {
+	private static SimpleType getType(Object obj) throws InternalError {
 		if (obj instanceof SimpleType) {
 			return (SimpleType) obj;
-		} else if (obj instanceof SimpleVariable) {
-			return ((SimpleVariable) obj).type;
+		} else if (obj instanceof SimpleOffsetVariable) {
+			return ((SimpleOffsetVariable) obj).type;
 		} else {
-			throw new InternalError( ("unknown class: " + obj.getClass()));
+			throw new InternalError("unknown class: " + obj.getClass());
 		}
-	}
-	
-	private SimpleCommandBlock emptyBlock(SimpleFile file, List <SimpleVariable> args, List <SimpleVariable> res) {
-		SimpleCommandBlock block = new SimpleCommandBlock(file.newFuncPool(args, res));
-		block.seal();
-		return block;
 	}
 	
 }

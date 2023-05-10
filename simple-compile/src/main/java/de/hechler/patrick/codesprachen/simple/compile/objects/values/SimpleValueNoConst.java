@@ -28,6 +28,7 @@ import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleType;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleTypePointer;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleTypePrimitive;
 
+@SuppressWarnings({ "javadoc", "unqualified-field-access" })
 public abstract class SimpleValueNoConst implements SimpleValue {
 	
 	public static final int FORWARD_JMP_BASE_LEN = 8;
@@ -202,7 +203,7 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		public long loadValue(int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader, StackUseListener sul) {
 			pos = valA.loadValue(targetRegister, blockedRegisters, commands, pos, loader, sul);
 			long mul = this.t.byteCount();
-			if (mul < 1L) { throw new AssertionError("target type is too small! valA: " + valA.type()); }
+			if (mul < 1L) throw new AssertionError("target type is too small! valA: " + valA.type());
 			if (valB instanceof SimpleValueConst c) {
 				long val = c.getNumber() * mul;
 				if (this.t.isPrimitive()) {
@@ -226,7 +227,14 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 				pos = findRegister(blockedRegisters, commands, pos, rd, rd.reg, sul);
 				pos = valB.loadValue(rd.reg, blockedRegisters, commands, pos, loader, sul);
 				if (mul != 1L) { // byte arrays don't need this
-					Command mulCmd = new Command(Commands.CMD_MUL, build(A_SR, rd.reg), build(A_NUM, mul));
+					Command mulCmd;
+					if (Long.bitCount(mul) == 1) {
+						mulCmd = new Command(Commands.CMD_MUL, build(A_SR, rd.reg), build(A_NUM, mul));
+					} else {
+						long shift;
+						for (shift = 1L; mul != 1L << shift; shift++) {/**/}
+						mulCmd = new Command(Commands.CMD_LSH, build(A_SR, rd.reg), build(A_NUM, shift));
+					}
 					pos += mulCmd.length();
 					commands.add(mulCmd);
 				}
@@ -328,7 +336,7 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 				return "~(" + this.val + ")";
 			case CMD_NEG, CMD_NEGFP:
 				return "-(" + this.val + ')';
-				//$CASES-OMITTED$
+			// $CASES-OMITTED$
 			default:
 				return this.op + " (" + this.val + ')';
 			}
@@ -1222,7 +1230,7 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		} else if (this.t.isStruct()) {
 			SimpleStructType struct = (SimpleStructType) this.t;
 			target = struct.member(text);
-		} else if (this instanceof SimpleDirectVariableValue vv && vv.sv instanceof SimpleDependency dep) {
+		} else if (this instanceof SimpleVariableValue vv && vv.sv instanceof SimpleDependency dep) {
 			SimpleExportable exp = dep.get(text);
 			if (exp instanceof SimpleConstant c) {
 				return new SimpleNumberValue(SimpleType.NUM, c.value());
@@ -1232,7 +1240,7 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 			} else if (exp instanceof SimpleStructType s) {
 				throw new IllegalArgumentException(dep.name + ':' + s.name + " is a structure, no value!");
 			} else if (exp instanceof SimpleVariable v) {
-				return new SimpleDirectVariableValue(v);
+				return new SimpleVariableValue(v);
 			} else {
 				throw new AssertionError("unknown export: " + exp.getClass() + " :  " + exp);
 			}

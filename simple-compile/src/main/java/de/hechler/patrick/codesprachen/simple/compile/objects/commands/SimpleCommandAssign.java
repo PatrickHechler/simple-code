@@ -4,6 +4,7 @@ import de.hechler.patrick.codesprachen.simple.compile.objects.SimplePool;
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleValue;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleType;
 
+@SuppressWarnings("javadoc")
 public class SimpleCommandAssign implements SimpleCommand {
 	
 	public final SimplePool  pool;
@@ -11,18 +12,17 @@ public class SimpleCommandAssign implements SimpleCommand {
 	public final SimpleValue value;
 	
 	public SimpleCommandAssign(SimplePool pool, SimpleValue target, SimpleValue value) {
-		this.pool = pool;
+		this.pool   = pool;
 		this.target = target;
-		this.value = value;
+		this.value  = value;
 	}
 	
 	public static SimpleCommandAssign create(SimplePool pool, SimpleValue target, SimpleValue value) {
-		SimpleType t = value.type();
-		if ( !t.isPrimitive() && !t.isPointer()) {
-			throw new IllegalStateException("can not assign with array/structure values! (target: " + target + " value: " + value + ")");
+		SimpleType t = target.type();
+		if (t.equals(value.type())) {
+			throw new IllegalStateException("target and value type are different");
 		}
-		t = target.type();
-		if ( !t.isPrimitive() && !t.isPointer()) {
+		if (!t.isPrimitive() && !t.isPointer()) {
 			throw new IllegalStateException("can not assign with array/structure values! (target: " + target + " value: " + value + ")");
 		}
 		return new SimpleCommandAssign(pool, target, value);
@@ -30,7 +30,7 @@ public class SimpleCommandAssign implements SimpleCommand {
 	
 	@Override
 	public SimplePool pool() {
-		return pool;
+		return this.pool;
 	}
 	
 }

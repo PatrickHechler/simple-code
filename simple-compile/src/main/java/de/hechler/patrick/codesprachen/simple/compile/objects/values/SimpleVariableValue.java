@@ -18,11 +18,12 @@ import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleVariable.Simp
 import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleVariable.SimpleOffsetVariable;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleTypePointer;
 
-public class SimpleDirectVariableValue extends SimpleValueNoConst {
+@SuppressWarnings("javadoc")
+public class SimpleVariableValue extends SimpleValueNoConst {
 	
 	public final SimpleVariable sv;
 	
-	public SimpleDirectVariableValue(SimpleVariable sv) {
+	public SimpleVariableValue(SimpleVariable sv) {
 		super(sv.type);
 		this.sv = sv;
 	}
@@ -30,22 +31,22 @@ public class SimpleDirectVariableValue extends SimpleValueNoConst {
 	@Override
 	public long loadValue(int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader, StackUseListener sul) {
 		Param reg = blockRegister(targetRegister, blockedRegisters);
-		if (sv instanceof SimpleFunctionVariable v) {
+		if (this.sv instanceof SimpleFunctionVariable v) {
 			if (loader != null) {
 				long np = loader.loadVar(pos, targetRegister, commands, v);
 				if (np != -1) {
 					return np;
 				}
 			}
-			if (t.isPrimitive() || t.isPointer()) {
+			if (this.t.isPrimitive() || this.t.isPointer()) {
 				Param p;
 				if (v.hasOffset()) {
 					p = build(A_SR | B_NUM, v.reg(), v.offset());
 				} else {
 					p = build(A_SR, v.reg());
 				}
-				pos = addMovCmd(t, commands, pos, p, reg);
-			} else if (t.isStruct() || t.isArray()) {
+				pos = addMovCmd(this.t, commands, pos, p, reg);
+			} else if (this.t.isStruct() || this.t.isArray()) {
 				if (v.hasOffset()) {
 					Command movCmd = new Command(Commands.CMD_MOV, reg, build(A_SR | B_NUM, v.reg(), v.offset()));
 					pos += movCmd.length();
@@ -57,52 +58,52 @@ public class SimpleDirectVariableValue extends SimpleValueNoConst {
 					commands.add(movCmd);
 				}
 			} else {
-				throw new AssertionError(t.getClass() + " : " + t);
+				throw new AssertionError(this.t.getClass() + " : " + this.t);
 			}
-		} else if (sv instanceof SimpleOffsetVariable v) { // offset is from file-start
-			if (t.isPrimitive() || t.isPointer()) {
-				pos = addMovCmd(t, commands, pos, lambdaPos -> build(A_SR | B_NUM, PrimAsmConstants.IP, v.offset() - lambdaPos), reg);
-			} else if (t.isStruct() || t.isArray()) {
+		} else if (this.sv instanceof SimpleOffsetVariable v) { // offset is from file-start
+			if (this.t.isPrimitive() || this.t.isPointer()) {
+				pos = addMovCmd(this.t, commands, pos, lambdaPos -> build(A_SR | B_NUM, PrimAsmConstants.IP, v.offset() - lambdaPos), reg);
+			} else if (this.t.isStruct() || this.t.isArray()) {
 				Command leaCmd = new Command(Commands.CMD_LEA, reg, build(A_NUM, v.offset() - pos));
 				pos += leaCmd.length();
 				commands.add(leaCmd);
 			} else {
-				throw new AssertionError(t.getClass() + " : " + t);
+				throw new AssertionError(this.t.getClass() + " : " + this.t);
 			}
 		} else {
-			throw new AssertionError(sv.getClass() + " : " + sv);
+			throw new AssertionError(this.sv.getClass() + " : " + this.sv);
 		}
 		return pos;
 	}
 	
 	@Override
-	public SimpleValue mkPointer(SimplePool pool) {
+	public SimpleValue mkPointer(@SuppressWarnings("unused") SimplePool pool) {
 		wantPntr();
 		return new SimpleVariablePointerValue();
 	}
 	
 	private void wantPntr() {
-		if (sv instanceof SimpleFunctionVariable v) {
+		if (this.sv instanceof SimpleFunctionVariable v) {
 			v.setWantsPointer();
 		}
 	}
 	
 	@Override
 	public String toString() {
-		return sv.name;
+		return this.sv.name;
 	}
 	
 	public class SimpleVariablePointerValue extends SimpleValueNoConst {
 		
 		public SimpleVariablePointerValue() {
-			super(new SimpleTypePointer(SimpleDirectVariableValue.this.t));
+			super(new SimpleTypePointer(SimpleVariableValue.this.t));
 		}
 		
 		@Override
 		public long loadValue(int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader, StackUseListener sul) {
 			Param   reg = blockRegister(targetRegister, blockedRegisters);
 			Command cmd;
-			if (sv instanceof SimpleFunctionVariable v) {
+			if (SimpleVariableValue.this.sv instanceof SimpleFunctionVariable v) {
 				if (loader != null) {
 					long np = loader.loadVarPntr(pos, targetRegister, commands, v);
 					if (np != -1L) {
@@ -114,10 +115,10 @@ public class SimpleDirectVariableValue extends SimpleValueNoConst {
 				} else {
 					cmd = new Command(Commands.CMD_MOV, reg, build(A_NUM, PrimAsmPreDefines.REGISTER_MEMORY_START + (v.reg() << 3)));
 				}
-			} else if (sv instanceof SimpleOffsetVariable v) {
+			} else if (SimpleVariableValue.this.sv instanceof SimpleOffsetVariable v) {
 				cmd = new Command(Commands.CMD_LEA, reg, build(A_NUM, v.offset() - pos));
 			} else {
-				throw new AssertionError(sv.getClass() + " : " + sv);
+				throw new AssertionError(SimpleVariableValue.this.sv.getClass() + " : " + SimpleVariableValue.this.sv);
 			}
 			pos += cmd.length();
 			commands.add(cmd);
@@ -126,7 +127,7 @@ public class SimpleDirectVariableValue extends SimpleValueNoConst {
 		
 		@Override
 		public String toString() {
-			return "&" + sv.name;
+			return "&" + SimpleVariableValue.this.sv.name;
 		}
 		
 	}

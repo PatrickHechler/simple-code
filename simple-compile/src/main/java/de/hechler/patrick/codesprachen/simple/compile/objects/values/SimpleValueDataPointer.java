@@ -19,14 +19,16 @@ public abstract class SimpleValueDataPointer extends SimpleValueNoConst {
 	 * this array is not allowed to be modified
 	 */
 	public final byte[] data;
+	public final int    align;
 	/**
 	 * this value is only allowed to be set once (twice when the -1 at the start counts) by the compiler!
 	 */
-	private long         addr = -1L;
+	private long        addr = -1L;
 	
-	public SimpleValueDataPointer(SimpleType mytype, byte[] data) {
+	public SimpleValueDataPointer(SimpleType mytype, byte[] data, int align) {
 		super(mytype);
 		this.data = data;
+		this.align = align;
 	}
 	
 	public void init(long addr) {
@@ -44,7 +46,7 @@ public abstract class SimpleValueDataPointer extends SimpleValueNoConst {
 	}
 	
 	@Override
-	public long loadValue(int targetRegister, boolean[] blockedRegisters, List <Command> commands, long pos, VarLoader loader) {
+	public long loadValue(int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader, StackUseListener sul) {
 		Param reg = blockRegister(targetRegister, blockedRegisters);
 		if (this.addr == -1L) {
 			throw new AssertionError("not yet initilized");
@@ -58,7 +60,7 @@ public abstract class SimpleValueDataPointer extends SimpleValueNoConst {
 	@Override
 	public SimpleValue mkPointer(SimplePool pool) {
 		if (t.isArray()) {
-			return new SimpleCastedDataValue(new SimpleTypePointer( ((SimpleTypeArray) t).target));
+			return new SimpleCastedDataValue(new SimpleTypePointer(((SimpleTypeArray) t).target));
 		} else if (!t.isPointer()) {
 			return super.mkPointer(pool);
 		} else {
@@ -68,14 +70,14 @@ public abstract class SimpleValueDataPointer extends SimpleValueNoConst {
 	
 	@Override
 	public SimpleValue addExpCast(SimplePool pool, SimpleType type) {
-		if ( !t.isArray()) {
+		if (!t.isArray()) {
 			assert t.isPointer();
 			if (type.isPointer()) {
 				return new SimpleCastedDataValue(type);
 			} else {
 				return super.addExpCast(pool, type);
 			}
-		} else if ( !type.isArray()) {
+		} else if (!type.isArray()) {
 			throw new IllegalStateException("can not cast from '" + t + "' to '" + type + "'");
 		} else {
 			return new SimpleCastedDataValue(type);
@@ -89,14 +91,14 @@ public abstract class SimpleValueDataPointer extends SimpleValueNoConst {
 		}
 		
 		@Override
-		public long loadValue(int targetRegister, boolean[] blockedRegisters, List <Command> commands, long pos, VarLoader loader) {
-			return SimpleValueDataPointer.this.loadValue(targetRegister, blockedRegisters, commands, pos, loader);
+		public long loadValue(int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader, StackUseListener sul) {
+			return SimpleValueDataPointer.this.loadValue(targetRegister, blockedRegisters, commands, pos, loader, sul);
 		}
 		
 		@Override
 		public SimpleValue mkPointer(SimplePool pool) {
 			if (t.isArray()) {
-				return new SimpleCastedDataValue(new SimpleTypePointer( ((SimpleTypeArray) t).target));
+				return new SimpleCastedDataValue(new SimpleTypePointer(((SimpleTypeArray) t).target));
 			} else {
 				assert t.isPointer();
 				return super.mkPointer(pool);
@@ -105,14 +107,14 @@ public abstract class SimpleValueDataPointer extends SimpleValueNoConst {
 		
 		@Override
 		public SimpleValue addExpCast(SimplePool pool, SimpleType type) {
-			if ( !t.isArray()) {
+			if (!t.isArray()) {
 				assert t.isPointer();
 				if (type.isPointer()) {
 					return new SimpleCastedDataValue(type);
 				} else {
 					return super.addExpCast(pool, type);
 				}
-			} else if ( !type.isArray()) {
+			} else if (!type.isArray()) {
 				throw new IllegalStateException("can not cast from '" + t + "' to '" + type + "'");
 			} else {
 				return new SimpleCastedDataValue(type);
