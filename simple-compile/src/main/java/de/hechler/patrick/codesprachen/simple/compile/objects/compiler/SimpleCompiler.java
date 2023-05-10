@@ -75,6 +75,7 @@ import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleStructT
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleType;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleTypeArray;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleTypePointer;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleTypePrimitive;
 import de.hechler.patrick.zeugs.pfs.interfaces.File;
 
 @SuppressWarnings({ "javadoc", "unqualified-field-access" })
@@ -488,7 +489,10 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 	}
 	
 	private static void addCmdIf(SimpleTU tu, SimpleCommandIf c) {
-		// TODO Auto-generated method stub
+		boolean[] regs = new boolean[256];
+		tu.pos = c.condition.loadValue(MIN_TMP_VAL_REG, regs, tu.commands, tu.pos, null, null);
+		if (c.condition.type().isPointer()) {
+		}
 	}
 	
 	private static void addCmdVarDecl(SimpleTU tu, SimpleCommandVarDecl c) {
