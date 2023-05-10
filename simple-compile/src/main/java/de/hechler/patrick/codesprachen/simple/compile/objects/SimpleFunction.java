@@ -1,10 +1,11 @@
 package de.hechler.patrick.codesprachen.simple.compile.objects;
 
-import java.util.List;
+import java.util.Arrays;
 
 import de.hechler.patrick.codesprachen.simple.compile.objects.SimpleFile.SimpleFuncPool;
 import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommandBlock;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleFunctionSymbol;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleVariable.SimpleFunctionVariable;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleVariable.SimpleOffsetVariable;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleFuncType;
 
@@ -14,21 +15,32 @@ public class SimpleFunction extends SimpleFunctionSymbol {
 	public final SimpleCommandBlock body;
 	public final SimpleFuncPool     pool;
 	
-	public SimpleFunction(boolean export, boolean main, String name, List<SimpleOffsetVariable> args,
-			List<SimpleOffsetVariable> results, SimpleCommandBlock cmd, SimpleFuncPool pool) {
-		this(-1L, export, main, name, new SimpleFuncType(args, results), cmd, pool);
+	public SimpleFunction(boolean export, boolean main, String name, SimpleCommandBlock cmd, SimpleFuncPool pool) {
+		this(-1L, null, export, main, name, type(pool), cmd, pool);
 	}
 	
-	public SimpleFunction(long address, String name, SimpleFuncType type) {
-		this(address, true, false, name, type, null, null);
+	public SimpleFunction(long address, Object relative, String name, SimpleFuncType type) {
+		this(address, relative, true, false, name, type, null, null);
 	}
 	
-	private SimpleFunction(long address, boolean export, boolean main, String name, SimpleFuncType type,
-			SimpleCommandBlock cmd, SimpleFuncPool pool) {
-		super(address, export, name, type);
+	private SimpleFunction(long address, Object relative, boolean export, boolean main, String name, SimpleFuncType type, SimpleCommandBlock cmd,
+		SimpleFuncPool pool) {
+		super(address, relative, export, name, type);
 		this.main = main;
 		this.body = cmd;
 		this.pool = pool;
+	}
+	
+	private static SimpleFuncType type(SimpleFuncPool pool) {
+		return new SimpleFuncType(Arrays.asList(convert(pool.myargs)), Arrays.asList(convert(pool.myresults)));
+	}
+	
+	private static SimpleOffsetVariable[] convert(SimpleFunctionVariable[] arr) {
+		SimpleOffsetVariable[] res = new SimpleOffsetVariable[arr.length];
+		for (int i = 0; i < res.length; i++) {
+			res[i] = new SimpleOffsetVariable(arr[i].type, arr[i].name);
+		}
+		return res;
 	}
 	
 	@Override

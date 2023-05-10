@@ -19,8 +19,9 @@ public class SimpleCommandAssign implements SimpleCommand {
 	
 	public static SimpleCommandAssign create(SimplePool pool, SimpleValue target, SimpleValue value) {
 		SimpleType t = target.type();
-		if (t.equals(value.type())) {
-			throw new IllegalStateException("target and value type are different");
+		if (!t.equals(value.type())) {
+			throw new IllegalStateException(
+				"target and value type are different! target.type: " + t + " value.type: " + value.type() + " target: '" + target + "' value: '" + value + "'");
 		}
 		if (!t.isPrimitive() && !t.isPointer()) {
 			throw new IllegalStateException("can not assign with array/structure values! (target: " + target + " value: " + value + ")");

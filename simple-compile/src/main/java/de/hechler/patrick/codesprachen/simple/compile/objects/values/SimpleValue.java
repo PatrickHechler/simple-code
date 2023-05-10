@@ -14,7 +14,7 @@ public interface SimpleValue {
 	 * the minimum register number which is allowed to be used when a value should load its value to a register
 	 */
 	public static final int MIN_REGISTER = SimpleCompiler.MIN_TMP_VAL_REG;
-	public static final int MAX_REGISTER = SimpleCompiler.MIN_TMP_VAL_REG;
+	public static final int MAX_REGISTER = SimpleCompiler.MAX_TMP_VAL_REG;
 	
 	public static final int EXP_MULTIPLY              = 1;
 	public static final int EXP_DIVIDE                = 2;

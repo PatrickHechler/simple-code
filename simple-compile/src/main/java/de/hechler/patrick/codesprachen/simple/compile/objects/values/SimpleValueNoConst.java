@@ -34,7 +34,7 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 	public static final int FORWARD_JMP_BASE_LEN = 8;
 	
 	static {
-		if (new Command(Commands.CMD_JMP, build(A_NUM, 0), null).length() != FORWARD_JMP_BASE_LEN) { throw new AssertionError(); }
+		if (new Command(Commands.CMD_JMP, build(A_NUM, 0), null).length() != FORWARD_JMP_BASE_LEN) { throw new AssertionError(new Command(Commands.CMD_JMP, build(A_NUM, 0), null).length()); }
 		if (new Command(Commands.CMD_JMPERR, build(A_NUM, 0), null).length() != FORWARD_JMP_BASE_LEN) { throw new AssertionError(); }
 		if (new Command(Commands.CMD_JMPNE, build(A_NUM, 0), Param.createLabel("--")).length() != FORWARD_JMP_BASE_LEN) {
 			throw new AssertionError();

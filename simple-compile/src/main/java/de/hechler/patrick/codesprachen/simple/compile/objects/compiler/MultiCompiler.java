@@ -8,6 +8,7 @@ import java.util.Set;
 import de.hechler.patrick.codesprachen.simple.compile.interfaces.Compiler;
 import de.hechler.patrick.zeugs.pfs.interfaces.File;
 
+@SuppressWarnings("javadoc")
 public abstract class MultiCompiler implements Compiler {
 
 	private final Set<Compiler> comps = new HashSet<>();

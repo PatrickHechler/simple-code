@@ -7,6 +7,7 @@ import java.nio.file.Paths;
 
 import de.hechler.patrick.codesprachen.simple.compile.interfaces.Compiler;
 
+@SuppressWarnings("javadoc")
 public class DefMultiCompiler extends MultiCompiler {
 	
 	public static final String SIMPLE_SOURCE_CODE_END    = "ssc";

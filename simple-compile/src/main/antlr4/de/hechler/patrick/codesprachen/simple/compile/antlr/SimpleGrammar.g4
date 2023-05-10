@@ -147,7 +147,7 @@ function [SimpleFile file] returns [SimpleFunction func]:
 	)?
 	{SimplePool pool = file.newFuncPool($args.list, results);}
 	commandBlock [pool]
-	{$func = new SimpleFunction(export, main, $NAME.getText(), $args.list, results, $commandBlock.cmd, (SimpleFuncPool) pool);}
+	{$func = new SimpleFunction(export, main, $NAME.getText(), $commandBlock.cmd, (SimpleFuncPool) pool);}
 ;
 constant [SimpleFile file] returns [SimpleConstant c]:
 	{

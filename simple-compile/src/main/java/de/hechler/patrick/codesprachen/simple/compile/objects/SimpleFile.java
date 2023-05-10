@@ -18,11 +18,11 @@ import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCom
 import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommandBlock;
 import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommandVarDecl;
 import de.hechler.patrick.codesprachen.simple.compile.objects.compiler.SimpleCompiler;
-import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleVariableValue;
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleNumberValue;
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleStringValue;
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleValue;
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleValueDataPointer;
+import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleVariableValue;
 import de.hechler.patrick.codesprachen.simple.symbol.interfaces.SimpleExportable;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleConstant;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleVariable;
@@ -127,12 +127,12 @@ public class SimpleFile implements SimplePool {
 		SimpleFuncType           type     = new SimpleFuncType(args, results);
 		SimpleFunctionVariable[] funcargs = new SimpleFunctionVariable[type.arguments.length];
 		for (int i = 0; i < funcargs.length; i++) {
-			funcargs[i] = new SimpleFunctionVariable(type.arguments[i].type, type.arguments[i].name);
+			funcargs[i] = new SimpleFunctionVariable(type.arguments[i].type, type.arguments[i].name); // init done in count
 		}
 		UsedData used = new UsedData();
 		count(used, Arrays.asList(funcargs));
 		SimpleFunctionVariable[] funcres = new SimpleFunctionVariable[type.results.length];
-		for (int i = 0; i < funcargs.length; i++) {
+		for (int i = 0; i < funcres.length; i++) {
 			funcres[i] = new SimpleFunctionVariable(type.results[i].type, type.results[i].name);
 			funcres[i].init(type.results[i].offset(), SimpleCompiler.REG_FUNC_STRUCT);
 		}
@@ -152,7 +152,7 @@ public class SimpleFile implements SimplePool {
 		final long startAddr = used.currentaddr;
 		for (Object obj : countTarget) {
 			if (obj instanceof SimpleCommandBlock scb) {
-				count(used, scb);
+				count(used, scb.commands, scb);
 			} else if (obj instanceof SimpleFunctionVariable sv) {
 				long regLen = (sv.type.byteCount() >>> 3) + ((sv.type.byteCount() & 7) != 0 ? 1 : 0);
 				if (used.regs < SimpleCompiler.MAX_VAR_REGISTER - regLen && !sv.watsPointer()) {
@@ -345,7 +345,7 @@ public class SimpleFile implements SimplePool {
 		}
 		
 		@Override
-		public void addCmd(SimpleCommand add) {
+		public void addCmd(@SuppressWarnings("unused") SimpleCommand add) {
 			throw new UnsupportedOperationException("only block pools can add commands (this is a function pool)!");
 		}
 		

@@ -1,0 +1,47 @@
+func main add_main(num argc, char## argv) --> <num exitnum> {
+	var num a <-- 5;
+	var num b <-- 4;
+	var num c <-- a + b;
+	char[64] myBufA;
+	num lenA;
+	char[64] myBufB;
+	num lenB;
+	char[64] myBufC;
+	num lenC;
+	(num value, char# buf, num system, char# bufLen) --> <num strLen, char# newBuf, num system, num bufNewLen> strFromNumArg;
+	strFromNumArg:value <-- a;
+	strFromNumArg:buf <-- myBufA;
+	strFromNumArg:system <-- 10;
+	strFromNumArg:bufLen <-- 64;
+	call std:strFromNum strFromNumArg;
+	lenA <-- strFromNumArg:strLen;
+	strFromNumArg:value <-- b; // assume that all buffers are large enough
+	strFromNumArg:buf <-- myBufB;
+	call std:strFromNum strFromNumArg;
+	lenB <-- strFromNumArg:strLen;
+	strFromNumArg:value <-- c;
+	strFromNumArg:buf <-- myBufC;
+	call std:strFromNum strFromNumArg;
+	lenC <-- strFromNumArg:strLen;
+	(num id, num length, ubyte# data) --> <num id, wrote> writeArg;
+	writeArg:id <-- std:OUT;
+	writeArg:length <-- lenA;
+	writeArg:data <-- myBufA;
+	call std:write writeArg;
+	writeArg:length <-- 3;
+	writeArg:data <-- " + ";
+	call std:write writeArg;
+	writeArg:length <-- lenB;
+	writeArg:data <-- myBufB;
+	call std:write writeArg;
+	writeArg:length <-- 3;
+	writeArg:data <-- " = ";
+	call std:write writeArg;
+	writeArg:length <-- lenC;
+	writeArg:data <-- myBufC;
+	call std:write writeArg;
+	writeArg:length <-- 1;
+	writeArg:data <-- "\n";
+	call std:write writeArg;
+	exitnum <-- 0;
+}
