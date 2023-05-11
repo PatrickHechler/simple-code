@@ -9,8 +9,10 @@ import static de.hechler.patrick.codesprachen.primitive.core.utils.PrimAsmConsta
 import static de.hechler.patrick.codesprachen.primitive.core.utils.PrimAsmConstants.X_ADD;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.IOError;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.Reader;
 import java.io.Writer;
 import java.nio.charset.Charset;
@@ -76,6 +78,7 @@ import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleType;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleTypeArray;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleTypePointer;
 import de.hechler.patrick.zeugs.pfs.interfaces.File;
+import de.hechler.patrick.zeugs.pfs.interfaces.WriteStream;
 
 @SuppressWarnings({ "javadoc", "unqualified-field-access" })
 public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
@@ -933,8 +936,16 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		if (tu.target.length() != 0L) {
 			tu.target.truncate(0L);
 		}
-		PrimitiveAssembler asm = new PrimitiveAssembler(tu.target.openWrite().asOutputStream(), null, new Path[0], false, false);
+		ByteArrayOutputStream baos = new ByteArrayOutputStream();
+		PrimitiveAssembler    asm  = new PrimitiveAssembler(baos, null, new Path[0], false, false);
 		asm.assemble(tu.commands, tu.labels);
+		System.out.println("baos length: " + baos.size());
+		try (OutputStream out = Files.newOutputStream(Path.of("./testout/file"))) {
+			out.write(baos.toByteArray());
+		}
+		try (WriteStream write = tu.target.openWrite()) {
+			write.write(baos.toByteArray());
+		}
 	}
 	
 	public static long align(long addr, int bc) {
