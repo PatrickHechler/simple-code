@@ -1,19 +1,19 @@
-//This file is part of the Simple Code Project
-//DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
-//Copyright (C) 2023  Patrick Hechler
+// This file is part of the Simple Code Project
+// DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+// Copyright (C) 2023 Patrick Hechler
 //
-//This program is free software: you can redistribute it and/or modify
-//it under the terms of the GNU General Public License as published by
-//the Free Software Foundation, either version 3 of the License, or
-//(at your option) any later version.
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
 //
-//This program is distributed in the hope that it will be useful,
-//but WITHOUT ANY WARRANTY; without even the implied warranty of
-//MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//GNU General Public License for more details.
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
 //
-//You should have received a copy of the GNU General Public License
-//along with this program.  If not, see <https://www.gnu.org/licenses/>.
+// You should have received a copy of the GNU General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
 package de.hechler.patrick.codesprachen.simple.compile.objects.compiler;
 
 import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.A_NUM;
@@ -31,11 +31,12 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.Reader;
 import java.io.Writer;
+import java.nio.channels.ClosedChannelException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
+import java.security.NoSuchProviderException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -51,7 +52,6 @@ import org.antlr.v4.runtime.CommonTokenStream;
 import de.hechler.patrick.codesprachen.primitive.assemble.PrimitiveFileGrammarParser.ParseContext;
 import de.hechler.patrick.codesprachen.primitive.assemble.enums.Commands;
 import de.hechler.patrick.codesprachen.primitive.assemble.enums.CompilerCommand;
-import de.hechler.patrick.codesprachen.primitive.assemble.enums.FileTypes;
 import de.hechler.patrick.codesprachen.primitive.assemble.objects.Command;
 import de.hechler.patrick.codesprachen.primitive.assemble.objects.CompilerCommandCommand;
 import de.hechler.patrick.codesprachen.primitive.assemble.objects.ConstantPoolCommand;
@@ -93,6 +93,8 @@ import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleStructT
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleType;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleTypeArray;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleTypePointer;
+import de.hechler.patrick.zeugs.pfs.FSProvider;
+import de.hechler.patrick.zeugs.pfs.interfaces.FS;
 import de.hechler.patrick.zeugs.pfs.interfaces.File;
 
 @SuppressWarnings({ "javadoc" })
@@ -111,13 +113,11 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 	public static final int MIN_TMP_VAL_REG       = MAX_VAR_REGISTER + 1;
 	public static final int MAX_TMP_VAL_REG       = 0xFF;
 	
-	public static final Map<String, SimpleConstant>    DEFAULT_CONSTANTS;
-	public static final Map<String, PrimitiveConstant> DEFAULT_CONSTANTS_PRIM;
-	
 	// when changed the compilers main call has most likely to be changed too
 	public static final SimpleFuncType MAIN_TYPE   = new SimpleFuncType(
-		List.of(new SimpleOffsetVariable(SimpleType.NUM, "argc"), new SimpleOffsetVariable(new SimpleTypePointer(new SimpleTypePointer(SimpleType.BYTE)), "argv")),
-		List.of(new SimpleOffsetVariable(SimpleType.NUM, "exitnum")));
+			List.of(new SimpleOffsetVariable(SimpleType.NUM, "argc"),
+					new SimpleOffsetVariable(new SimpleTypePointer(new SimpleTypePointer(SimpleType.BYTE)), "argv")),
+			List.of(new SimpleOffsetVariable(SimpleType.NUM, "exitnum")));
 	private static final long          MAIN_LENGTH = 16L;
 	private static final long          JMP_LENGTH  = 8L;
 	
@@ -128,14 +128,58 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		if (JMP_LENGTH != new Command(Commands.CMD_JMPERR, Param.createLabel(""), null).length()) throw new AssertionError("JMP_LENGTH has the wrong value");
 		if (JMP_LENGTH != new Command(Commands.CMD_JMPGT, Param.createLabel(""), null).length()) throw new AssertionError("JMP_LENGTH has the wrong value");
 		if (JMP_LENGTH != new Command(Commands.CMD_JMPEQ, Param.createLabel(""), null).length()) throw new AssertionError("JMP_LENGTH has the wrong value");
-		Map<String, PrimitiveConstant> defConstsPrim = new HashMap<>(PrimAsmConstants.START_CONSTANTS);
-		Map<String, SimpleConstant>    defConsts     = new HashMap<>();
-		for (PrimitiveConstant cnst : PrimAsmConstants.START_CONSTANTS.values()) {
-			defConsts.put(cnst.name(), new SimpleConstant(cnst.name(), cnst.value(), false));
-		}
-		DEFAULT_CONSTANTS      = Collections.unmodifiableMap(defConsts);
-		DEFAULT_CONSTANTS_PRIM = Collections.unmodifiableMap(defConstsPrim);
 	}
+	
+	private static class StdFunc extends SimpleFunction {
+		
+		public StdFunc(Object relative, String name, SimpleFuncType type) {
+			super(0, relative, name, type);
+		}
+		
+	}
+	
+	public static final SimpleDependency STD_DEP = new SimpleDependency("std", null, true) {
+		
+		private final Map<String, SimpleExportable> map = init();
+		
+		private HashMap<String, SimpleExportable> init() {
+			HashMap<String, SimpleExportable> res = new HashMap<>();
+			for (PrimitiveConstant pc : PrimAsmConstants.START_CONSTANTS.values()) {
+				String n = pc.name();
+				if (n.startsWith("INT_")) {
+					StringBuilder sb = new StringBuilder(n.length() - 4); // max length
+					for (int i = 4; i != -1;) {
+						int nu = n.indexOf(i, '_');
+						sb.append(n.charAt(i++));
+						String sub;
+						if (nu == -1) sub = n.substring(i);
+						else sub = n.substring(i, nu);
+						sb.append(sub.toLowerCase());
+						i = nu + 1;
+					}
+					// TODO continue
+				}
+				res.put(n, new SimpleConstant(n, pc.value(), true));
+			}
+			return res;
+		}
+		
+		@Override
+		public SimpleExportable get(String name) {
+			SimpleExportable val = map.get(name);
+			if (val == null) {
+				return val;
+			}
+			throw new NoSuchElementException("there is no export with the name '" + name + "' in the std dependency");
+		}
+		
+		@Override
+		public Iterator<SimpleExportable> getAll() {
+			// TODO Auto-generated method stub
+			return null;
+		}
+		
+	};
 	
 	private final Charset cs;
 	private final Path    srcRoot;
@@ -176,7 +220,6 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		addDataValues(tu);
 		addVariables(tu);
 		addFunction(tu);
-		writeExports(tu);
 	}
 	
 	private static void addFunction(SimpleTU tu) {
@@ -249,7 +292,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 	}
 	
 	private static Map<String, PrimitiveConstant> consts(SimpleTU tu, SimpleCommandAsm c) {
-		Map<String, PrimitiveConstant> res = new HashMap<>(SimpleCompiler.DEFAULT_CONSTANTS_PRIM);
+		Map<String, PrimitiveConstant> res = new HashMap<>();
 		for (SimpleFunction sf : tu.sf.functions()) {
 			SimpleExportable.ImportHelp.convertFunc(res, null, sf, tu.source, false);
 		}
@@ -260,6 +303,17 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 			String depName = SimpleExportable.ImportHelp.DEPENDENCY_PREFIX + sd.name;
 			String comment = "dependency: " + sd.name + "\ndata: " + sd.path;
 			res.put(depName, new PrimitiveConstant(depName, comment, sd.path.addr(), tu.source, -1));
+			String prefix = depName + '_';
+			for (Iterator<SimpleExportable> iter = sd.getAll(); iter.hasNext();) {
+				SimpleExportable se = iter.next();
+				switch (se) {
+				case @SuppressWarnings("preview") SimpleConstant sc -> SimpleExportable.ImportHelp.convertConst(res, prefix, sc, null);
+				case @SuppressWarnings("preview") SimpleOffsetVariable sov -> SimpleExportable.ImportHelp.convertVar(res, prefix, sov, null);
+				case @SuppressWarnings("preview") SimpleFunction sf -> SimpleExportable.ImportHelp.convertFunc(res, prefix, sf, null, true);
+				case @SuppressWarnings("preview") SimpleStructType sst -> SimpleExportable.ImportHelp.convertStrut(res, prefix, sst, null);
+				default -> throw new AssertionError("unknown simple exportable type: " + se);
+				}
+			}
 		}
 		return res;
 	}
@@ -461,8 +515,8 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		if (c.secondName == null) {
 			SimpleFunction func = tu.sf.getFunction(c.firstName);
 			if (!func.type.equals(c.function.type())) {
-				throw new IllegalArgumentException(
-					"the function call argument needs to have the same type as the functions type! (arg-type: " + c.function.type() + " func: " + func.type + ")");
+				throw new IllegalArgumentException("the function call argument needs to have the same type as the functions type! (arg-type: " + c.function.type()
+						+ " func: " + func.type + ")");
 			}
 			// MOV FUNC, TMP0
 			// CALL func.name
@@ -477,8 +531,8 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 				throw new IllegalArgumentException("the export " + c.firstName + ':' + c.secondName + " is no function: " + exp);
 			}
 			if (!func.type.equals(c.function.type())) {
-				throw new IllegalArgumentException(
-					"the function call argument needs to have the same type as the functions type! (arg-type: " + c.function.type() + " func: " + func.type + ")");
+				throw new IllegalArgumentException("the function call argument needs to have the same type as the functions type! (arg-type: " + c.function.type()
+						+ " func: " + func.type + ")");
 			}
 			// LEA X00, (dep.pos - tu.pos)
 			// INT INT_LOAD_LIB
@@ -902,25 +956,6 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		tu.commands.add(cmd);
 	}
 	
-	private static void writeExports(SimpleTU tu) throws IOException {
-		Iterator<SimpleExportable> iter = tu.sf.exportsIter();
-		if (!iter.hasNext()) return;
-		String name   = tu.source.getFileName().toString();
-		Path   export = switch (FileTypes.getTypeFromName(name, FileTypes.PRIMITIVE_MASHINE_CODE)) {
-						case SIMPLE_SOURCE_CODE ->
-							tu.source.resolveSibling(name.substring(0, name.lastIndexOf('.')) + FileTypes.SIMPLE_SYMBOL_FILE.getExtensionWithDot());
-						case PRIMITIVE_MASHINE_CODE, PRIMITIVE_SOURCE_CODE, PRIMITIVE_SYMBOL_FILE, SIMPLE_SYMBOL_FILE ->
-							tu.source.resolveSibling(name + FileTypes.SIMPLE_SYMBOL_FILE.getExtensionWithDot());
-						};
-		try (Writer out = Files.newBufferedWriter(export, StandardOpenOption.WRITE, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
-			while (iter.hasNext()) {
-				SimpleExportable se = iter.next();
-				out.write(se.toExportString());
-				out.write('\n');
-			}
-		}
-	}
-	
 	// no need for an ordered/single-threaded step
 	@Override
 	protected boolean skipCompile() { return true; }
@@ -930,24 +965,39 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 	
 	@Override
 	protected void finish(SimpleTU tu) throws IOException {
-		List<SimpleExportable> later = new ArrayList<>();
-		for (Iterator<SimpleExportable> iter = tu.sf.exportsIter(); iter.hasNext();) {
-			SimpleExportable se = iter.next();
-			if (!(se instanceof SimpleStructType)) {
-				later.add(se);
-				continue;
-			}
-			tu.expOut.append(se.toExportString()).append('\n');
-		}
-		for (SimpleExportable se : later) {
-			tu.expOut.append(se.toExportString()).append('\n');
-		}
+		writeExports(tu);
 		if (tu.target.length() != 0L) {
 			tu.target.truncate(0L);
 		}
-		try (OutputStream out = tu.target.openWrite().asOutputStream(); OutputStream bout = new BufferedOutputStream(out, tu.target.fs().blockSize() - 4)) {
-			PrimitiveAssembler    asm  = new PrimitiveAssembler(bout, null, new Path[0], false, false);
+		try (OutputStream bout = new BufferedOutputStream(tu.target.openWrite().asOutputStream(), bufferSize(tu))) {
+			PrimitiveAssembler asm = new PrimitiveAssembler(bout, null, new Path[0], false, false);
 			asm.assemble(tu.commands, tu.labels);
+		}
+	}
+	
+	private static int bufferSize(SimpleTU tu) throws IOException, ClosedChannelException {
+		FS  fs = tu.target.fs();
+		int bs = fs.blockSize();
+		try {
+			if (FSProvider.ofName(FSProvider.PATR_FS_PROVIDER_NAME).loadedFS().contains(fs)) {
+				bs -= 4;
+			}
+		} catch (NoSuchProviderException e) {
+			e.printStackTrace();
+		}
+		while (bs < 512) bs <<= 1;
+		return bs;
+	}
+	
+	private static void writeExports(SimpleTU tu) throws IOException {
+		Iterator<SimpleExportable> iter = tu.sf.exportsIter();
+		if (!iter.hasNext()) return;
+		try (tu.expOut) {
+			while (iter.hasNext()) {
+				SimpleExportable se = iter.next();
+				tu.expOut.write(se.toExportString());
+				tu.expOut.write('\n');
+			}
 		}
 	}
 	
@@ -988,6 +1038,13 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		}
 		
 		@Override
+		public Iterator<SimpleExportable> getAll() {
+			SimpleTU stu = SimpleCompiler.super.tus.get(dependency);
+			if (stu == null) { throw new NoSuchElementException("the dependency " + depend + ": '" + dependency + "' could not be found"); }
+			return stu.sf.exportsIter();
+		}
+		
+		@Override
 		public int hashCode() {
 			return super.hashCode();
 		}
@@ -1005,7 +1062,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		
 		public SimpleSymbolDependency(String name, String runtimeDepend, Map<String, SimpleExportable> imported) {
 			super(name, runtimeDepend);
-			this.imported = imported;
+			this.imported = Collections.unmodifiableMap(imported);
 		}
 		
 		private static SimpleSymbolDependency create(String name, String run, Path path, Charset cs) {
@@ -1034,6 +1091,11 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		@Override
 		public boolean equals(Object obj) {
 			return super.equals(obj);
+		}
+		
+		@Override
+		public Iterator<SimpleExportable> getAll() {
+			return imported.values().iterator();
 		}
 		
 	}

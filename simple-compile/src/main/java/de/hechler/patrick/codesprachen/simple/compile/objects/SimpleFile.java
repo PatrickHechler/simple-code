@@ -49,7 +49,7 @@ import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleStructT
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleType;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleTypePointer;
 
-@SuppressWarnings({ "javadoc", "unqualified-field-access" })
+@SuppressWarnings({ "javadoc" })
 public class SimpleFile implements SimplePool {
 	
 	private final TriFunction<String, String, String, SimpleDependency> dependencyProvider;
@@ -57,13 +57,14 @@ public class SimpleFile implements SimplePool {
 	private final Map<String, SimpleOffsetVariable>                     vars         = new LinkedHashMap<>();
 	private final Map<String, SimpleStructType>                         structs      = new HashMap<>();
 	private final Map<String, SimpleFunction>                           funcs        = new LinkedHashMap<>();
-	private final Map<String, SimpleConstant>                           consts       = new HashMap<>(SimpleCompiler.DEFAULT_CONSTANTS);
+	private final Map<String, SimpleConstant>                           consts       = new HashMap<>();
 	private final List<SimpleValueDataPointer>                          datas        = new ArrayList<>();
 	private final List<SimpleExportable>                                exports      = new ArrayList<>();
 	private SimpleFunction                                              main         = null;
 	
 	public SimpleFile(TriFunction<String, String, String, SimpleDependency> dependencyProvider) {
 		this.dependencyProvider = dependencyProvider;
+		this.dependencies.put(SimpleCompiler.STD_DEP.name(), SimpleCompiler.STD_DEP);
 	}
 	
 	private void checkName(String name) {
@@ -498,6 +499,17 @@ public class SimpleFile implements SimplePool {
 			this.depend = runtimeDepend;
 		}
 		
+		public SimpleDependency(String name, String runtimeDepend, boolean allowNull) {
+			super(DEPENDENCY_TYPE, name, false);
+			if (!allowNull || runtimeDepend != null) {
+				this.path   = new SimpleStringValue(runtimeDepend);
+				this.depend = runtimeDepend;
+			} else {
+				this.path   = null;
+				this.depend = null;
+			}
+		}
+		
 		public static String runtimeName(String compileDepend) {
 			return switch (FileTypes.getTypeFromName(compileDepend, FileTypes.PRIMITIVE_MASHINE_CODE)) {
 			case PRIMITIVE_SYMBOL_FILE -> compileDepend.substring(0, compileDepend.length() - FileTypes.PRIMITIVE_SOURCE_CODE.getExtensionWithDot().length());
@@ -507,6 +519,8 @@ public class SimpleFile implements SimplePool {
 		}
 		
 		public abstract SimpleExportable get(String name);
+		
+		public abstract Iterator<SimpleExportable> getAll();
 		
 		@Override
 		public int hashCode() {

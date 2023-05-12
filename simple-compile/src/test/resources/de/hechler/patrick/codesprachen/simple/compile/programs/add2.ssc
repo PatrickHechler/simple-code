@@ -26,7 +26,8 @@ func main add_main(num argc, char## argv) --> <num exitnum> {
 	var num lenB;
 	var char[64] myBufC;
 	var num lenC;
-	var (num value, char# buf, num system, char# bufLen) --> <num strLen, char# newBuf, num system, num bufNewLen> strFromNumArg;
+	var (num value, char# buf, num system, char# bufLen)
+		--> <num strLen, char# newBuf, num system_unmodified, num bufNewLen> strFromNumArg;
 	strFromNumArg:value <-- a;
 	strFromNumArg:buf <-- myBufA;
 	strFromNumArg:system <-- 10;
