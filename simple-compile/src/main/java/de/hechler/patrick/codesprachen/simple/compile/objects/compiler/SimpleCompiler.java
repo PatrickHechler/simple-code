@@ -95,7 +95,7 @@ import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleTypeArr
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleTypePointer;
 import de.hechler.patrick.zeugs.pfs.interfaces.File;
 
-@SuppressWarnings({ "javadoc", "unqualified-field-access" })
+@SuppressWarnings({ "javadoc" })
 public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 	
 	// X00 .. X1F are reserved for interrupts and asm blocks
@@ -113,9 +113,6 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 	
 	public static final Map<String, SimpleConstant>    DEFAULT_CONSTANTS;
 	public static final Map<String, PrimitiveConstant> DEFAULT_CONSTANTS_PRIM;
-	
-	public static final long INT_ERR_OUT_OF_MEM = PrimAsmPreDefines.INTERRUPT_COUNT;
-	public static final long INTERRUPT_COUNT    = INT_ERR_OUT_OF_MEM + 1;
 	
 	// when changed the compilers main call has most likely to be changed too
 	public static final SimpleFuncType MAIN_TYPE   = new SimpleFuncType(
@@ -136,12 +133,6 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		for (PrimitiveConstant cnst : PrimAsmConstants.START_CONSTANTS.values()) {
 			defConsts.put(cnst.name(), new SimpleConstant(cnst.name(), cnst.value(), false));
 		}
-		defConsts.put("INT_ERR_OUT_OF_MEM", new SimpleConstant("INT_ERR_OUT_OF_MEM", INT_ERR_OUT_OF_MEM, false));
-		defConsts.put("INTERRUPT_COUNT", new SimpleConstant("INTERRUPT_COUNT", INTERRUPT_COUNT, false));
-		defConstsPrim.put("INT_ERR_OUT_OF_MEM",
-			new PrimitiveConstant("INT_ERR_OUT_OF_MEM", "|: called when there is not enugh memory", INT_ERR_OUT_OF_MEM, PrimAsmConstants.START_CONSTANTS_PATH, -1));
-		defConstsPrim.put("INTERRUPT_COUNT",
-			new PrimitiveConstant("INTERRUPT_COUNT", defConstsPrim.get("INTERRUPT_COUNT").comment(), INTERRUPT_COUNT, PrimAsmConstants.START_CONSTANTS_PATH, -1));
 		DEFAULT_CONSTANTS      = Collections.unmodifiableMap(defConsts);
 		DEFAULT_CONSTANTS_PRIM = Collections.unmodifiableMap(defConstsPrim);
 	}
@@ -203,13 +194,17 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		ud.regs        = ud.maxregs;
 		SimpleFile.count(ud, func.body);
 		if (ud.maxaddr != 0L) {
-			Command movSizeCmd = new Command(Commands.CMD_MOV, build(A_SR, X_ADD), build(X_ADD, ud.maxaddr));
+			// MOV X00, NEEDED_SIZE
+			// INT INT_MEMORY_ALLOC
+			// JMPERR OUT_OF_MEMORY
+			// MOV REG_VAR, X00
+			Command movSizeCmd = new Command(Commands.CMD_MOV, build(A_SR, X_ADD), build(A_NUM, ud.maxaddr));
 			add(tu, movSizeCmd);
 			Command intMallocCmd = new Command(Commands.CMD_INT, build(A_NUM, PrimAsmPreDefines.INT_MEMORY_ALLOC), null);
 			add(tu, intMallocCmd);
 			Command jmpErrCmd = new Command(Commands.CMD_JMPERR, build(A_NUM, tu.outOfMem - tu.pos), null);
 			add(tu, jmpErrCmd);
-			Command movToReg = new Command(Commands.CMD_MOV, build(A_SR, X_ADD), build(A_SR, REG_VAR_PNTR));
+			Command movToReg = new Command(Commands.CMD_MOV, build(A_SR, REG_VAR_PNTR), build(A_SR, X_ADD));
 			add(tu, movToReg);
 		}
 		for (int i = 0; i < func.type.arguments.length; i++) {
@@ -224,8 +219,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 			Command intFreeCmd = new Command(Commands.CMD_INT, build(A_NUM, PrimAsmPreDefines.INT_MEMORY_FREE), null);
 			add(tu, intFreeCmd);
 		}
-		Command ret = new Command(Commands.CMD_RET, null, null);
-		add(tu, ret);
+		add(tu, new Command(Commands.CMD_RET, null, null));
 	}
 	
 	// only used to preassemble asm blocks
@@ -932,7 +926,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 	protected boolean skipCompile() { return true; }
 	
 	@Override
-	protected void compile(@SuppressWarnings("unused") SimpleTU tu) throws IOException {/* skip compile */}
+	protected void compile(SimpleTU tu) throws IOException { throw new AssertionError("compile should be skipped"); }
 	
 	@Override
 	protected void finish(SimpleTU tu) throws IOException {

@@ -130,9 +130,6 @@ public class SimpleCompilerMain {
 		try {
 			pfs.close();
 		} catch (Throwable e) {
-			if (e instanceof ThreadDeath td) {
-				throw td;
-			}
 			System.err.println("could not close the file system:");
 			e.printStackTrace();
 			System.exit(2);
