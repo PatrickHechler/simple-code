@@ -1,3 +1,19 @@
+//This file is part of the Simple Code Project
+//DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+//Copyright (C) 2023  Patrick Hechler
+//
+//This program is free software: you can redistribute it and/or modify
+//it under the terms of the GNU General Public License as published by
+//the Free Software Foundation, either version 3 of the License, or
+//(at your option) any later version.
+//
+//This program is distributed in the hope that it will be useful,
+//but WITHOUT ANY WARRANTY; without even the implied warranty of
+//MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//GNU General Public License for more details.
+//
+//You should have received a copy of the GNU General Public License
+//along with this program.  If not, see <https://www.gnu.org/licenses/>.
 package de.hechler.patrick.codesprachen.simple.compile.objects.compiler;
 
 import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.A_NUM;
@@ -8,8 +24,8 @@ import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.P
 import static de.hechler.patrick.codesprachen.primitive.core.utils.PrimAsmConstants.SP;
 import static de.hechler.patrick.codesprachen.primitive.core.utils.PrimAsmConstants.X_ADD;
 
+import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
-import java.io.ByteArrayOutputStream;
 import java.io.IOError;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -78,7 +94,6 @@ import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleType;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleTypeArray;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleTypePointer;
 import de.hechler.patrick.zeugs.pfs.interfaces.File;
-import de.hechler.patrick.zeugs.pfs.interfaces.WriteStream;
 
 @SuppressWarnings({ "javadoc", "unqualified-field-access" })
 public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
@@ -936,15 +951,9 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		if (tu.target.length() != 0L) {
 			tu.target.truncate(0L);
 		}
-		ByteArrayOutputStream baos = new ByteArrayOutputStream();
-		PrimitiveAssembler    asm  = new PrimitiveAssembler(baos, null, new Path[0], false, false);
-		asm.assemble(tu.commands, tu.labels);
-		System.out.println("baos length: " + baos.size());
-		try (OutputStream out = Files.newOutputStream(Path.of("./testout/file"))) {
-			out.write(baos.toByteArray());
-		}
-		try (WriteStream write = tu.target.openWrite()) {
-			write.write(baos.toByteArray());
+		try (OutputStream out = tu.target.openWrite().asOutputStream(); OutputStream bout = new BufferedOutputStream(out, tu.target.fs().blockSize() - 4)) {
+			PrimitiveAssembler    asm  = new PrimitiveAssembler(bout, null, new Path[0], false, false);
+			asm.assemble(tu.commands, tu.labels);
 		}
 	}
 	
