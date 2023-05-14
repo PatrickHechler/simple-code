@@ -130,37 +130,13 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		if (JMP_LENGTH != new Command(Commands.CMD_JMPEQ, Param.createLabel(""), null).length()) throw new AssertionError("JMP_LENGTH has the wrong value");
 	}
 	
-	private static class StdFunc extends SimpleFunction {
-		
-		public StdFunc(Object relative, String name, SimpleFuncType type) {
-			super(0, relative, name, type);
-		}
-		
-	}
-	
 	public static final SimpleDependency STD_DEP = new SimpleDependency("std", null, true) {
 		
 		private final Map<String, SimpleExportable> map = init();
 		
-		private HashMap<String, SimpleExportable> init() {
-			HashMap<String, SimpleExportable> res = new HashMap<>();
-			for (PrimitiveConstant pc : PrimAsmConstants.START_CONSTANTS.values()) {
-				String n = pc.name();
-				if (n.startsWith("INT_")) {
-					StringBuilder sb = new StringBuilder(n.length() - 4); // max length
-					for (int i = 4; i != -1;) {
-						int nu = n.indexOf(i, '_');
-						sb.append(n.charAt(i++));
-						String sub;
-						if (nu == -1) sub = n.substring(i);
-						else sub = n.substring(i, nu);
-						sb.append(sub.toLowerCase());
-						i = nu + 1;
-					}
-					// TODO continue
-				}
-				res.put(n, new SimpleConstant(n, pc.value(), true));
-			}
+		private Map<String, SimpleExportable> init() {
+			Map<String, SimpleExportable> res = new HashMap<>();
+			
 			return res;
 		}
 		
@@ -863,7 +839,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		Param   x02             = build(A_SR, X_ADD + 2);
 		Param   x03             = build(A_SR, X_ADD + 3);
 		Param   stdLog          = build(A_NUM, PrimAsmPreDefines.STD_LOG);
-		Command intStreamsWrite = new Command(Commands.CMD_INT, build(A_NUM, PrimAsmPreDefines.INT_STREAMS_WRITE), null);
+		Command intStreamsWrite = new Command(Commands.CMD_INT, build(A_NUM, PrimAsmPreDefines.INT_STREAM_WRITE), null);
 		add(tu, new Command(Commands.CMD_MOV, x03, x00));
 		add(tu, new Command(Commands.CMD_MOV, x00, stdLog));
 		add(tu, new Command(Commands.CMD_MOV, x01, build(A_NUM, dleMsg0Len)));
@@ -891,7 +867,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		add(tu, movStrLen);
 		Command leaAddrCmd = new Command(Commands.CMD_LEA, build(A_SR, X_ADD + 2L), build(A_NUM, oomMsgPos - tu.pos));
 		add(tu, leaAddrCmd);
-		Command intOutOfMemErrCmd = new Command(Commands.CMD_INT, build(A_NUM, PrimAsmPreDefines.INT_STREAMS_WRITE), null);
+		Command intOutOfMemErrCmd = new Command(Commands.CMD_INT, build(A_NUM, PrimAsmPreDefines.INT_STREAM_WRITE), null);
 		add(tu, intOutOfMemErrCmd);
 		Command movExitNumCmd = new Command(Commands.CMD_MOV, build(A_SR, X_ADD), build(A_NUM, 8L));
 		add(tu, movExitNumCmd);
