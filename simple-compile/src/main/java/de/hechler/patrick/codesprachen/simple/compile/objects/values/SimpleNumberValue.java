@@ -24,6 +24,7 @@ import java.util.List;
 import de.hechler.patrick.codesprachen.primitive.assemble.enums.Commands;
 import de.hechler.patrick.codesprachen.primitive.assemble.objects.Command;
 import de.hechler.patrick.codesprachen.primitive.assemble.objects.Param;
+import de.hechler.patrick.codesprachen.simple.compile.objects.SimpleFile;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleType;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleTypePrimitive;
 
@@ -123,11 +124,11 @@ public class SimpleNumberValue extends SimpleValueConst {
 	}
 	
 	@Override
-	public long loadValue(int targetRegister, boolean[] blockedRegisters, List <Command> commands, long pos, VarLoader loader, StackUseListener sul) {
-		return loadValue(getNumber(), targetRegister, blockedRegisters, commands, pos);
+	public long loadValue(SimpleFile sf, int targetRegister, boolean[] blockedRegisters, List <Command> commands, long pos, VarLoader loader, StackUseListener sul) {
+		return loadValue(sf, getNumber(), targetRegister, blockedRegisters, commands, pos);
 	}
 	
-	public static long loadValue(long value, int targetRegister, boolean[] blockedRegisters, List <Command> commands, long pos) throws InternalError {
+	public static long loadValue(SimpleFile sf, long value, int targetRegister, boolean[] blockedRegisters, List <Command> commands, long pos) throws InternalError {
 		Param reg = SimpleValueNoConst.blockRegister(targetRegister, blockedRegisters);
 		Command addCmd = new Command(Commands.CMD_MOV, reg, build(A_NUM, value));
 		commands.add(addCmd);

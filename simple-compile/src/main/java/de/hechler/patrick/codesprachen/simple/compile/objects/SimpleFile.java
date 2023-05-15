@@ -524,6 +524,11 @@ public class SimpleFile implements SimplePool {
 		public abstract Iterator<SimpleExportable> getAll();
 		
 		@Override
+		public SimpleExportable changeRelative(Object relative) {
+			throw new AssertionError("change relative on dependency called");
+		}
+		
+		@Override
 		public int hashCode() {
 			return depend.hashCode();
 		}

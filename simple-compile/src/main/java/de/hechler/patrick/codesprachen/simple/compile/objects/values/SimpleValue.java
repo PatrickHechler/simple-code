@@ -19,6 +19,7 @@ package de.hechler.patrick.codesprachen.simple.compile.objects.values;
 import java.util.List;
 
 import de.hechler.patrick.codesprachen.primitive.assemble.objects.Command;
+import de.hechler.patrick.codesprachen.simple.compile.objects.SimpleFile;
 import de.hechler.patrick.codesprachen.simple.compile.objects.SimplePool;
 import de.hechler.patrick.codesprachen.simple.compile.objects.compiler.SimpleCompiler;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleVariable.SimpleFunctionVariable;
@@ -121,7 +122,7 @@ public interface SimpleValue {
 	 * @param commands         the list of commands, where the commands should be added
 	 * @param pos              the current length of current the binary in bytes
 	 */
-	long loadValue(int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader, StackUseListener sul);
+	long loadValue(SimpleFile sf, int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader, StackUseListener sul);
 	
 	SimpleType type();
 	

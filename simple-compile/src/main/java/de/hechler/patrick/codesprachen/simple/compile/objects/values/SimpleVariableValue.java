@@ -28,7 +28,10 @@ import de.hechler.patrick.codesprachen.primitive.assemble.objects.Command;
 import de.hechler.patrick.codesprachen.primitive.assemble.objects.Param;
 import de.hechler.patrick.codesprachen.primitive.core.utils.PrimAsmConstants;
 import de.hechler.patrick.codesprachen.primitive.core.utils.PrimAsmPreDefines;
+import de.hechler.patrick.codesprachen.simple.compile.objects.SimpleFile;
+import de.hechler.patrick.codesprachen.simple.compile.objects.SimpleFile.SimpleDependency;
 import de.hechler.patrick.codesprachen.simple.compile.objects.SimplePool;
+import de.hechler.patrick.codesprachen.simple.compile.utils.StdLib;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleVariable;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleVariable.SimpleFunctionVariable;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleVariable.SimpleOffsetVariable;
@@ -45,7 +48,7 @@ public class SimpleVariableValue extends SimpleValueNoConst {
 	}
 	
 	@Override
-	public long loadValue(int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader, StackUseListener sul) {
+	public long loadValue(SimpleFile sf, int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader, StackUseListener sul) {
 		Param reg = blockRegister(targetRegister, blockedRegisters);
 		if (this.sv instanceof SimpleFunctionVariable v) {
 			if (loader != null) {
@@ -76,7 +79,17 @@ public class SimpleVariableValue extends SimpleValueNoConst {
 			} else {
 				throw new AssertionError(this.t.getClass() + " : " + this.t);
 			}
-		} else if (this.sv instanceof SimpleOffsetVariable v) { // offset is from file-start
+		} else if (this.sv instanceof SimpleOffsetVariable v) {
+			Object rel = v.relative();
+			if (rel == StdLib.DEP) {
+				
+			} else if (rel == sf) {
+				
+			} else if (rel instanceof SimpleDependency sd) {
+				
+			} else {
+				throw new AssertionError("unknown relative: " + rel);
+			}
 			if (this.t.isPrimitive() || this.t.isPointer()) {
 				pos = addMovCmd(this.t, commands, pos, lambdaPos -> build(A_SR | B_NUM, PrimAsmConstants.IP, v.offset() - lambdaPos), reg);
 			} else if (this.t.isStruct() || this.t.isArray()) {
@@ -116,7 +129,7 @@ public class SimpleVariableValue extends SimpleValueNoConst {
 		}
 		
 		@Override
-		public long loadValue(int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader, StackUseListener sul) {
+		public long loadValue(SimpleFile sf, int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader, StackUseListener sul) {
 			Param   reg = blockRegister(targetRegister, blockedRegisters);
 			Command cmd;
 			if (SimpleVariableValue.this.sv instanceof SimpleFunctionVariable v) {

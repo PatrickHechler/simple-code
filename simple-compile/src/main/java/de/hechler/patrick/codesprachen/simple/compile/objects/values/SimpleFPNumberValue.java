@@ -19,6 +19,7 @@ package de.hechler.patrick.codesprachen.simple.compile.objects.values;
 import java.util.List;
 
 import de.hechler.patrick.codesprachen.primitive.assemble.objects.Command;
+import de.hechler.patrick.codesprachen.simple.compile.objects.SimpleFile;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleType;
 
 public class SimpleFPNumberValue extends SimpleValueConst {
@@ -31,8 +32,8 @@ public class SimpleFPNumberValue extends SimpleValueConst {
 	}
 	
 	@Override
-	public long loadValue(int targetRegister, boolean[] blockedRegisters, List <Command> commands, long pos, VarLoader loader, StackUseListener sul) {
-		return SimpleNumberValue.loadValue(Double.doubleToRawLongBits(value), targetRegister, blockedRegisters, commands, pos);
+	public long loadValue(SimpleFile sf, int targetRegister, boolean[] blockedRegisters, List <Command> commands, long pos, VarLoader loader, StackUseListener sul) {
+		return SimpleNumberValue.loadValue(sf, Double.doubleToRawLongBits(value), targetRegister, blockedRegisters, commands, pos);
 	}
 	
 	@Override

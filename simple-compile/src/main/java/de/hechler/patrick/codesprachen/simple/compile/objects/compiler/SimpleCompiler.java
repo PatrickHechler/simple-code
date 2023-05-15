@@ -83,7 +83,6 @@ import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleValue
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleValueDataPointer;
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleValueNoConst;
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleVariableValue;
-import de.hechler.patrick.codesprachen.simple.compile.utils.StdLib;
 import de.hechler.patrick.codesprachen.simple.compile.utils.StdLib.StdLibFunc;
 import de.hechler.patrick.codesprachen.simple.compile.utils.TwoInts;
 import de.hechler.patrick.codesprachen.simple.symbol.interfaces.SimpleExportable;
@@ -150,7 +149,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 	
 	@Override
 	protected void init(SimpleTU tu) throws IOException {
-		try (Reader r = Files.newBufferedReader(tu.source, cs)) {
+		try (Reader r = Files.newBufferedReader(tu.source, this.cs)) {
 			ANTLRInputStream in = new ANTLRInputStream();
 			in.load(r, 1024, 1024);
 			SimpleGrammarLexer  lexer  = new SimpleGrammarLexer(in);
@@ -235,7 +234,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		StackUseListener sul       = new StackUseListener();
 		VarLoaderImpl    varLoader = new VarLoaderImpl(minMax, sul);
 		for (AsmParam arg : c.asmArguments) {
-			tu.pos = arg.value.loadValue(arg.register, blockedRegs, tu.commands, tu.pos, varLoader, sul);
+			tu.pos = arg.value.loadValue(tu.sf, arg.register, blockedRegs, tu.commands, tu.pos, varLoader, sul);
 		}
 		ParseContext context = PREASSEMBLER.preassemble(tu.source, new ANTLRInputStream(c.asmCode.substring(2, c.asmCode.length() - 2)), consts(tu, c), tu.pos);
 		tu.pos = context.pos;
@@ -306,8 +305,8 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		
 		@Override
 		public long loadVar(long pos, int targetRegister, List<Command> commands, SimpleFunctionVariable sv) {
-			if (sv.reg() < minMax.a || sv.reg() > minMax.b) return -1L;
-			long off = minMax.b;
+			if (sv.reg() < this.minMax.a || sv.reg() > this.minMax.b) return -1L;
+			long off = this.minMax.b;
 			off -= sv.reg() << 3;
 			off  = -off - 8L;
 			Param reg = build(A_SR, targetRegister);
@@ -320,7 +319,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 									default -> throw new AssertionError(sv.type);
 									};
 				Commands op0        = sv.hasOffset() ? Commands.CMD_MOV : op;
-				Command  movAddrCmd = new Command(op0, reg, build(A_SR | B_NUM, SP, off - sul.size()));
+				Command  movAddrCmd = new Command(op0, reg, build(A_SR | B_NUM, SP, off - this.sul.size()));
 				pos += movAddrCmd.length();
 				commands.add(movAddrCmd);
 				if (sv.hasOffset()) {
@@ -336,12 +335,12 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 				}
 				return SimpleValueNoConst.addMovCmd(sv.type, commands, pos, reg, reg);
 			} else if (sv.hasOffset()) {
-				Command movCmd = new Command(Commands.CMD_MVAD, reg, build(A_SR | B_NUM, SP, off - sul.size()), build(A_NUM, sv.offset()));
+				Command movCmd = new Command(Commands.CMD_MVAD, reg, build(A_SR | B_NUM, SP, off - this.sul.size()), build(A_NUM, sv.offset()));
 				pos += movCmd.length();
 				commands.add(movCmd);
 			} else {
-				sul.setForbidden();
-				Command movCmd = new Command(Commands.CMD_MVAD, reg, build(A_SR, SP), build(A_NUM, off - sul.size()));
+				this.sul.setForbidden();
+				Command movCmd = new Command(Commands.CMD_MVAD, reg, build(A_SR, SP), build(A_NUM, off - this.sul.size()));
 				pos += movCmd.length();
 				commands.add(movCmd);
 			}
@@ -350,16 +349,16 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		
 		@Override
 		public long loadVarPntr(long pos, int targetRegister, List<Command> commands, SimpleFunctionVariable sv) {
-			if (sv.reg() < minMax.a || sv.reg() > minMax.b) { return -1L; }
-			long  off = (-(minMax.b - (sv.reg() << 3))) - 8L;
+			if (sv.reg() < this.minMax.a || sv.reg() > this.minMax.b) { return -1L; }
+			long  off = (-(this.minMax.b - (sv.reg() << 3))) - 8L;
 			Param reg = build(A_SR, targetRegister);
 			if (sv.hasOffset()) {
-				Command movCmd = new Command(Commands.CMD_MVAD, reg, build(A_SR | B_NUM, SP, off - sul.size()), build(A_NUM, sv.offset()));
+				Command movCmd = new Command(Commands.CMD_MVAD, reg, build(A_SR | B_NUM, SP, off - this.sul.size()), build(A_NUM, sv.offset()));
 				pos += movCmd.length();
 				commands.add(movCmd);
 			} else {
-				sul.setForbidden();
-				Command movCmd = new Command(Commands.CMD_MVAD, reg, build(A_SR, SP), build(A_NUM, off - sul.size()));
+				this.sul.setForbidden();
+				Command movCmd = new Command(Commands.CMD_MVAD, reg, build(A_SR, SP), build(A_NUM, off - this.sul.size()));
 				pos += movCmd.length();
 				commands.add(movCmd);
 			}
@@ -392,28 +391,28 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 			switch (svv.sv) {
 			case SimpleOffsetVariable sov -> {
 				Commands mov = mov(c, (int) c.target.type().byteCount());
-				tu.pos = c.value.loadValue(MIN_TMP_VAL_REG, blockedRegs, tu.commands, tu.pos, null, null);
+				tu.pos = c.value.loadValue(tu.sf, MIN_TMP_VAL_REG, blockedRegs, tu.commands, tu.pos, null, null);
 				// MOV [IP + (offset - pos)], value
 				Command cmd = new Command(mov, build(A_SR | B_NUM, PrimAsmConstants.IP, sov.offset() - tu.pos), build(A_SR, MIN_TMP_VAL_REG));
 				add(tu, cmd);
 			}
 			case SimpleFunctionVariable sfv when sfv.hasOffset() -> {
 				Commands mov = mov(c, (int) c.target.type().byteCount());
-				tu.pos = c.value.loadValue(MIN_TMP_VAL_REG, blockedRegs, tu.commands, tu.pos, null, null);
+				tu.pos = c.value.loadValue(tu.sf, MIN_TMP_VAL_REG, blockedRegs, tu.commands, tu.pos, null, null);
 				// MOV [sfv.reg + offset], value
 				Command cmd = new Command(mov, build(A_SR | B_NUM, sfv.reg(), sfv.offset()), build(A_SR, MIN_TMP_VAL_REG));
 				add(tu, cmd);
 			}
 			case SimpleFunctionVariable sfv -> {
-				tu.pos = c.value.loadValue(sfv.reg(), blockedRegs, tu.commands, tu.pos, null, null);
+				tu.pos = c.value.loadValue(tu.sf, sfv.reg(), blockedRegs, tu.commands, tu.pos, null, null);
 			}
 			default -> throw new AssertionError("unknown variable type: " + svv.sv.getClass());
 			}
 		} else {
 			Commands    mov = mov(c, (int) c.target.type().byteCount());
 			SimpleValue t   = c.target.mkPointer(c.pool);
-			tu.pos = t.loadValue(MIN_TMP_VAL_REG, blockedRegs, tu.commands, tu.pos, null, null);
-			tu.pos = c.value.loadValue(MIN_TMP_VAL_REG + 1, blockedRegs, tu.commands, tu.pos, null, null);
+			tu.pos = t.loadValue(tu.sf, MIN_TMP_VAL_REG, blockedRegs, tu.commands, tu.pos, null, null);
+			tu.pos = c.value.loadValue(tu.sf, MIN_TMP_VAL_REG + 1, blockedRegs, tu.commands, tu.pos, null, null);
 			// MOV [TMP0], TMP1
 			Command cmd = new Command(mov, build(A_SR | B_REG, MIN_TMP_VAL_REG), build(A_SR, MIN_TMP_VAL_REG + 1L));
 			add(tu, cmd);
@@ -451,7 +450,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 	
 	private static void addCmdFuncCall(SimpleTU tu, SimpleCommandFuncCall c) {
 		// load value before pushing to stack, so when modifying values are supported, the changes are saved
-		tu.pos = c.function.loadValue(MIN_TMP_VAL_REG, new boolean[256], tu.commands, tu.pos, null, null);
+		tu.pos = c.function.loadValue(tu.sf, MIN_TMP_VAL_REG, new boolean[256], tu.commands, tu.pos, null, null);
 		int min    = MIN_COMPILER_REGISTER;
 		int max    = c.pool.regMax();
 		int regLen = max - min + 1;
@@ -538,7 +537,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 	
 	private static void addCmdIf(SimpleTU tu, SimpleCommandIf c) {
 		boolean[] regs = new boolean[256];
-		tu.pos = c.condition.loadValue(MIN_TMP_VAL_REG, regs, tu.commands, tu.pos, null, null);
+		tu.pos = c.condition.loadValue(tu.sf, MIN_TMP_VAL_REG, regs, tu.commands, tu.pos, null, null);
 		Commands jotCmd;
 		Commands jofCmd;
 		Commands cmpCmd;
@@ -601,7 +600,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		// end:
 		long      loopStartPos = tu.pos;
 		boolean[] regs         = new boolean[256];
-		tu.pos = c.condition.loadValue(MIN_TMP_VAL_REG, regs, tu.commands, tu.pos, null, null);
+		tu.pos = c.condition.loadValue(tu.sf, MIN_TMP_VAL_REG, regs, tu.commands, tu.pos, null, null);
 		Commands jofCmd;
 		Commands cmpCmd;
 		if (c.condition.type().isPointer()) {
@@ -934,7 +933,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 	protected boolean skipCompile() { return true; }
 	
 	@Override
-	protected void compile(SimpleTU tu) throws IOException { throw new AssertionError("compile should be skipped"); }
+	protected void compile(@SuppressWarnings("unused") SimpleTU tu) throws IOException { throw new AssertionError("compile should be skipped"); }
 	
 	@Override
 	protected void finish(SimpleTU tu) throws IOException {
@@ -948,6 +947,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		}
 	}
 	
+	@SuppressWarnings("unlikely-arg-type")
 	private static int bufferSize(SimpleTU tu) throws IOException, ClosedChannelException {
 		FS  fs = tu.target.fs();
 		int bs = fs.blockSize();
@@ -1005,15 +1005,15 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		
 		@Override
 		public SimpleExportable get(String name) {
-			SimpleTU stu = SimpleCompiler.super.tus.get(dependency);
-			if (stu == null) { throw new NoSuchElementException("the dependency " + depend + ": '" + dependency + "' could not be found"); }
-			return stu.sf.getExport(name);
+			SimpleTU stu = SimpleCompiler.super.tus.get(this.dependency);
+			if (stu == null) { throw new NoSuchElementException("the dependency " + this.depend + ": '" + this.dependency + "' could not be found"); }
+			return stu.sf.getExport(name).changeRelative(this);
 		}
 		
 		@Override
 		public Iterator<SimpleExportable> getAll() {
-			SimpleTU stu = SimpleCompiler.super.tus.get(dependency);
-			if (stu == null) { throw new NoSuchElementException("the dependency " + depend + ": '" + dependency + "' could not be found"); }
+			SimpleTU stu = SimpleCompiler.super.tus.get(this.dependency);
+			if (stu == null) { throw new NoSuchElementException("the dependency " + this.depend + ": '" + this.dependency + "' could not be found"); }
 			return stu.sf.exportsIter();
 		}
 		
@@ -1051,7 +1051,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		
 		@Override
 		public SimpleExportable get(String name) {
-			SimpleExportable se = imported.get(name);
+			SimpleExportable se = this.imported.get(name);
 			if (se == null) { throw new NoSuchElementException(name); }
 			return se;
 		}
@@ -1068,7 +1068,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		
 		@Override
 		public Iterator<SimpleExportable> getAll() {
-			return imported.values().iterator();
+			return this.imported.values().iterator();
 		}
 		
 	}
@@ -1086,12 +1086,12 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		
 		public SimpleTU(Path source, File target) {
 			super(source, target);
-			commands.add(new CompilerCommandCommand(CompilerCommand.notAlign));
+			this.commands.add(new CompilerCommandCommand(CompilerCommand.notAlign));
 		}
 		
 		@Override
 		public SimpleDependency apply(String name, String compileDepend, String runtimeDepend) {
-			Path   path = srcRoot.resolve(compileDepend);
+			Path   path = SimpleCompiler.this.srcRoot.resolve(compileDepend);
 			String dep;
 			if (runtimeDepend != null) {
 				dep = runtimeDepend;
@@ -1102,9 +1102,9 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 			if (Files.exists(path)) {
 				res = new SimpleSourceDependency(name, dep, path.normalize());
 			} else {
-				for (Path p : lockups) {
+				for (Path p : SimpleCompiler.this.lockups) {
 					if (Files.exists(p)) {
-						res = SimpleSymbolDependency.create(name, dep, path, cs);
+						res = SimpleSymbolDependency.create(name, dep, path, SimpleCompiler.this.cs);
 						break;
 					}
 				}

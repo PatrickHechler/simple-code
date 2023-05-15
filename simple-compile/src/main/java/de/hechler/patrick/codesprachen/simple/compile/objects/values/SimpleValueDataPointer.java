@@ -24,6 +24,7 @@ import java.util.List;
 import de.hechler.patrick.codesprachen.primitive.assemble.enums.Commands;
 import de.hechler.patrick.codesprachen.primitive.assemble.objects.Command;
 import de.hechler.patrick.codesprachen.primitive.assemble.objects.Param;
+import de.hechler.patrick.codesprachen.simple.compile.objects.SimpleFile;
 import de.hechler.patrick.codesprachen.simple.compile.objects.SimplePool;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleType;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleTypeArray;
@@ -62,7 +63,7 @@ public abstract class SimpleValueDataPointer extends SimpleValueNoConst {
 	}
 	
 	@Override
-	public long loadValue(int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader, StackUseListener sul) {
+	public long loadValue(SimpleFile sf, int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader, StackUseListener sul) {
 		Param reg = blockRegister(targetRegister, blockedRegisters);
 		if (this.addr == -1L) {
 			throw new AssertionError("not yet initilized");
@@ -107,8 +108,8 @@ public abstract class SimpleValueDataPointer extends SimpleValueNoConst {
 		}
 		
 		@Override
-		public long loadValue(int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader, StackUseListener sul) {
-			return SimpleValueDataPointer.this.loadValue(targetRegister, blockedRegisters, commands, pos, loader, sul);
+		public long loadValue(SimpleFile sf, int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader, StackUseListener sul) {
+			return SimpleValueDataPointer.this.loadValue(sf, targetRegister, blockedRegisters, commands, pos, loader, sul);
 		}
 		
 		@Override

@@ -26,6 +26,7 @@ import java.util.List;
 import de.hechler.patrick.codesprachen.primitive.assemble.enums.Commands;
 import de.hechler.patrick.codesprachen.primitive.assemble.objects.Command;
 import de.hechler.patrick.codesprachen.primitive.assemble.objects.Param;
+import de.hechler.patrick.codesprachen.simple.compile.objects.SimpleFile;
 import de.hechler.patrick.codesprachen.simple.compile.objects.SimplePool;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleVariable.SimpleOffsetVariable;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleTypePointer;
@@ -43,10 +44,10 @@ public class SimpleNonDirectVariableValue extends SimpleValueNoConst {
 	}
 	
 	@Override
-	public long loadValue(int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader, StackUseListener sul) {
+	public long loadValue(SimpleFile sf, int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader, StackUseListener sul) {
 		RegisterData rd = new RegisterData(fallbackRegister(targetRegister));
 		pos = findRegister(blockedRegisters, commands, pos, rd, rd.reg(), sul);
-		pos = val.loadValue(rd.reg(), blockedRegisters, commands, pos, loader, sul);
+		pos = val.loadValue(sf, rd.reg(), blockedRegisters, commands, pos, loader, sul);
 		Param reg = blockRegister(targetRegister, blockedRegisters);
 		if (t.isPrimitive() || t.isPointer()) {
 			Param from = build(A_SR | B_NUM, rd.reg(), sv.offset());
@@ -100,8 +101,8 @@ public class SimpleNonDirectVariableValue extends SimpleValueNoConst {
 		}
 		
 		@Override
-		public long loadValue(int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader, StackUseListener sul) {
-			pos = valPntr.loadValue(targetRegister, blockedRegisters, commands, pos, loader, sul);
+		public long loadValue(SimpleFile sf, int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader, StackUseListener sul) {
+			pos = valPntr.loadValue(sf, targetRegister, blockedRegisters, commands, pos, loader, sul);
 			Command addCmd = new Command(Commands.CMD_ADD, build(A_SR, targetRegister), build(A_NUM, sv.offset()));
 			pos += addCmd.length();
 			commands.add(addCmd);

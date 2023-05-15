@@ -20,6 +20,7 @@ import java.util.Arrays;
 
 import de.hechler.patrick.codesprachen.simple.compile.objects.SimpleFile.SimpleFuncPool;
 import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommandBlock;
+import de.hechler.patrick.codesprachen.simple.symbol.interfaces.SimpleExportable;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleFunctionSymbol;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleVariable.SimpleFunctionVariable;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleVariable.SimpleOffsetVariable;
@@ -86,6 +87,13 @@ public class SimpleFunction extends SimpleFunctionSymbol {
 	@Override
 	public int hashCode() {
 		return type.hashCode();
+	}
+	
+	@Override
+	public SimpleExportable changeRelative(Object relative) {
+		if (super.address() == -1) { throw new AssertionError("address is not initilized!"); }
+		if (super.relative() == null) { throw new AssertionError("relative is not initilized!"); }
+		return new SimpleFunction(super.address(), relative, super.export, this.main, super.name, super.type, this.body, this.pool);
 	}
 	
 	@Override
