@@ -39,6 +39,7 @@ import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleStrin
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleValue;
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleValueDataPointer;
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleVariableValue;
+import de.hechler.patrick.codesprachen.simple.compile.utils.StdLib;
 import de.hechler.patrick.codesprachen.simple.symbol.interfaces.SimpleExportable;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleConstant;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleVariable;
@@ -64,7 +65,7 @@ public class SimpleFile implements SimplePool {
 	
 	public SimpleFile(TriFunction<String, String, String, SimpleDependency> dependencyProvider) {
 		this.dependencyProvider = dependencyProvider;
-		this.dependencies.put(SimpleCompiler.STD_DEP.name(), SimpleCompiler.STD_DEP);
+		this.dependencies.put(StdLib.DEP.name(), StdLib.DEP);
 	}
 	
 	private void checkName(String name) {
@@ -501,12 +502,12 @@ public class SimpleFile implements SimplePool {
 		
 		public SimpleDependency(String name, String runtimeDepend, boolean allowNull) {
 			super(DEPENDENCY_TYPE, name, false);
-			if (!allowNull || runtimeDepend != null) {
-				this.path   = new SimpleStringValue(runtimeDepend);
-				this.depend = runtimeDepend;
-			} else {
+			if (allowNull && runtimeDepend == null) {
 				this.path   = null;
 				this.depend = null;
+			} else {
+				this.path   = new SimpleStringValue(runtimeDepend);
+				this.depend = runtimeDepend;
 			}
 		}
 		

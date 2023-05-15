@@ -83,9 +83,12 @@ import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleValue
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleValueDataPointer;
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleValueNoConst;
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleVariableValue;
+import de.hechler.patrick.codesprachen.simple.compile.utils.StdLib;
+import de.hechler.patrick.codesprachen.simple.compile.utils.StdLib.StdLibFunc;
 import de.hechler.patrick.codesprachen.simple.compile.utils.TwoInts;
 import de.hechler.patrick.codesprachen.simple.symbol.interfaces.SimpleExportable;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleConstant;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleFunctionSymbol;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleVariable.SimpleFunctionVariable;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleVariable.SimpleOffsetVariable;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleFuncType;
@@ -129,33 +132,6 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		if (JMP_LENGTH != new Command(Commands.CMD_JMPGT, Param.createLabel(""), null).length()) throw new AssertionError("JMP_LENGTH has the wrong value");
 		if (JMP_LENGTH != new Command(Commands.CMD_JMPEQ, Param.createLabel(""), null).length()) throw new AssertionError("JMP_LENGTH has the wrong value");
 	}
-	
-	public static final SimpleDependency STD_DEP = new SimpleDependency("std", null, true) {
-		
-		private final Map<String, SimpleExportable> map = init();
-		
-		private Map<String, SimpleExportable> init() {
-			Map<String, SimpleExportable> res = new HashMap<>();
-			
-			return res;
-		}
-		
-		@Override
-		public SimpleExportable get(String name) {
-			SimpleExportable val = map.get(name);
-			if (val == null) {
-				return val;
-			}
-			throw new NoSuchElementException("there is no export with the name '" + name + "' in the std dependency");
-		}
-		
-		@Override
-		public Iterator<SimpleExportable> getAll() {
-			// TODO Auto-generated method stub
-			return null;
-		}
-		
-	};
 	
 	private final Charset cs;
 	private final Path    srcRoot;
@@ -479,16 +455,8 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		int min    = MIN_COMPILER_REGISTER;
 		int max    = c.pool.regMax();
 		int regLen = max - min + 1;
-		if (regLen <= 4) {
-			for (int i = min; i <= max; i++) {
-				Command cmd = new Command(Commands.CMD_PUSH, build(A_SR, i), null);
-				add(tu, cmd);
-			}
-		} else {
-			Command cmd = new Command(Commands.CMD_PUSHBLK, build(A_NUM, PrimAsmPreDefines.REGISTER_MEMORY_START + (min << 3)), build(A_NUM, regLen << 3));
-			add(tu, cmd);
-		}
 		if (c.secondName == null) {
+			push(tu, min, max, regLen);
 			SimpleFunction func = tu.sf.getFunction(c.firstName);
 			if (!func.type.equals(c.function.type())) {
 				throw new IllegalArgumentException("the function call argument needs to have the same type as the functions type! (arg-type: " + c.function.type()
@@ -503,30 +471,47 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		} else {
 			SimpleDependency dep = tu.sf.getDependency(c.firstName);
 			SimpleExportable exp = dep.get(c.secondName);
-			if (!(exp instanceof SimpleFunction func)) {
+			if (!(exp instanceof SimpleFunctionSymbol func)) {
 				throw new IllegalArgumentException("the export " + c.firstName + ':' + c.secondName + " is no function: " + exp);
 			}
 			if (!func.type.equals(c.function.type())) {
 				throw new IllegalArgumentException("the function call argument needs to have the same type as the functions type! (arg-type: " + c.function.type()
 						+ " func: " + func.type + ")");
 			}
-			// LEA X00, (dep.pos - tu.pos)
-			// INT INT_LOAD_LIB
-			// JMPERR LOAD_ERROR
-			// MOV FUNC, TMP0
-			// CALO X00, func.off
-			Command cmd = new Command(Commands.CMD_LEA, build(A_SR, X_ADD), build(A_NUM, dep.path.addr() - tu.pos));
-			add(tu, cmd);
-			cmd = new Command(Commands.CMD_MOV, build(A_SR, X_ADD + 3L), build(A_SR, X_ADD));
-			add(tu, cmd);
-			cmd = new Command(Commands.CMD_INT, build(A_NUM, PrimAsmPreDefines.INT_LOAD_LIB), null);
-			add(tu, cmd);
-			cmd = new Command(Commands.CMD_JMPERR, build(A_NUM, tu.depLoad - tu.pos), null);
-			add(tu, cmd);
-			cmd = new Command(Commands.CMD_MOV, build(A_SR, REG_FUNC_STRUCT), build(A_SR, MIN_TMP_VAL_REG));
-			add(tu, cmd);
-			cmd = new Command(Commands.CMD_CALO, build(A_SR, X_ADD), build(A_NUM, func.address()));
-			add(tu, cmd);
+			if (func instanceof StdLibFunc slf) {
+				int reg = X_ADD;
+				for (SimpleOffsetVariable sov : slf.type.arguments) {
+					Commands mov = switch (sov.type.byteCount()) {
+					case 1L -> Commands.CMD_MVB;
+					case 2L -> Commands.CMD_MVW;
+					case 4L -> Commands.CMD_MVDW;
+					case 8L -> Commands.CMD_MOV;
+					default -> throw new AssertionError(sov.type);
+					};
+					
+					Param p = sov.offset() == 0 ? build(A_SR | B_REG, MIN_TMP_VAL_REG) : build(A_SR | B_NUM, MIN_TMP_VAL_REG, sov.offset());
+					add(tu, new Command(mov, build(A_SR, reg++), p));
+				}
+			} else {
+				push(tu, min, max, regLen);
+				// LEA X00, (dep.pos - tu.pos)
+				// INT INT_LOAD_LIB
+				// JMPERR LOAD_ERROR
+				// MOV FUNC, TMP0
+				// CALO X00, func.off
+				Command cmd = new Command(Commands.CMD_LEA, build(A_SR, X_ADD), build(A_NUM, dep.path.addr() - tu.pos));
+				add(tu, cmd);
+				cmd = new Command(Commands.CMD_MOV, build(A_SR, X_ADD + 3L), build(A_SR, X_ADD));
+				add(tu, cmd);
+				cmd = new Command(Commands.CMD_INT, build(A_NUM, PrimAsmPreDefines.INT_LOAD_LIB), null);
+				add(tu, cmd);
+				cmd = new Command(Commands.CMD_JMPERR, build(A_NUM, tu.depLoad - tu.pos), null);
+				add(tu, cmd);
+				cmd = new Command(Commands.CMD_MOV, build(A_SR, REG_FUNC_STRUCT), build(A_SR, MIN_TMP_VAL_REG));
+				add(tu, cmd);
+				cmd = new Command(Commands.CMD_CALO, build(A_SR, X_ADD), build(A_NUM, func.address()));
+				add(tu, cmd);
+			}
 		}
 		if (regLen <= 4) {
 			for (int i = max; i >= min; i--) {
@@ -535,6 +520,18 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 			}
 		} else {
 			Command cmd = new Command(Commands.CMD_POPBLK, build(A_NUM, PrimAsmPreDefines.REGISTER_MEMORY_START + (min << 3)), build(A_NUM, regLen << 3));
+			add(tu, cmd);
+		}
+	}
+	
+	private static void push(SimpleTU tu, int min, int max, int regLen) {
+		if (regLen <= 4) {
+			for (int i = min; i <= max; i++) {
+				Command cmd = new Command(Commands.CMD_PUSH, build(A_SR, i), null);
+				add(tu, cmd);
+			}
+		} else {
+			Command cmd = new Command(Commands.CMD_PUSHBLK, build(A_NUM, PrimAsmPreDefines.REGISTER_MEMORY_START + (min << 3)), build(A_NUM, regLen << 3));
 			add(tu, cmd);
 		}
 	}
@@ -956,7 +953,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		int bs = fs.blockSize();
 		try {
 			if (FSProvider.ofName(FSProvider.PATR_FS_PROVIDER_NAME).loadedFS().contains(fs)) {
-				bs -= 4;
+				bs -= 8;
 			}
 		} catch (NoSuchProviderException e) {
 			e.printStackTrace();
