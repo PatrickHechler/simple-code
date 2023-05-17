@@ -48,6 +48,12 @@ import java.util.NoSuchElementException;
 import org.antlr.v4.runtime.ANTLRInputStream;
 import org.antlr.v4.runtime.BailErrorStrategy;
 import org.antlr.v4.runtime.CommonTokenStream;
+import org.antlr.v4.runtime.InputMismatchException;
+import org.antlr.v4.runtime.NoViableAltException;
+import org.antlr.v4.runtime.Token;
+import org.antlr.v4.runtime.misc.Interval;
+import org.antlr.v4.runtime.misc.IntervalSet;
+import org.antlr.v4.runtime.misc.ParseCancellationException;
 
 import de.hechler.patrick.codesprachen.primitive.assemble.PrimitiveFileGrammarParser.ParseContext;
 import de.hechler.patrick.codesprachen.primitive.assemble.enums.Commands;
@@ -76,6 +82,7 @@ import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCom
 import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommandIf;
 import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommandVarDecl;
 import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommandWhile;
+import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleNonDirectVariableValue;
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleValue;
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleValue.StackUseListener;
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleValue.VarLoader;
@@ -95,21 +102,13 @@ import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleStructT
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleType;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleTypeArray;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleTypePointer;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleTypePrimitive;
 import de.hechler.patrick.zeugs.pfs.FSProvider;
 import de.hechler.patrick.zeugs.pfs.interfaces.FS;
 import de.hechler.patrick.zeugs.pfs.interfaces.File;
 
 @SuppressWarnings({ "javadoc" })
 public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
-	
-	static {
-		System.out.println("SimpleCompiler:init");
-	}
-	
-	public static Void nop() {
-		System.out.println("SimpleCompiler:nop");
-		return null;
-	}
 	
 	// X00 .. X1F are reserved for interrupts and asm blocks
 	// X20 .. X3F are reserved for special compiler registers
@@ -124,8 +123,6 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 	public static final int MIN_TMP_VAL_REG       = MAX_VAR_REGISTER + 1;
 	public static final int MAX_TMP_VAL_REG       = 0xFF;
 	
-	private static final Void VAL = nop();
-	
 	public static final SimpleFuncType MAIN_TYPE   = new SimpleFuncType(
 			List.of(new SimpleOffsetVariable(SimpleType.NUM, "argc"),
 					new SimpleOffsetVariable(new SimpleTypePointer(new SimpleTypePointer(SimpleType.BYTE)), "argv")),
@@ -134,7 +131,6 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 	private static final long          JMP_LENGTH  = 8L;
 	
 	static {
-		if (VAL != null) throw new AssertionError();
 		if (MAIN_LENGTH != MAIN_TYPE.byteCount()) throw new AssertionError(MAIN_TYPE.byteCount() + " : " + MAIN_TYPE);
 		if (JMP_LENGTH != new Command(Commands.CMD_JMP, Param.createLabel(""), null).length()) throw new AssertionError("JMP_LENGTH has the wrong value");
 		if (JMP_LENGTH != new Command(Commands.CMD_JMPAB, Param.createLabel(""), null).length()) throw new AssertionError("JMP_LENGTH has the wrong value");
@@ -160,6 +156,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 	}
 	
 	@Override
+	@SuppressWarnings("preview")
 	protected void init(SimpleTU tu) throws IOException {
 		try (Reader r = Files.newBufferedReader(tu.source, this.cs)) {
 			ANTLRInputStream in = new ANTLRInputStream();
@@ -168,7 +165,59 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 			CommonTokenStream   toks   = new CommonTokenStream(lexer);
 			SimpleGrammarParser parser = new SimpleGrammarParser(toks);
 			parser.setErrorHandler(new BailErrorStrategy());
-			parser.simpleFile(tu.sf);
+			try {
+				parser.simpleFile(tu.sf);
+			} catch (ParseCancellationException e) {
+				StringBuilder msg = new StringBuilder();
+				msg.append("parse error: ").append(e).append('\n');
+				Throwable t = e.getCause();
+				switch (t) {
+				case NoViableAltException nvae -> {
+					Token bad = nvae.getOffendingToken();
+					msg.append("  line: ").append(bad.getLine() + 1).append('\n');
+					msg.append("  char in line: ").append(bad.getCharPositionInLine()).append('\n');
+					msg.append("  bad text: '").append(bad.getText()).append("'\n");
+					msg.append("  expected: ");
+					IntervalSet exp   = nvae.getExpectedTokens();
+					boolean     first = true;
+					for (Interval i : exp.getIntervals()) {
+						for (int ii = i.a; ii <= i.b; ii++) {
+							if (!first) msg.append(", ");
+							else first = false;
+							if (ii == -1) msg.append("EOF");
+							else {
+								msg.append(ii).append(':').append(SimpleGrammarParser.tokenNames[ii]);
+							}
+						}
+					}
+					msg.append('\n');
+					msg.append("  rule: ").append(nvae.getCtx());
+				}
+				case InputMismatchException ime -> {
+					Token bad = ime.getOffendingToken();
+					msg.append("  line: ").append(bad.getLine() + 1).append('\n');
+					msg.append("  char in line: ").append(bad.getCharPositionInLine()).append('\n');
+					msg.append("  bad text: '").append(bad.getText()).append("'\n");
+					msg.append("  expected: ");
+					IntervalSet exp   = ime.getExpectedTokens();
+					boolean     first = true;
+					for (Interval i : exp.getIntervals()) {
+						if (!first) msg.append(", ");
+						else first = false;
+						for (int ii = i.a; ii <= i.b; ii++) {
+							if (ii == -1) msg.append("EOF");
+							else {
+								msg.append(ii).append(':').append(SimpleGrammarParser.tokenNames[ii]);
+							}
+						}
+					}
+					msg.append('\n');
+					msg.append("  rule: ").append(ime.getCtx());
+				}
+				case null, default -> msg.append("  cause: ").append(t);
+				}
+				throw new IllegalStateException(msg.toString(), e);
+			}
 		}
 	}
 	
@@ -192,7 +241,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 	}
 	
 	private static void addFunc(SimpleTU tu, SimpleFunction func) {
-		align(tu, 8L, null);
+		align(tu, 8, null);
 		label(tu, func.name);
 		func.init(tu.pos, tu.sf);
 		UsedData ud = func.pool.used();
@@ -250,6 +299,12 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		}
 		ParseContext context = PREASSEMBLER.preassemble(tu.source, new ANTLRInputStream(c.asmCode.substring(2, c.asmCode.length() - 2)), consts(tu, c), tu.pos);
 		tu.pos = context.pos;
+		context.labels.forEach((name, addr) -> {
+			Long old = tu.labels.put(name, addr);
+			if (old != null) {
+				throw new IllegalStateException("label already set: " + name);
+			}
+		});
 		
 		pop(tu, minMax);
 	}
@@ -390,7 +445,6 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		}
 	}
 	
-	@SuppressWarnings("preview")
 	private static void addCmdAssign(SimpleTU tu, SimpleCommandAssign c) {
 		if (!c.target.type().isPrimitive() && !c.target.type().isPointer()) {
 			throw new IllegalStateException("can not assign with array/structure values! (command: " + c + ")");
@@ -400,26 +454,9 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		}
 		boolean[] blockedRegs = new boolean[256];
 		if (c.target instanceof SimpleVariableValue svv) {
-			switch (svv.sv) {
-			case SimpleOffsetVariable sov -> {
-				Commands mov = mov(c, (int) c.target.type().byteCount());
-				tu.pos = c.value.loadValue(tu.sf, MIN_TMP_VAL_REG, blockedRegs, tu.commands, tu.pos, null, null);
-				// MOV [IP + (offset - pos)], value
-				Command cmd = new Command(mov, build(A_SR | B_NUM, PrimAsmConstants.IP, sov.offset() - tu.pos), build(A_SR, MIN_TMP_VAL_REG));
-				add(tu, cmd);
-			}
-			case SimpleFunctionVariable sfv when sfv.hasOffset() -> {
-				Commands mov = mov(c, (int) c.target.type().byteCount());
-				tu.pos = c.value.loadValue(tu.sf, MIN_TMP_VAL_REG, blockedRegs, tu.commands, tu.pos, null, null);
-				// MOV [sfv.reg + offset], value
-				Command cmd = new Command(mov, build(A_SR | B_NUM, sfv.reg(), sfv.offset()), build(A_SR, MIN_TMP_VAL_REG));
-				add(tu, cmd);
-			}
-			case SimpleFunctionVariable sfv -> {
-				tu.pos = c.value.loadValue(tu.sf, sfv.reg(), blockedRegs, tu.commands, tu.pos, null, null);
-			}
-			default -> throw new AssertionError("unknown variable type: " + svv.sv.getClass());
-			}
+			assignVar(tu, c, blockedRegs, svv, 0L);
+		} else if (c.target instanceof SimpleNonDirectVariableValue sndvv && sndvv.val instanceof SimpleVariableValue svv) {
+			assignVar(tu, c, blockedRegs, svv, sndvv.sv.offset());
 		} else {
 			Commands    mov = mov(c, (int) c.target.type().byteCount());
 			SimpleValue t   = c.target.mkPointer(c.pool);
@@ -428,6 +465,48 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 			// MOV [TMP0], TMP1
 			Command cmd = new Command(mov, build(A_SR | B_REG, MIN_TMP_VAL_REG), build(A_SR, MIN_TMP_VAL_REG + 1L));
 			add(tu, cmd);
+		}
+	}
+	
+	@SuppressWarnings("preview")
+	private static void assignVar(SimpleTU tu, SimpleCommandAssign c, boolean[] blockedRegs, SimpleVariableValue svv, final long addOff) throws AssertionError {
+		switch (svv.sv) {
+		case SimpleOffsetVariable sov when sov.relative() == tu.sf -> {
+			Commands mov = mov(c, (int) c.target.type().byteCount());
+			tu.pos = c.value.loadValue(tu.sf, MIN_TMP_VAL_REG, blockedRegs, tu.commands, tu.pos, null, null);
+			// MOV [IP + (offset - pos)], value
+			add(tu, new Command(mov, build(A_SR | B_NUM, PrimAsmConstants.IP, addOff + sov.offset() - tu.pos), build(A_SR, MIN_TMP_VAL_REG)));
+		}
+		case SimpleOffsetVariable sov when sov.relative() instanceof SimpleDependency dep -> {
+			Commands mov = mov(c, (int) c.target.type().byteCount());
+			tu.pos = c.value.loadValue(tu.sf, MIN_TMP_VAL_REG, blockedRegs, tu.commands, tu.pos, null, null);
+			// LEA X00, (posInFile - tu.pos)
+			// INT INT_LOAD_LIB
+			// JMPERR DEP_LOAD_ERROR
+			// MOV [X00 + offset], value
+			add(tu, new Command(Commands.CMD_LEA, build(A_SR, PrimAsmConstants.X_ADD), build(A_NUM, dep.path.addr() - tu.pos)));
+			add(tu, new Command(Commands.CMD_INT, build(A_NUM, PrimAsmPreDefines.INT_LOAD_LIB), null));
+			add(tu, new Command(Commands.CMD_JMPERR, build(A_NUM, tu.depLoad - tu.pos), null));
+			add(tu, new Command(mov, build(A_SR | B_NUM, PrimAsmConstants.X_ADD, addOff + sov.offset()), build(A_SR, MIN_TMP_VAL_REG)));
+		}
+		case SimpleFunctionVariable sfv when sfv.hasOffset() -> {
+			Commands mov = mov(c, (int) c.target.type().byteCount());
+			tu.pos = c.value.loadValue(tu.sf, MIN_TMP_VAL_REG, blockedRegs, tu.commands, tu.pos, null, null);
+			// MOV [sfv.reg + offset], value
+			Command cmd = new Command(mov, build(A_SR | B_NUM, sfv.reg(), addOff + sfv.offset()), build(A_SR, MIN_TMP_VAL_REG));
+			add(tu, cmd);
+		}
+		case SimpleFunctionVariable sfv when (addOff & 7) != 0-> {
+			Commands mov = mov(c, (int) c.target.type().byteCount());
+			tu.pos = c.value.loadValue(tu.sf, MIN_TMP_VAL_REG, blockedRegs, tu.commands, tu.pos, null, null);
+			// MOV [sfv.reg + offset], value
+			Command cmd = new Command(mov, build(A_SR | B_NUM, sfv.reg(), addOff), build(A_SR, MIN_TMP_VAL_REG));
+			add(tu, cmd);
+		}
+		case SimpleFunctionVariable sfv -> {
+			tu.pos = c.value.loadValue(tu.sf, sfv.reg() + (int) (addOff >>> 3), blockedRegs, tu.commands, tu.pos, null, null);
+		}
+		default -> throw new AssertionError("unknown variable type: " + svv.sv.getClass());
 		}
 	}
 	
@@ -716,7 +795,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 	private static void addVariables(SimpleTU tu) {
 		for (SimpleOffsetVariable sv : tu.sf.vars()) {
 			ConstantPoolCommand cp = new ConstantPoolCommand();
-			align(tu, sv.type.byteCount(), null);
+			align(tu, sv.type, null);
 			sv.init(tu.pos, tu.sf);
 			int len = (int) sv.type.byteCount();
 			if (len != sv.type.byteCount()) {
@@ -730,7 +809,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 	private static void addDataValues(SimpleTU tu) {
 		for (SimpleValueDataPointer sv : tu.sf.dataValues()) {
 			ConstantPoolCommand cp = new ConstantPoolCommand();
-			align(tu, sv.t.byteCount(), cp);
+			align(tu, sv.t, cp);
 			sv.init(tu.pos);
 			cp.addBytes(sv.data);
 			tu.pos += sv.data.length;
@@ -738,7 +817,11 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		}
 	}
 	
-	private static void align(SimpleTU tu, long bc, ConstantPoolCommand cp) {
+	private static void align(SimpleTU tu, SimpleType t, ConstantPoolCommand cp) {
+		align(tu, alignment(t), cp);
+	}
+	
+	private static void align(SimpleTU tu, int bc, ConstantPoolCommand cp) {
 		long np = align(tu.pos, bc);
 		if (np != tu.pos) {
 			int len = (int) (np - tu.pos);
@@ -808,7 +891,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		cp.addBytes("'\n".getBytes(StandardCharsets.UTF_8));
 		long dleMsg1Len = cp.length() - dleMsg1Pos;
 		add(tu, cp);
-		align(tu, 8L, cp);
+		align(tu, 8, cp);
 		oomHandler(tu, oomMsgPos, oomMsgLen);
 		dleHandler(tu, dleMsg0Pos, dleMsg0Len, dleMsg1Pos, dleMsg1Len);
 	}
@@ -945,7 +1028,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 	protected boolean skipCompile() { return true; }
 	
 	@Override
-	protected void compile(@SuppressWarnings("unused") SimpleTU tu) throws IOException { throw new AssertionError("compile should be skipped"); }
+	protected void compile(SimpleTU tu) throws IOException { throw new AssertionError("compile should be skipped"); }
 	
 	@Override
 	protected void finish(SimpleTU tu) throws IOException {
@@ -959,7 +1042,6 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		}
 	}
 	
-	@SuppressWarnings("unlikely-arg-type")
 	private static int bufferSize(SimpleTU tu) throws IOException, ClosedChannelException {
 		FS  fs = tu.target.fs();
 		int bs = fs.blockSize();
@@ -986,17 +1068,11 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		}
 	}
 	
-	public static long align(long addr, int bc) {
-		if (bc > 4) bc = 8;
-		if (Integer.bitCount(bc) != 1) bc = Integer.highestOneBit(bc) << 1;
-		long bcm1 = bc - 1;
-		if ((addr & bcm1) != 0L) {
-			addr = (addr & ~bcm1) + bc;
-		}
-		return addr;
+	public static long align(long addr, SimpleType t) {
+		return align(addr, alignment(t));
 	}
 	
-	public static long align(long addr, long bc) {
+	private static long align(long addr, long bc) {
 		if (bc > 4L) bc = 8L;
 		if (Long.bitCount(bc) != 1) bc = Long.highestOneBit(bc) << 1;
 		long bcm1 = bc - 1;
@@ -1004,6 +1080,34 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 			addr = (addr & ~bcm1) + bc;
 		}
 		return addr;
+	}
+	
+	private static int alignment(SimpleType t) throws AssertionError {
+		return switch (t) {
+		case @SuppressWarnings("preview") SimpleFuncType sft -> {
+			int max = 0;
+			for (SimpleOffsetVariable sov : sft.arguments) {
+				int val = alignment(sov.type);
+				if (val > max) max = val;
+			}
+			for (SimpleOffsetVariable sov : sft.results) {
+				int val = alignment(sov.type);
+				if (val > max) max = val;
+			}
+			yield max;
+		}
+		case @SuppressWarnings("preview") SimpleStructType sst -> {
+			int max = 0;
+			for (SimpleOffsetVariable sov : sst.members) {
+				int val = alignment(sov.type);
+				if (val > max) max = val;
+			}
+			yield max;
+		}
+		case @SuppressWarnings("preview") SimpleTypePointer stp -> 8;
+		case @SuppressWarnings("preview") SimpleTypePrimitive stp -> (int) stp.byteCount();
+		default -> throw new AssertionError("unknown type: " + t.getClass().getName());
+		};
 	}
 	
 	private class SimpleSourceDependency extends SimpleDependency {

@@ -1,19 +1,19 @@
-//This file is part of the Simple Code Project
-//DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
-//Copyright (C) 2023  Patrick Hechler
+// This file is part of the Simple Code Project
+// DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+// Copyright (C) 2023 Patrick Hechler
 //
-//This program is free software: you can redistribute it and/or modify
-//it under the terms of the GNU General Public License as published by
-//the Free Software Foundation, either version 3 of the License, or
-//(at your option) any later version.
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
 //
-//This program is distributed in the hope that it will be useful,
-//but WITHOUT ANY WARRANTY; without even the implied warranty of
-//MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//GNU General Public License for more details.
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
 //
-//You should have received a copy of the GNU General Public License
-//along with this program.  If not, see <https://www.gnu.org/licenses/>.
+// You should have received a copy of the GNU General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
 package de.hechler.patrick.codesprachen.simple.compile.objects.values;
 
 import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.A_NUM;
@@ -45,13 +45,15 @@ import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleType;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleTypePointer;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleTypePrimitive;
 
-@SuppressWarnings({ "javadoc", "unqualified-field-access" })
+@SuppressWarnings({ "javadoc" })
 public abstract class SimpleValueNoConst implements SimpleValue {
 	
 	public static final int FORWARD_JMP_BASE_LEN = 8;
 	
 	static {
-		if (new Command(Commands.CMD_JMP, build(A_NUM, 0), null).length() != FORWARD_JMP_BASE_LEN) { throw new AssertionError(new Command(Commands.CMD_JMP, build(A_NUM, 0), null).length()); }
+		if (new Command(Commands.CMD_JMP, build(A_NUM, 0), null).length() != FORWARD_JMP_BASE_LEN) {
+			throw new AssertionError(new Command(Commands.CMD_JMP, build(A_NUM, 0), null).length());
+		}
 		if (new Command(Commands.CMD_JMPERR, build(A_NUM, 0), null).length() != FORWARD_JMP_BASE_LEN) { throw new AssertionError(); }
 		if (new Command(Commands.CMD_JMPNE, build(A_NUM, 0), Param.createLabel("--")).length() != FORWARD_JMP_BASE_LEN) {
 			throw new AssertionError();
@@ -217,7 +219,8 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		}
 		
 		@Override
-		public long loadValue(SimpleFile sf, int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader, StackUseListener sul) {
+		public long loadValue(SimpleFile sf, int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader,
+				StackUseListener sul) {
 			pos = valA.loadValue(sf, targetRegister, blockedRegisters, commands, pos, loader, sul);
 			long mul = this.t.byteCount();
 			if (mul < 1L) throw new AssertionError("target type is too small! valA: " + valA.type());
@@ -334,7 +337,8 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		}
 		
 		@Override
-		public long loadValue(SimpleFile sf, int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader, StackUseListener sul) {
+		public long loadValue(SimpleFile sf, int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader,
+				StackUseListener sul) {
 			pos = this.val.loadValue(sf, targetRegister, blockedRegisters, commands, pos, loader, sul);
 			Command cmd = new Command(this.op, build(A_SR, targetRegister), null);
 			pos += cmd.length();
@@ -377,7 +381,8 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		}
 		
 		@Override
-		public long loadValue(SimpleFile sf, int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader, StackUseListener sul) {
+		public long loadValue(SimpleFile sf, int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader,
+				StackUseListener sul) {
 			RegisterData rd = new RegisterData(fallbackRegister(targetRegister));
 			blockedRegisters[targetRegister] = true;
 			pos                              = findRegister(blockedRegisters, commands, pos, rd, rd.reg, sul);
@@ -410,7 +415,8 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		}
 		
 		@Override
-		public long loadValue(SimpleFile sf, int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader, StackUseListener sul) {
+		public long loadValue(SimpleFile sf, int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader,
+				StackUseListener sul) {
 			return val.loadValue(sf, targetRegister, blockedRegisters, commands, pos, loader, sul);
 		}
 		
@@ -428,7 +434,8 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		}
 		
 		@Override
-		public long loadValue(SimpleFile sf, int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader, StackUseListener sul) {
+		public long loadValue(SimpleFile sf, int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader,
+				StackUseListener sul) {
 			int     oldByteCount;
 			boolean oldSigned;
 			boolean oldPntr;
@@ -499,7 +506,8 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		}
 		
 		@Override
-		public long loadValue(SimpleFile sf, int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader, StackUseListener sul) {
+		public long loadValue(SimpleFile sf, int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader,
+				StackUseListener sul) {
 			pos = super.val.loadValue(sf, targetRegister, blockedRegisters, commands, pos, loader, sul);
 			Commands c;
 			if (this.t == SimpleType.FPNUM) {
@@ -524,7 +532,8 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		}
 		
 		@Override
-		public long loadValue(SimpleFile sf, int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader, StackUseListener sul) {
+		public long loadValue(SimpleFile sf, int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader,
+				StackUseListener sul) {
 			pos = super.loadValue(sf, targetRegister, blockedRegisters, commands, pos, loader, sul);
 			Param   reg = build(A_SR, targetRegister);
 			Command cmp = new Command(Commands.CMD_CMP, reg, build(A_NUM, this.t.isPointerOrArray() ? 0L : -1L));
@@ -585,10 +594,8 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 					case 64 -> this;
 					default -> cast(SimpleType.NUM);
 					};
-					yield switch (val) {
-					case SimpleValueConst c -> new SimpleFPNumberValue(c.getFPNumber());
-					default -> new FPNumberCastValue(t, val);
-					};
+					if (val instanceof SimpleValueConst c) yield new SimpleFPNumberValue(c.getFPNumber());
+					else yield new FPNumberCastValue(t, val);
 				} else {
 					yield new NumberCastValue(t, this);
 				}
@@ -721,7 +728,8 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		}
 		
 		@Override
-		public long loadValue(SimpleFile sf, int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader, StackUseListener sul) {
+		public long loadValue(SimpleFile sf, int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader,
+				StackUseListener sul) {
 			Param reg     = build(A_SR, targetRegister);
 			Param zero    = build(A_NUM, 0L);
 			Param notZero = build(A_NUM, 1L);
@@ -791,7 +799,8 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		}
 		
 		@Override
-		public long loadValue(SimpleFile sf, int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader, StackUseListener sul) {
+		public long loadValue(SimpleFile sf, int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader,
+				StackUseListener sul) {
 			Param targetReg = build(A_SR, targetRegister);
 			pos = valA.loadValue(sf, targetRegister, blockedRegisters, commands, pos, loader, sul);
 			RegisterData rd = new RegisterData(fallbackRegister(targetRegister));
@@ -1207,7 +1216,8 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		return new SimpleValueNoConst(targetType) {
 			
 			@Override
-			public long loadValue(SimpleFile sf, int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader, StackUseListener sul) {
+			public long loadValue(SimpleFile sf, int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader,
+					StackUseListener sul) {
 				pos = me.loadValue(sf, targetRegister, blockedRegisters, commands, pos, loader, sul);
 				addMovCmd(this.t, commands, pos, build(A_SR, targetRegister), build(A_SR | B_REG, targetRegister));
 				return pos;
@@ -1235,37 +1245,38 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 	
 	@Override
 	public SimpleValue addExpNameRef(SimplePool pool, String text) {
-		if (!this.t.isStruct()) { // also returns true for function structures and dependencies
+		if (!this.t.isStruct() && this.t != SimpleFile.DEPENDENCY_TYPE) {
 			throw new IllegalStateException("name referencing is only possible on (function) structures and dependencies!");
 		}
-		SimpleOffsetVariable target = null;
-		if (this.t.isFunc()) {
-			SimpleFuncType func = (SimpleFuncType) this.t;
-			target = func.member(text);
-		} else if (this.t.isStruct()) {
-			SimpleStructType struct = (SimpleStructType) this.t;
-			target = struct.member(text);
-		} else if (this instanceof SimpleVariableValue vv && vv.sv instanceof SimpleDependency dep) {
-			SimpleExportable exp = dep.get(text);
-			if (exp instanceof SimpleConstant c) {
-				return new SimpleNumberValue(SimpleType.NUM, c.value());
-			} else if (exp instanceof SimpleFunctionSymbol f) {
-				// TODO change when in future function pointers are supported
-				throw new IllegalArgumentException(dep.name + ':' + f.name + " is a function address, no value!");
-			} else if (exp instanceof SimpleStructType s) {
-				throw new IllegalArgumentException(dep.name + ':' + s.name + " is a structure, no value!");
-			} else if (exp instanceof SimpleVariable v) {
-				return new SimpleVariableValue(v);
+		try {
+			SimpleOffsetVariable target = null;
+			if (this.t.isFunc()) {
+				SimpleFuncType func = (SimpleFuncType) this.t;
+				target = func.member(text);
+			} else if (this.t.isStruct()) {
+				SimpleStructType struct = (SimpleStructType) this.t;
+				target = struct.member(text);
+			} else if (this instanceof SimpleVariableValue vv && vv.sv instanceof SimpleDependency dep) {
+				SimpleExportable exp = dep.get(text);
+				return switch (exp) {
+				case @SuppressWarnings("preview") SimpleConstant c -> new SimpleNumberValue(SimpleType.NUM, c.value());
+				case @SuppressWarnings("preview") SimpleFunctionSymbol f ->
+					throw new IllegalArgumentException(dep.name + ':' + f.name + " is a function address, no value!");
+				case @SuppressWarnings("preview") SimpleStructType s -> throw new IllegalArgumentException(dep.name + ':' + s.name + " is a structure, no value!");
+				case @SuppressWarnings("preview") SimpleVariable v -> new SimpleVariableValue(v);
+				default -> throw new AssertionError("unknown export: " + exp.getClass() + " :  " + exp);
+				};
 			} else {
-				throw new AssertionError("unknown export: " + exp.getClass() + " :  " + exp);
+				throw new AssertionError("unknown variable use type: " + getClass() + "  " + toString());
 			}
-		} else {
-			throw new AssertionError("unknown variable use type: " + getClass() + "  " + toString());
+			if (target == null) {
+				throw new IllegalStateException(
+						"this structure does not has a member with the name '" + text + "' ((func-)struct: " + this.t + ") (me: " + this + ')');
+			}
+			return new SimpleNonDirectVariableValue(this, target);
+		} catch (RuntimeException re) {
+			throw new IllegalArgumentException("failed to add the name expression (name: " + text + " me: " + this + " type: " + this.t + " " + re.toString(), re);
 		}
-		if (target == null) {
-			throw new IllegalStateException("this structure does not has a member with the name '" + text + "' ((func-)struct: " + this.t + ") (me: " + this + ")");
-		}
-		return new SimpleNonDirectVariableValue(this, target);
 	}
 	
 	@Override

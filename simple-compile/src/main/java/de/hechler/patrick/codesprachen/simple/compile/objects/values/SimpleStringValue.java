@@ -37,13 +37,14 @@ public class SimpleStringValue extends SimpleValueDataPointer {
 	}
 	
 	public SimpleStringValue(byte[] data) {
-		super(new SimpleTypeArray(SimpleType.UBYTE, data.length), data, 1);
+		super(new SimpleTypeArray(SimpleType.UBYTE, data.length), data);
 	}
 	
 	private static final byte[] data(List<String> strs) {
+		if (strs.size() == 1) return strs.get(0).getBytes(CHARSET);
 		int len = 0;
 		for (String str : strs) {
-			len += str.length() << 1;
+			len += str.length();
 			if (len < 0) {
 				throw new OutOfMemoryError("too large");
 			}
@@ -52,6 +53,12 @@ public class SimpleStringValue extends SimpleValueDataPointer {
 		int    off   = 0;
 		for (String str : strs) {
 			byte[] cpy = str.getBytes(CHARSET);
+			if (cpy.length != str.length()) {
+				int grow = cpy.length - str.length();
+				byte[] nb = new byte[bytes.length + grow];
+				System.arraycopy(bytes, 0, nb, 0, off);
+				bytes = nb;
+			}
 			System.arraycopy(cpy, 0, bytes, off, cpy.length);
 			off += cpy.length;
 		}

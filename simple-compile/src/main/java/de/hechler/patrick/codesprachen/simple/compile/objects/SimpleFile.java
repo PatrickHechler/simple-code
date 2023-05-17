@@ -135,7 +135,7 @@ public class SimpleFile implements SimplePool {
 	public Collection<SimpleValueDataPointer> dataValues() {
 		List<SimpleValueDataPointer> result = new ArrayList<>();
 		for (SimpleDependency sd : dependencies.values()) {
-			result.add(sd.path);
+			if (sd != StdLib.DEP) result.add(sd.path);
 		}
 		result.addAll(datas);
 		return result;
@@ -272,7 +272,7 @@ public class SimpleFile implements SimplePool {
 	public Map<String, SimpleVariable> getVariables() { return new HashMap<>(vars); }
 	
 	@Override
-	public void addCmd(@SuppressWarnings("unused") SimpleCommand add) {
+	public void addCmd(SimpleCommand add) {
 		throw new UnsupportedOperationException("only block pools can add commands (this is a file pool)!");
 	}
 	
@@ -282,7 +282,7 @@ public class SimpleFile implements SimplePool {
 	}
 	
 	@Override
-	public void initRegMax(@SuppressWarnings("unused") int regMax) {
+	public void initRegMax(int regMax) {
 		throw new UnsupportedOperationException("only block pools can initilize their regMax (this is a file pool)!");
 	}
 	
@@ -363,7 +363,7 @@ public class SimpleFile implements SimplePool {
 		}
 		
 		@Override
-		public void addCmd(@SuppressWarnings("unused") SimpleCommand add) {
+		public void addCmd(SimpleCommand add) {
 			throw new UnsupportedOperationException("only block pools can add commands (this is a function pool)!");
 		}
 		
@@ -373,7 +373,7 @@ public class SimpleFile implements SimplePool {
 		}
 		
 		@Override
-		public void initRegMax(@SuppressWarnings("unused") int size) {
+		public void initRegMax(int size) {
 			throw new UnsupportedOperationException("only block pools can initilize their regMax (this is a function pool)!");
 		}
 		
@@ -384,10 +384,11 @@ public class SimpleFile implements SimplePool {
 		
 	}
 	
-	public static class SimpleSubPool implements SimplePool, Cloneable {
+	public static class SimpleSubPool implements SimplePool {
 		
 		public final SimplePool         parent;
 		public final SimpleCommandBlock block;
+		private SimpleSubPool snap;
 		
 		public SimpleSubPool(SimplePool parent) {
 			this.parent = parent;
@@ -400,7 +401,7 @@ public class SimpleFile implements SimplePool {
 		}
 		
 		private SimplePool p() {
-			SimplePool p = parent;
+			SimplePool p = this.parent;
 			while (p.getClass() == SimpleSubPool.class) {
 				p = ((SimpleSubPool) p).parent;
 			}
@@ -413,38 +414,48 @@ public class SimpleFile implements SimplePool {
 		}
 		
 		@Override
+		public SimpleSubPool snapshot() {
+			SimpleSubPool sn = this.snap; // reuse snapshots
+			if (sn == null || sn.block.commands.size() != this.block.commands.size()) {
+				sn = new SimpleSubPool(this.parent, this.block);
+				this.snap = sn;
+			}
+			return sn;
+		}
+		
+		@Override
 		public SimpleSubPool newSubPool() {
-			return new SimpleSubPool(new SimpleSubPool(parent, block));
+			return new SimpleSubPool(this, this.block);
 		}
 		
 		@Override
 		public SimpleValue newNameUseValue(String name) {
-			for (SimpleCommand cmd : block.commands) {
+			for (SimpleCommand cmd : this.block.commands) {
 				if (cmd instanceof SimpleCommandVarDecl vd && vd.name.equals(name)) {
 					return new SimpleVariableValue(vd);
 				}
 			}
-			return parent.newNameUseValue(name);
+			return this.parent.newNameUseValue(name);
 		}
 		
 		@Override
 		public void addCmd(SimpleCommand add) {
-			block.addCmd(add);
+			this.block.addCmd(add);
 		}
 		
 		@Override
 		public void seal() {
-			block.seal();
+			this.block.seal();
 		}
 		
 		@Override
 		public void initRegMax(int regMax) {
-			block.initRegMax(regMax);
+			this.block.initRegMax(regMax);
 		}
 		
 		@Override
 		public int regMax() {
-			return block.regMax();
+			return this.block.regMax();
 		}
 		
 		@Override
@@ -469,7 +480,7 @@ public class SimpleFile implements SimplePool {
 		public Map<String, SimpleStructType> getStructures() { return p().getStructures(); }
 		
 		@Override
-		public Map<String, SimpleVariable> getVariables() { return parent.getVariables(); }
+		public Map<String, SimpleVariable> getVariables() { return this.parent.getVariables(); }
 		
 	}
 	
@@ -479,7 +490,7 @@ public class SimpleFile implements SimplePool {
 	}
 	
 	public static final SimpleType DEPENDENCY_TYPE = new SimpleType() { // @formatter:off
-		@Override public boolean isStruct()                             { return true; }
+		@Override public boolean isStruct()                             { return false; }
 		@Override public boolean isPrimitive()                          { return false; }
 		@Override public boolean isPointerOrArray()                     { return false; }
 		@Override public boolean isPointer()                            { return false; }
@@ -530,7 +541,7 @@ public class SimpleFile implements SimplePool {
 		
 		@Override
 		public int hashCode() {
-			return depend.hashCode();
+			return this.depend.hashCode();
 		}
 		
 		@Override
@@ -539,7 +550,7 @@ public class SimpleFile implements SimplePool {
 			if (obj == null) return false;
 			if (getClass() != obj.getClass()) return false;
 			SimpleDependency other = (SimpleDependency) obj;
-			return depend.equals(other.depend);
+			return this.depend.equals(other.depend);
 		}
 		
 		@Override

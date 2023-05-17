@@ -1,19 +1,19 @@
-//This file is part of the Simple Code Project
-//DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
-//Copyright (C) 2023  Patrick Hechler
+// This file is part of the Simple Code Project
+// DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+// Copyright (C) 2023 Patrick Hechler
 //
-//This program is free software: you can redistribute it and/or modify
-//it under the terms of the GNU General Public License as published by
-//the Free Software Foundation, either version 3 of the License, or
-//(at your option) any later version.
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
 //
-//This program is distributed in the hope that it will be useful,
-//but WITHOUT ANY WARRANTY; without even the implied warranty of
-//MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//GNU General Public License for more details.
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
 //
-//You should have received a copy of the GNU General Public License
-//along with this program.  If not, see <https://www.gnu.org/licenses/>.
+// You should have received a copy of the GNU General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
 package de.hechler.patrick.codesprachen.simple.compile.utils;
 
 import static java.util.List.of;
@@ -53,7 +53,7 @@ public class StdLib {
 		}
 		
 		@Override
-		public SimpleExportable changeRelative(Object relative) { 
+		public SimpleExportable changeRelative(Object relative) {
 			throw new AssertionError("change relative called on a std lib function");
 		}
 		
@@ -84,8 +84,8 @@ public class StdLib {
 	private static final SimpleType UBYTE  = SimpleType.UBYTE;
 	private static final SimpleType CHAR   = SimpleType.UBYTE;
 	
-	public static final Map<String, SimpleConstant>       ALL_CONSTANTS  = Collections.unmodifiableMap(allConsts());
 	public static final Map<String, StdLibFunc>           ALL_INTERRUPTS = Collections.unmodifiableMap(allInts());
+	public static final Map<String, SimpleConstant>       ALL_CONSTANTS  = Collections.unmodifiableMap(allConsts());
 	public static final Map<String, SimpleOffsetVariable> ALL_VARS       = Collections.unmodifiableMap(allVars());
 	public static final Map<String, SimpleStructType>     ALL_STRUCTS    = Collections.unmodifiableMap(allStructs());
 	
@@ -96,8 +96,21 @@ public class StdLib {
 		private Map<String, SimpleExportable> init() {
 			Map<String, SimpleExportable> res = new HashMap<>();
 			res.putAll(ALL_INTERRUPTS);
-			res.putAll(ALL_CONSTANTS);
-			res.putAll(ALL_VARS);
+			for (SimpleConstant sc : ALL_CONSTANTS.values()) {
+				if (res.put(sc.name(), sc) != null) {
+					throw new AssertionError("multiple values in StdLib with same name: " + sc.name());
+				}
+			}
+			for (SimpleOffsetVariable sc : ALL_VARS.values()) {
+				if (res.put(sc.name(), sc) != null) {
+					throw new AssertionError("multiple values in StdLib with same name: " + sc.name());
+				}
+			}
+			for (SimpleStructType sc : ALL_STRUCTS.values()) {
+				if (res.put(sc.name(), sc) != null) {
+					throw new AssertionError("multiple values in StdLib with same name: " + sc.name());
+				}
+			}
 			for (SimpleExportable se : res.values()) {
 				switch (se) {
 				case @SuppressWarnings("preview") SimpleOffsetVariable sov -> sov.init(-2L, this);
@@ -113,9 +126,7 @@ public class StdLib {
 		@Override
 		public SimpleExportable get(String name) {
 			SimpleExportable val = map.get(name);
-			if (val == null) {
-				return val;
-			}
+			if (val != null) return val;
 			throw new NoSuchElementException("there is no export with the name '" + name + "' in the std dependency");
 		}
 		
@@ -123,11 +134,11 @@ public class StdLib {
 		public Iterator<SimpleExportable> getAll() {
 			return map.values().iterator();
 		}
-
+		
 		@Override
-		public SimpleExportable changeRelative(Object relative) { 
-		// TODO Auto-generated method stub
-		return null; }
+		public SimpleExportable changeRelative(Object relative) {
+			throw new AssertionError("change relative used on StdLib");
+		}
 		
 	};
 	
@@ -151,10 +162,10 @@ public class StdLib {
 		res.put("streamFileSetPos", slf(13, "streamFileSetPos", of(sv(NUM, 0, "id"), sv(UNUM, 0, "pos")), of(sv(NUM, 0, "ignored0"), sv(NUM, 0, "success"))));
 		res.put("streamFileAddPos", slf(14, "streamFileAddPos", of(sv(NUM, 0, "id"), sv(NUM, 0, "add")), of(sv(NUM, 0, "ignored0"), sv(NUM, 0, "pos"))));
 		res.put("streamFileSeekEof", slf(15, "streamFileSeekEof", of(sv(NUM, 0, "id")), of(sv(NUM, 0, "ignored0"), sv(NUM, 0, "pos"))));
-		res.put("openFile", slf(16, "openFile", of(sv(CHAR, 1, "file")), of(sv(NUM, 0, "id"))));
-		res.put("openFolder", slf(17, "openFolder", of(sv(CHAR, 1, "folder")), of(sv(NUM, 0, "id"))));
-		res.put("openPipe", slf(18, "openPipe", of(sv(CHAR, 1, "pipe")), of(sv(NUM, 0, "id"))));
-		res.put("openElement", slf(19, "openElement", of(sv(CHAR, 1, "element")), of(sv(NUM, 0, "id"))));
+		res.put("streamFile", slf(16, "streamFile", of(sv(CHAR, 1, "file")), of(sv(NUM, 0, "id"))));
+		res.put("streamFolder", slf(17, "streamFolder", of(sv(CHAR, 1, "folder")), of(sv(NUM, 0, "id"))));
+		res.put("streamPipe", slf(18, "streamPipe", of(sv(CHAR, 1, "pipe")), of(sv(NUM, 0, "id"))));
+		res.put("streamElement", slf(19, "streamElement", of(sv(CHAR, 1, "element")), of(sv(NUM, 0, "id"))));
 		res.put("elementOpenParent", slf(20, "elementOpenParent", of(sv(NUM, 0, "id")), of(sv(NUM, 0, "parent_id"))));
 		res.put("elementGetCreate", slf(21, "elementGetCreate", of(sv(NUM, 0, "id")), of(sv(NUM, 0, "ignored0"), sv(NUM, 0, "date"))));
 		res.put("elementGetLastMod", slf(22, "elementGetLastMod", of(sv(NUM, 0, "id")), of(sv(NUM, 0, "ignored0"), sv(NUM, 0, "date"))));
@@ -191,7 +202,7 @@ public class StdLib {
 		res.put("strLen", slf(53, "strLen", of(sv(CHAR, 1, "str")), of(sv(NUM, 0, "len"))));
 		res.put("strCmp", slf(54, "strCmp", of(sv(CHAR, 1, "strA"), sv(CHAR, 1, "strB")), of(sv(0x7L, "cmpRes")), 0x7L));
 		res.put("strFromNum", slf(55, "strFromNum", of(sv(NUM, 0, "val"), sv(CHAR, 1, "buf"), sv(NUM, 0, "base"), sv(UNUM, 0, "bufLen")), of(sv(NUM, 0, "strLen"), sv(CHAR, 1, "str"), sv(NUM, 0, "ignored0"), sv(NUM, 0, "newBufLen"))));
-		res.put("strFromFpnum", slf(56, "strFromFpnum", of(sv(FPNUM, 0, "val"), sv(CHAR, 1, "buf"), sv(UNUM, 0, "bufLen")), of(sv(NUM, 0, "strLen"), sv(CHAR, 1, "str"), sv(NUM, 0, "bufLen"))));
+		res.put("strFromFpnum", slf(56, "strFromFpnum", of(sv(FPNUM, 0, "val"), sv(CHAR, 1, "buf"), sv(UNUM, 0, "bufLen")), of(sv(NUM, 0, "strLen"), sv(CHAR, 1, "str"), sv(NUM, 0, "newBufLen"))));
 		res.put("strToNum", slf(57, "strToNum", of(sv(CHAR, 1, "str"), sv(NUM, 0, "base")), of(sv(NUM, 0, "val"), sv(NUM, 0, "success"))));
 		res.put("strToFpnum", slf(58, "strToFpnum", of(sv(CHAR, 1, "str")), of(sv(FPNUM, 0, "val"), sv(NUM, 0, "success"))));
 		res.put("strToU16str", slf(59, "strToU16str", of(sv(CHAR, 1, "u8str"), sv(UWORD, 1, "u16str"), sv(NUM, 0, "bufLen")), of(sv(CHAR, 1, "u8strUnconcStart"), sv(UWORD, 1, "u16strUnconvStart"), sv(NUM, 0, "remBufLen"), sv(NUM, 0, "remU8Len"))));
@@ -212,7 +223,12 @@ public class StdLib {
 		Map<String, SimpleConstant> res = new HashMap<>();
 		for (PrimitiveConstant pc : PrimAsmConstants.START_CONSTANTS.values()) {
 			if (pc.name().startsWith("INT_")) continue;
-			String name = name(pc.name());
+			String name; 
+			if (pc.name().startsWith("STD_")) {
+				name = name(pc.name().substring(4));
+			} else {
+				name = name(pc.name());
+			}
 			res.put(name, new SimpleConstant(name, pc.value(), true));
 		}
 		return res;
@@ -232,7 +248,7 @@ public class StdLib {
 	}
 	
 	private static String name(String name) {
-		StringBuilder b = new StringBuilder(name.length() - 4);
+		StringBuilder b = new StringBuilder(name.length());
 		for (int i = 0; i < name.length();) {
 			int ni = name.indexOf('_', i);
 			if (i == 0) i--;
@@ -255,7 +271,7 @@ public class StdLib {
 	
 	private static SimpleOffsetVariable sv(SimpleType type, int deapth, String name) {
 		if (deapth < 0) throw new AssertionError();
-		while (deapth > 0) type = new SimpleTypePointer(type);
+		while (deapth-- > 0) type = new SimpleTypePointer(type);
 		return new SimpleVariable.SimpleOffsetVariable(type, name);
 	}
 	

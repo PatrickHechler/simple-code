@@ -22,4 +22,6 @@ public interface SimpleCommand {
 	
 	SimplePool pool();
 	
+	void toString(StringBuilder b, String indention);
+	
 }

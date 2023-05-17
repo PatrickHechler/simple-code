@@ -36,16 +36,14 @@ public abstract class SimpleValueDataPointer extends SimpleValueNoConst {
 	 * this array is not allowed to be modified
 	 */
 	public final byte[] data;
-	public final int    align;
 	/**
 	 * this value is only allowed to be set once (twice when the -1 at the start counts) by the compiler!
 	 */
 	private long        addr = -1L;
 	
-	public SimpleValueDataPointer(SimpleType mytype, byte[] data, int align) {
+	public SimpleValueDataPointer(SimpleType mytype, byte[] data) {
 		super(mytype);
 		this.data = data;
-		this.align = align;
 	}
 	
 	public void init(long addr) {
@@ -94,7 +92,7 @@ public abstract class SimpleValueDataPointer extends SimpleValueNoConst {
 			} else {
 				return super.addExpCast(pool, type);
 			}
-		} else if (!type.isArray()) {
+		} else if (!type.isPointerOrArray()) {
 			throw new IllegalStateException("can not cast from '" + t + "' to '" + type + "'");
 		} else {
 			return new SimpleCastedDataValue(type);

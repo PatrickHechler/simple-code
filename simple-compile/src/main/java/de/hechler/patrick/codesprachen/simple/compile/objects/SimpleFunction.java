@@ -112,7 +112,7 @@ public class SimpleFunction extends SimpleFunctionSymbol {
 		if (export) {
 			b.append("exp ");
 		}
-		return b.append(name).append(type).append(';').toString();
+		return b.append(name).append(type).append(' ').append(this.body).toString();
 	}
 	
 }

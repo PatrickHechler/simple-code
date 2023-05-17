@@ -1,19 +1,19 @@
-//This file is part of the Simple Code Project
-//DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
-//Copyright (C) 2023  Patrick Hechler
+// This file is part of the Simple Code Project
+// DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+// Copyright (C) 2023 Patrick Hechler
 //
-//This program is free software: you can redistribute it and/or modify
-//it under the terms of the GNU General Public License as published by
-//the Free Software Foundation, either version 3 of the License, or
-//(at your option) any later version.
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
 //
-//This program is distributed in the hope that it will be useful,
-//but WITHOUT ANY WARRANTY; without even the implied warranty of
-//MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//GNU General Public License for more details.
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
 //
-//You should have received a copy of the GNU General Public License
-//along with this program.  If not, see <https://www.gnu.org/licenses/>.
+// You should have received a copy of the GNU General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
 package de.hechler.patrick.codesprachen.simple.compile.objects.commands;
 
 import java.util.List;
@@ -29,20 +29,20 @@ public class SimpleCommandAsm implements SimpleCommand {
 	public final String     asmCode;
 	public final AsmParam[] asmResults;
 	
-	public SimpleCommandAsm(SimplePool pool, List <AsmParam> asmArguments, String asmCode, List <AsmParam> asmResults) {
+	public SimpleCommandAsm(SimplePool pool, List<AsmParam> asmArguments, String asmCode, List<AsmParam> asmResults) {
 		this(pool, toa(asmArguments), asmCode, toa(asmResults));
 	}
 	
-	private static AsmParam[] toa(List <AsmParam> list) {
+	private static AsmParam[] toa(List<AsmParam> list) {
 		return list.toArray(new AsmParam[list.size()]);
 	}
 	
 	public SimpleCommandAsm(SimplePool pool, AsmParam[] asmArguments, String asmCode, AsmParam[] asmResults) {
-		this.pool = pool;
+		this.pool         = pool;
 		this.asmArguments = asmArguments;
 		assert asmCode.startsWith("::");
 		assert asmCode.endsWith(">>");
-		this.asmCode = asmCode.substring(2, asmCode.length() - 2);
+		this.asmCode    = asmCode.substring(2, asmCode.length() - 2);
 		this.asmResults = asmResults;
 	}
 	
@@ -57,7 +57,7 @@ public class SimpleCommandAsm implements SimpleCommand {
 		public final int         register;
 		
 		public AsmParam(SimpleValue value, int register) {
-			this.value = value;
+			this.value    = value;
 			this.register = register;
 		}
 		
@@ -67,6 +67,28 @@ public class SimpleCommandAsm implements SimpleCommand {
 			return new AsmParam(val, reg);
 		}
 		
+	}
+	
+	@Override
+	public String toString() {
+		StringBuilder b = new StringBuilder();
+		toString(b, "");
+		return b.toString();
+	}
+	
+	@Override
+	public void toString(StringBuilder b, String indention) {
+		b.append("asm");
+		for (AsmParam ap : this.asmArguments) {
+			b.append(' ').append(ap.value).append(" --> ");
+			b.append('X').append(Integer.toHexString(ap.register - PrimAsmConstants.X_ADD).toUpperCase());
+		}
+		b.append(this.asmCode);
+		for (AsmParam ap : this.asmResults) {
+			b.append(" X").append(Integer.toHexString(ap.register - PrimAsmConstants.X_ADD).toUpperCase());
+			b.append(" --> ").append(ap.value);
+		}
+		b.append(';');
 	}
 	
 }

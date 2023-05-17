@@ -22,7 +22,6 @@ import static de.hechler.patrick.zeugs.check.Assert.assertTrue;
 import java.io.IOError;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.StringReader;
 import java.lang.reflect.Method;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -55,7 +54,8 @@ public class SimpleCompilerChecker {
 	
 	private FSProvider patrFsProv;
 	
-	@Start
+	@Start(onlyOnce = true)
+	@SuppressWarnings("static-method")
 	protected void init() throws IOException {
 		Files.createDirectories(Path.of("./testout/"));
 	}
@@ -103,22 +103,12 @@ public class SimpleCompilerChecker {
 			URI uri = res.toURI();
 			Path p = Path.of(uri);
 			Path[] ps = new Path[0];
-			System.out.println("load now the class");
-			SimpleCompiler.nop();
 			SimpleCompiler compiler = new SimpleCompiler(cs, p, ps);
-			System.out.println("simple compiler created");
 			fs.stream(ADD_PMF, new StreamOpenOptions(false, true, false, ElementType.FILE, true, true)).close();
-			System.out.println("file created");
 			try (File file = fs.file(ADD_PMF)) {
 				file.flag(FSElement.FLAG_EXECUTABLE, 0);
-				System.out.println("file marked as executable");
 				compiler.addTranslationUnit(Path.of(cls.getResource(ADD_RES).toURI()), file);
-				System.out.println("compile now");
 				compiler.compile();
-				System.out.println("finish compile");
-			}
-			try (File file = fs.file(ADD_PMF)) {
-				System.out.println("finished compile, close now fs, binary-length: " + file.length());
 			}
 		} catch (Throwable t) {
 			t.printStackTrace();
@@ -128,7 +118,7 @@ public class SimpleCompilerChecker {
 		execute(ADD_PFS, ADD_PMF, 9, EMPTY_BARR, EMPTY_BARR, EMPTY_BARR);
 	}
 	
-	@Check(disabled = true)
+	@Check
 	private void checkAdd2() throws IOException, URISyntaxException, InterruptedException {
 		try (FS fs = this.patrFsProv.loadFS(new PatrFSOptions(ADD2_PFS, true, 4096L, 1024))) {
 			System.out.println("opened fs, compile now");
@@ -144,7 +134,7 @@ public class SimpleCompilerChecker {
 		execute(ADD2_PFS, ADD2_PMF, 0, EMPTY_BARR, "5 + 4 = 9".getBytes(StandardCharsets.UTF_8), EMPTY_BARR);
 	}
 	
-	@Check(disabled = true)
+	@Check
 	private void checkHelloWorld() throws IOException, URISyntaxException, InterruptedException {
 		try (FS fs = this.patrFsProv.loadFS(new PatrFSOptions(HW_PFS, true, 4096L, 1024))) {
 			System.out.println("opened fs, compile now");
@@ -175,16 +165,17 @@ public class SimpleCompilerChecker {
 		if (stdin.length > 0) { process.getOutputStream().write(stdin); }
 		TwoBools b1 = new TwoBools(), b2 = new TwoBools();
 		Thread   t  = Thread.ofVirtual().unstarted(() -> check(() -> process.isAlive(), process.getErrorStream(), stderr, b1));
-		t.setName("check stderr");
+		t.setName("check stderr of " + pmfFile);
 		t.start();
 		t = Thread.ofVirtual().unstarted(() -> check(() -> process.isAlive(), process.getInputStream(), stdout, b2));
-		t.setName("check stdout");
+		t.setName("check stdout of " + pmfFile);
 		t.start();
 		assertEquals(exitCode, process.waitFor());
 		checkResult(b1);
 		checkResult(b2);
 	}
 	
+	@SuppressWarnings("static-method")
 	protected void checkResult(TwoBools res) throws InterruptedException, CheckerException {
 		while (!res.finish) {
 			synchronized (res) {
@@ -195,8 +186,9 @@ public class SimpleCompilerChecker {
 		assertTrue(res.result);
 	}
 	
+	@SuppressWarnings("static-method")
 	protected void check(BooleanSupplier cond, InputStream stream, byte[] value, TwoBools b) {
-		System.err.println(logStart() + "start");
+		System.out.println(logStart() + "start");
 		try {
 			b.result = false;
 			byte[] other = new byte[value.length];
@@ -222,7 +214,7 @@ public class SimpleCompilerChecker {
 				System.err.print(logStart() + "read: ");
 				try {
 					System.err.write(other);
-				} catch (@SuppressWarnings("unused") IOException e) {
+				} catch (IOException e) {
 				}
 				System.err.println();
 			}
@@ -246,7 +238,7 @@ public class SimpleCompilerChecker {
 			synchronized (b) {
 				b.notifyAll();
 			}
-			System.err.println(logStart() + "finish");
+			System.out.println(logStart() + "finish");
 		}
 	}
 	

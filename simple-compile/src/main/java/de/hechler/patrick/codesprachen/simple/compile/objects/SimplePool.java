@@ -25,6 +25,7 @@ import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleValue
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleValueDataPointer;
 import de.hechler.patrick.codesprachen.simple.symbol.interfaces.SimpleExportable;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleConstant;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleFunctionSymbol;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleVariable;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleStructType;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleType;
@@ -74,9 +75,13 @@ public interface SimplePool {
 			return getFunction(first).type;
 		} else {
 			SimpleExportable se = getDependency(first).get(second);
-			if (!(se instanceof SimpleFunction f)) { throw new IllegalArgumentException("the dependency " + first + " has no function " + second); }
+			if (!(se instanceof SimpleFunctionSymbol f)) { throw new IllegalArgumentException("the dependency " + first + " has no function " + second); }
 			return f.type;
 		}
+	}
+
+	default SimpleSubPool snapshot() {
+		throw new UnsupportedOperationException("snapshot");
 	}
 	
 }

@@ -103,8 +103,9 @@ public abstract class StepCompiler<T extends TranslationUnit> implements Compile
 	}
 	
 	private void unwrappingRethrow(IllegalArgumentException e) throws IOException {
-		if (e.getCause() == this.err) {
-			throw this.err;
+		IOException er = this.err;
+		if (e.getCause() == er && er != null) {
+			throw er;
 		} else {
 			throw e;
 		}
