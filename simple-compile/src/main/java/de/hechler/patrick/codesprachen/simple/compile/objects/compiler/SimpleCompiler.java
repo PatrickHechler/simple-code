@@ -17,10 +17,10 @@
 package de.hechler.patrick.codesprachen.simple.compile.objects.compiler;
 
 import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.A_NUM;
-import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.A_SR;
+import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.A_XX;
 import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.B_NUM;
 import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.B_REG;
-import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.build;
+import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.build2;
 import static de.hechler.patrick.codesprachen.primitive.core.utils.PrimAsmConstants.SP;
 import static de.hechler.patrick.codesprachen.primitive.core.utils.PrimAsmConstants.X_ADD;
 
@@ -231,10 +231,10 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		addErrorHandlers(tu);
 		addDataValues(tu);
 		addVariables(tu);
-		addFunction(tu);
+		addFunctions(tu);
 	}
 	
-	private static void addFunction(SimpleTU tu) {
+	private static void addFunctions(SimpleTU tu) {
 		for (SimpleFunction sf : tu.sf.functions()) {
 			addFunc(tu, sf);
 		}
@@ -253,14 +253,10 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 			// INT INT_MEMORY_ALLOC
 			// JMPERR OUT_OF_MEMORY
 			// MOV REG_VAR, X00
-			Command movSizeCmd = new Command(Commands.CMD_MOV, build(A_SR, X_ADD), build(A_NUM, ud.maxaddr));
-			add(tu, movSizeCmd);
-			Command intMallocCmd = new Command(Commands.CMD_INT, build(A_NUM, PrimAsmPreDefines.INT_MEMORY_ALLOC), null);
-			add(tu, intMallocCmd);
-			Command jmpErrCmd = new Command(Commands.CMD_JMPERR, build(A_NUM, tu.outOfMem - tu.pos), null);
-			add(tu, jmpErrCmd);
-			Command movToReg = new Command(Commands.CMD_MOV, build(A_SR, REG_VAR_PNTR), build(A_SR, X_ADD));
-			add(tu, movToReg);
+			add(tu, new Command(Commands.CMD_MOV, build2(A_XX, X_ADD), build2(A_NUM, ud.maxaddr)));
+			add(tu, new Command(Commands.CMD_INT, build2(A_NUM, PrimAsmPreDefines.INT_MEMORY_ALLOC), null));
+			add(tu, new Command(Commands.CMD_JMPERR, build2(A_NUM, tu.outOfMem - tu.pos), null));
+			add(tu, new Command(Commands.CMD_MOV, build2(A_XX, REG_VAR_PNTR), build2(A_XX, X_ADD)));
 		}
 		for (int i = 0; i < func.type.arguments.length; i++) {
 			long off = func.type.arguments[i].offset();
@@ -269,9 +265,9 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		}
 		addCmdBlock(tu, func.body);
 		if (ud.maxaddr != 0L) {
-			Command movFromReg = new Command(Commands.CMD_MOV, build(A_SR, REG_VAR_PNTR), build(A_SR, X_ADD));
+			Command movFromReg = new Command(Commands.CMD_MOV, build2(A_XX, REG_VAR_PNTR), build2(A_XX, X_ADD));
 			add(tu, movFromReg);
-			Command intFreeCmd = new Command(Commands.CMD_INT, build(A_NUM, PrimAsmPreDefines.INT_MEMORY_FREE), null);
+			Command intFreeCmd = new Command(Commands.CMD_INT, build2(A_NUM, PrimAsmPreDefines.INT_MEMORY_FREE), null);
 			add(tu, intFreeCmd);
 		}
 		add(tu, new Command(Commands.CMD_RET, null, null));
@@ -339,11 +335,11 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 	private static void pop(SimpleTU tu, TwoInts minMax) {
 		if (minMax.b - minMax.a <= 4) {
 			for (int reg = minMax.b; reg >= minMax.a; reg--) {
-				Command pushCmd = new Command(Commands.CMD_POP, build(A_SR, reg), null);
+				Command pushCmd = new Command(Commands.CMD_POP, build2(A_XX, reg), null);
 				add(tu, pushCmd);
 			}
 		} else {
-			Command pushCmd = new Command(Commands.CMD_POPBLK, build(A_NUM, minMax.a), build(A_NUM, (minMax.b - (long) minMax.a) << 3));
+			Command pushCmd = new Command(Commands.CMD_POPBLK, build2(A_NUM, minMax.a), build2(A_NUM, (minMax.b - (long) minMax.a) << 3));
 			add(tu, pushCmd);
 		}
 	}
@@ -351,11 +347,11 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 	private static void push(SimpleTU tu, TwoInts minMax) {
 		if (minMax.b - minMax.a <= 4) {
 			for (int reg = minMax.a; reg <= minMax.b; reg++) {
-				Command pushCmd = new Command(Commands.CMD_PUSH, build(A_SR, reg), null);
+				Command pushCmd = new Command(Commands.CMD_PUSH, build2(A_XX, reg), null);
 				add(tu, pushCmd);
 			}
 		} else {
-			Command pushCmd = new Command(Commands.CMD_PUSHBLK, build(A_NUM, minMax.a), build(A_NUM, (minMax.b - (long) minMax.a) << 3));
+			Command pushCmd = new Command(Commands.CMD_PUSHBLK, build2(A_NUM, minMax.a), build2(A_NUM, (minMax.b - (long) minMax.a) << 3));
 			add(tu, pushCmd);
 		}
 	}
@@ -376,7 +372,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 			long off = this.minMax.b;
 			off -= sv.reg() << 3;
 			off  = -off - 8L;
-			Param reg = build(A_SR, targetRegister);
+			Param reg = build2(A_XX, targetRegister);
 			if (sv.type.isPrimitive() || sv.type.isPointer()) {
 				Commands op         = switch ((int) sv.type.byteCount()) {
 									case 8 -> Commands.CMD_MOV;
@@ -386,15 +382,15 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 									default -> throw new AssertionError(sv.type);
 									};
 				Commands op0        = sv.hasOffset() ? Commands.CMD_MOV : op;
-				Command  movAddrCmd = new Command(op0, reg, build(A_SR | B_NUM, SP, off - this.sul.size()));
+				Command  movAddrCmd = new Command(op0, reg, build2(A_XX | B_NUM, SP, off - this.sul.size()));
 				pos += movAddrCmd.length();
 				commands.add(movAddrCmd);
 				if (sv.hasOffset()) {
 					Param p;
 					if (sv.offset() != 0) {
-						p = build(A_SR | B_NUM, targetRegister, sv.offset());
+						p = build2(A_XX | B_NUM, targetRegister, sv.offset());
 					} else {
-						p = build(A_SR | B_REG, targetRegister);
+						p = build2(A_XX | B_REG, targetRegister);
 					}
 					Command movValCmd = new Command(op, reg, p);
 					pos += movValCmd.length();
@@ -402,12 +398,12 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 				}
 				return SimpleValueNoConst.addMovCmd(sv.type, commands, pos, reg, reg);
 			} else if (sv.hasOffset()) {
-				Command movCmd = new Command(Commands.CMD_MVAD, reg, build(A_SR | B_NUM, SP, off - this.sul.size()), build(A_NUM, sv.offset()));
+				Command movCmd = new Command(Commands.CMD_MVAD, reg, build2(A_XX | B_NUM, SP, off - this.sul.size()), build2(A_NUM, sv.offset()));
 				pos += movCmd.length();
 				commands.add(movCmd);
 			} else {
 				this.sul.setForbidden();
-				Command movCmd = new Command(Commands.CMD_MVAD, reg, build(A_SR, SP), build(A_NUM, off - this.sul.size()));
+				Command movCmd = new Command(Commands.CMD_MVAD, reg, build2(A_XX, SP), build2(A_NUM, off - this.sul.size()));
 				pos += movCmd.length();
 				commands.add(movCmd);
 			}
@@ -418,14 +414,14 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		public long loadVarPntr(long pos, int targetRegister, List<Command> commands, SimpleFunctionVariable sv) {
 			if (sv.reg() < this.minMax.a || sv.reg() > this.minMax.b) { return -1L; }
 			long  off = (-(this.minMax.b - (sv.reg() << 3))) - 8L;
-			Param reg = build(A_SR, targetRegister);
+			Param reg = build2(A_XX, targetRegister);
 			if (sv.hasOffset()) {
-				Command movCmd = new Command(Commands.CMD_MVAD, reg, build(A_SR | B_NUM, SP, off - this.sul.size()), build(A_NUM, sv.offset()));
+				Command movCmd = new Command(Commands.CMD_MVAD, reg, build2(A_XX | B_NUM, SP, off - this.sul.size()), build2(A_NUM, sv.offset()));
 				pos += movCmd.length();
 				commands.add(movCmd);
 			} else {
 				this.sul.setForbidden();
-				Command movCmd = new Command(Commands.CMD_MVAD, reg, build(A_SR, SP), build(A_NUM, off - this.sul.size()));
+				Command movCmd = new Command(Commands.CMD_MVAD, reg, build2(A_XX, SP), build2(A_NUM, off - this.sul.size()));
 				pos += movCmd.length();
 				commands.add(movCmd);
 			}
@@ -445,6 +441,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		}
 	}
 	
+	@SuppressWarnings("preview")
 	private static void addCmdAssign(SimpleTU tu, SimpleCommandAssign c) {
 		if (!c.target.type().isPrimitive() && !c.target.type().isPointer()) {
 			throw new IllegalStateException("can not assign with array/structure values! (command: " + c + ")");
@@ -453,18 +450,22 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 			throw new IllegalStateException("target and value type are different (command: " + c + ")");
 		}
 		boolean[] blockedRegs = new boolean[256];
-		if (c.target instanceof SimpleVariableValue svv) {
+		switch (c.target) {
+		case SimpleVariableValue svv -> {
 			assignVar(tu, c, blockedRegs, svv, 0L);
-		} else if (c.target instanceof SimpleNonDirectVariableValue sndvv && sndvv.val instanceof SimpleVariableValue svv) {
+		}
+		case SimpleNonDirectVariableValue sndvv when sndvv.val instanceof SimpleVariableValue svv -> {
 			assignVar(tu, c, blockedRegs, svv, sndvv.sv.offset());
-		} else {
+		}
+		default -> {
 			Commands    mov = mov(c, (int) c.target.type().byteCount());
 			SimpleValue t   = c.target.mkPointer(c.pool);
 			tu.pos = t.loadValue(tu.sf, MIN_TMP_VAL_REG, blockedRegs, tu.commands, tu.pos, null, null);
 			tu.pos = c.value.loadValue(tu.sf, MIN_TMP_VAL_REG + 1, blockedRegs, tu.commands, tu.pos, null, null);
 			// MOV [TMP0], TMP1
-			Command cmd = new Command(mov, build(A_SR | B_REG, MIN_TMP_VAL_REG), build(A_SR, MIN_TMP_VAL_REG + 1L));
+			Command cmd = new Command(mov, build2(A_XX | B_REG, MIN_TMP_VAL_REG), build2(A_XX, MIN_TMP_VAL_REG + 1L));
 			add(tu, cmd);
+		}
 		}
 	}
 	
@@ -475,7 +476,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 			Commands mov = mov(c, (int) c.target.type().byteCount());
 			tu.pos = c.value.loadValue(tu.sf, MIN_TMP_VAL_REG, blockedRegs, tu.commands, tu.pos, null, null);
 			// MOV [IP + (offset - pos)], value
-			add(tu, new Command(mov, build(A_SR | B_NUM, PrimAsmConstants.IP, addOff + sov.offset() - tu.pos), build(A_SR, MIN_TMP_VAL_REG)));
+			add(tu, new Command(mov, build2(A_XX | B_NUM, PrimAsmConstants.IP, addOff + sov.offset() - tu.pos), build2(A_XX, MIN_TMP_VAL_REG)));
 		}
 		case SimpleOffsetVariable sov when sov.relative() instanceof SimpleDependency dep -> {
 			Commands mov = mov(c, (int) c.target.type().byteCount());
@@ -484,23 +485,23 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 			// INT INT_LOAD_LIB
 			// JMPERR DEP_LOAD_ERROR
 			// MOV [X00 + offset], value
-			add(tu, new Command(Commands.CMD_LEA, build(A_SR, PrimAsmConstants.X_ADD), build(A_NUM, dep.path.addr() - tu.pos)));
-			add(tu, new Command(Commands.CMD_INT, build(A_NUM, PrimAsmPreDefines.INT_LOAD_LIB), null));
-			add(tu, new Command(Commands.CMD_JMPERR, build(A_NUM, tu.depLoad - tu.pos), null));
-			add(tu, new Command(mov, build(A_SR | B_NUM, PrimAsmConstants.X_ADD, addOff + sov.offset()), build(A_SR, MIN_TMP_VAL_REG)));
+			add(tu, new Command(Commands.CMD_LEA, build2(A_XX, PrimAsmConstants.X_ADD), build2(A_NUM, dep.path.addr() - tu.pos)));
+			add(tu, new Command(Commands.CMD_INT, build2(A_NUM, PrimAsmPreDefines.INT_LOAD_LIB), null));
+			add(tu, new Command(Commands.CMD_JMPERR, build2(A_NUM, tu.depLoad - tu.pos), null));
+			add(tu, new Command(mov, build2(A_XX | B_NUM, PrimAsmConstants.X_ADD, addOff + sov.offset()), build2(A_XX, MIN_TMP_VAL_REG)));
 		}
 		case SimpleFunctionVariable sfv when sfv.hasOffset() -> {
 			Commands mov = mov(c, (int) c.target.type().byteCount());
 			tu.pos = c.value.loadValue(tu.sf, MIN_TMP_VAL_REG, blockedRegs, tu.commands, tu.pos, null, null);
 			// MOV [sfv.reg + offset], value
-			Command cmd = new Command(mov, build(A_SR | B_NUM, sfv.reg(), addOff + sfv.offset()), build(A_SR, MIN_TMP_VAL_REG));
-			add(tu, cmd);
+			long off = addOff + sfv.offset();
+			add(tu, new Command(mov, build2(A_XX | B_NUM, sfv.reg(), off), build2(A_XX, MIN_TMP_VAL_REG)));
 		}
-		case SimpleFunctionVariable sfv when (addOff & 7) != 0-> {
+		case SimpleFunctionVariable sfv when (addOff & 7) != 0 -> {
 			Commands mov = mov(c, (int) c.target.type().byteCount());
 			tu.pos = c.value.loadValue(tu.sf, MIN_TMP_VAL_REG, blockedRegs, tu.commands, tu.pos, null, null);
 			// MOV [sfv.reg + offset], value
-			Command cmd = new Command(mov, build(A_SR | B_NUM, sfv.reg(), addOff), build(A_SR, MIN_TMP_VAL_REG));
+			Command cmd = new Command(mov, build2(A_NUM, PrimAsmPreDefines.REGISTER_MEMORY_START + (sfv.reg() << 3) + addOff), build2(A_XX, MIN_TMP_VAL_REG));
 			add(tu, cmd);
 		}
 		case SimpleFunctionVariable sfv -> {
@@ -548,27 +549,20 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		if (c.secondName == null) {
 			push(tu, min, max, regLen);
 			SimpleFunction func = tu.sf.getFunction(c.firstName);
-			if (!func.type.equals(c.function.type())) {
-				throw new IllegalArgumentException("the function call argument needs to have the same type as the functions type! (arg-type: " + c.function.type()
-						+ " func: " + func.type + ")");
-			}
+			checkFuncType(c, func);
 			// MOV FUNC, TMP0
 			// CALL func.name
-			Command mov = new Command(Commands.CMD_MOV, build(A_SR, REG_FUNC_STRUCT), build(A_SR, MIN_TMP_VAL_REG));
-			add(tu, mov);
-			Command call = new Command(Commands.CMD_CALL, Param.createLabel(func.name), null);
-			add(tu, call);
+			add(tu, new Command(Commands.CMD_MOV, build2(A_XX, REG_FUNC_STRUCT), build2(A_XX, MIN_TMP_VAL_REG)));
+			add(tu, new Command(Commands.CMD_CALL, Param.createLabel(func.name), null));
 		} else {
 			SimpleDependency dep = tu.sf.getDependency(c.firstName);
 			SimpleExportable exp = dep.get(c.secondName);
 			if (!(exp instanceof SimpleFunctionSymbol func)) {
 				throw new IllegalArgumentException("the export " + c.firstName + ':' + c.secondName + " is no function: " + exp);
 			}
-			if (!func.type.equals(c.function.type())) {
-				throw new IllegalArgumentException("the function call argument needs to have the same type as the functions type! (arg-type: " + c.function.type()
-						+ " func: " + func.type + ")");
-			}
+			checkFuncType(c, func);
 			if (func instanceof StdLibFunc slf) {
+				regLen = 0;
 				int reg = X_ADD;
 				for (SimpleOffsetVariable sov : slf.type.arguments) {
 					Commands mov = switch ((int) sov.type.byteCount()) {
@@ -579,8 +573,8 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 					default -> throw new AssertionError(sov.type);
 					};
 					
-					Param p = sov.offset() == 0 ? build(A_SR | B_REG, MIN_TMP_VAL_REG) : build(A_SR | B_NUM, MIN_TMP_VAL_REG, sov.offset());
-					add(tu, new Command(mov, build(A_SR, reg++), p));
+					Param p = sov.offset() == 0 ? build2(A_XX | B_REG, MIN_TMP_VAL_REG) : build2(A_XX | B_NUM, MIN_TMP_VAL_REG, sov.offset());
+					add(tu, new Command(mov, build2(A_XX, reg++), p));
 				}
 			} else {
 				push(tu, min, max, regLen);
@@ -589,39 +583,40 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 				// JMPERR LOAD_ERROR
 				// MOV FUNC, TMP0
 				// CALO X00, func.off
-				Command cmd = new Command(Commands.CMD_LEA, build(A_SR, X_ADD), build(A_NUM, dep.path.addr() - tu.pos));
-				add(tu, cmd);
-				cmd = new Command(Commands.CMD_MOV, build(A_SR, X_ADD + 3L), build(A_SR, X_ADD));
-				add(tu, cmd);
-				cmd = new Command(Commands.CMD_INT, build(A_NUM, PrimAsmPreDefines.INT_LOAD_LIB), null);
-				add(tu, cmd);
-				cmd = new Command(Commands.CMD_JMPERR, build(A_NUM, tu.depLoad - tu.pos), null);
-				add(tu, cmd);
-				cmd = new Command(Commands.CMD_MOV, build(A_SR, REG_FUNC_STRUCT), build(A_SR, MIN_TMP_VAL_REG));
-				add(tu, cmd);
-				cmd = new Command(Commands.CMD_CALO, build(A_SR, X_ADD), build(A_NUM, func.address()));
-				add(tu, cmd);
+				add(tu, new Command(Commands.CMD_LEA, build2(A_XX, X_ADD), build2(A_NUM, dep.path.addr() - tu.pos)));
+				add(tu, new Command(Commands.CMD_MOV, build2(A_XX, X_ADD + 3L), build2(A_XX, X_ADD)));
+				add(tu, new Command(Commands.CMD_INT, build2(A_NUM, PrimAsmPreDefines.INT_LOAD_LIB), null));
+				add(tu, new Command(Commands.CMD_JMPERR, build2(A_NUM, tu.depLoad - tu.pos), null));
+				add(tu, new Command(Commands.CMD_MOV, build2(A_XX, REG_FUNC_STRUCT), build2(A_XX, MIN_TMP_VAL_REG)));
+				add(tu, new Command(Commands.CMD_CALO, build2(A_XX, X_ADD), build2(A_NUM, func.address())));
 			}
 		}
 		if (regLen <= 4) {
 			for (int i = max; i >= min; i--) {
-				Command cmd = new Command(Commands.CMD_POP, build(A_SR, i), null);
+				Command cmd = new Command(Commands.CMD_POP, build2(A_XX, i), null);
 				add(tu, cmd);
 			}
 		} else {
-			Command cmd = new Command(Commands.CMD_POPBLK, build(A_NUM, PrimAsmPreDefines.REGISTER_MEMORY_START + (min << 3)), build(A_NUM, regLen << 3));
+			Command cmd = new Command(Commands.CMD_POPBLK, build2(A_NUM, PrimAsmPreDefines.REGISTER_MEMORY_START + (min << 3)), build2(A_NUM, regLen << 3));
 			add(tu, cmd);
+		}
+	}
+	
+	private static void checkFuncType(SimpleCommandFuncCall c, SimpleFunctionSymbol func) {
+		if (!func.type.equals(((SimpleTypePointer) c.function.type()).target)) {
+			throw new IllegalArgumentException(
+					"the function call argument needs to have the same type as the functions type! (arg-type: " + c.function.type() + " func: " + func.type + ")");
 		}
 	}
 	
 	private static void push(SimpleTU tu, int min, int max, int regLen) {
 		if (regLen <= 4) {
 			for (int i = min; i <= max; i++) {
-				Command cmd = new Command(Commands.CMD_PUSH, build(A_SR, i), null);
+				Command cmd = new Command(Commands.CMD_PUSH, build2(A_XX, i), null);
 				add(tu, cmd);
 			}
 		} else {
-			Command cmd = new Command(Commands.CMD_PUSHBLK, build(A_NUM, PrimAsmPreDefines.REGISTER_MEMORY_START + (min << 3)), build(A_NUM, regLen << 3));
+			Command cmd = new Command(Commands.CMD_PUSHBLK, build2(A_NUM, PrimAsmPreDefines.REGISTER_MEMORY_START + (min << 3)), build2(A_NUM, regLen << 3));
 			add(tu, cmd);
 		}
 	}
@@ -643,7 +638,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		} else {
 			throw new IllegalStateException("unknown condition type: " + c.condition);
 		}
-		Command cmp = new Command(cmpCmd, build(A_SR, MIN_TMP_VAL_REG), null);
+		Command cmp = new Command(cmpCmd, build2(A_XX, MIN_TMP_VAL_REG), null);
 		add(tu, cmp);
 		long jmpPos = tu.pos;
 		tu.pos += JMP_LENGTH;
@@ -654,7 +649,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 			// - ifBlock
 			// end:
 			addCmd(tu, c.ifCmd);
-			cmds.add(new Command(jofCmd, build(A_NUM, tu.pos - jmpPos), null));
+			cmds.add(new Command(jofCmd, build2(A_NUM, tu.pos - jmpPos), null));
 			cmds.addAll(tu.commands);
 		} else {
 			// jmpOnTrue trueLabel
@@ -664,12 +659,12 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 			// - ifBlock
 			// end:
 			addCmd(tu, c.elseCmd);
-			cmds.add(new Command(jotCmd, build(A_NUM, tu.pos - jmpPos), null));
+			cmds.add(new Command(jotCmd, build2(A_NUM, tu.pos - jmpPos), null));
 			cmds.addAll(tu.commands);
 			jmpPos = tu.pos;
 			tu.commands.clear();
 			addCmd(tu, c.ifCmd);
-			cmds.add(new Command(Commands.CMD_JMP, build(A_NUM, tu.pos - jmpPos), null));
+			cmds.add(new Command(Commands.CMD_JMP, build2(A_NUM, tu.pos - jmpPos), null));
 			cmds.addAll(tu.commands);
 		}
 		tu.commands = cmds;
@@ -703,16 +698,16 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		} else {
 			throw new IllegalStateException("unknown condition type: " + c.condition);
 		}
-		Command cmp = new Command(cmpCmd, build(A_SR, MIN_TMP_VAL_REG), null);
+		Command cmp = new Command(cmpCmd, build2(A_XX, MIN_TMP_VAL_REG), null);
 		add(tu, cmp);
 		long jmpPos = tu.pos;
 		tu.pos += JMP_LENGTH;
 		List<Command> cmds = tu.commands;
 		tu.commands = new ArrayList<>();
 		addCmd(tu, c.whileCmd);
-		Command gotoStart = new Command(Commands.CMD_JMP, build(A_NUM, loopStartPos - tu.pos), null);
+		Command gotoStart = new Command(Commands.CMD_JMP, build2(A_NUM, loopStartPos - tu.pos), null);
 		tu.pos += gotoStart.length();
-		cmds.add(new Command(jofCmd, build(A_NUM, tu.pos - jmpPos), null));
+		cmds.add(new Command(jofCmd, build2(A_NUM, tu.pos - jmpPos), null));
 		cmds.addAll(tu.commands);
 		cmds.add(gotoStart);
 		tu.commands = cmds;
@@ -727,22 +722,22 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 			if (targetVar.hasOffset()) {
 				long dstOff = targetVar.offset();
 				if (dstOff != 0) {
-					movDstAddrCmd = new Command(Commands.CMD_MVAD, build(A_SR, X_ADD), build(A_SR, dstReg), build(A_NUM, dstOff));
+					movDstAddrCmd = new Command(Commands.CMD_MVAD, build2(A_XX, X_ADD), build2(A_XX, dstReg), build2(A_NUM, dstOff));
 				} else {
-					movDstAddrCmd = new Command(Commands.CMD_MOV, build(A_SR, X_ADD), build(A_SR, dstReg));
+					movDstAddrCmd = new Command(Commands.CMD_MOV, build2(A_XX, X_ADD), build2(A_XX, dstReg));
 				}
 			} else {
-				movDstAddrCmd = new Command(Commands.CMD_MOV, build(A_SR, X_ADD), build(A_NUM, PrimAsmPreDefines.REGISTER_MEMORY_START + (dstReg << 3)));
+				movDstAddrCmd = new Command(Commands.CMD_MOV, build2(A_XX, X_ADD), build2(A_NUM, PrimAsmPreDefines.REGISTER_MEMORY_START + (dstReg << 3)));
 			}
 			add(tu, movDstAddrCmd);
 			Command movSrcAddrCmd;
 			if (srcOff != 0L) {
-				movSrcAddrCmd = new Command(Commands.CMD_MVAD, build(A_SR, X_ADD + 1L), build(A_SR, REG_FUNC_STRUCT), build(A_NUM, srcOff));
+				movSrcAddrCmd = new Command(Commands.CMD_MVAD, build2(A_XX, X_ADD + 1L), build2(A_XX, REG_FUNC_STRUCT), build2(A_NUM, srcOff));
 			} else {
-				movSrcAddrCmd = new Command(Commands.CMD_MOV, build(A_SR, X_ADD + 1L), build(A_SR, REG_FUNC_STRUCT));
+				movSrcAddrCmd = new Command(Commands.CMD_MOV, build2(A_XX, X_ADD + 1L), build2(A_XX, REG_FUNC_STRUCT));
 			}
 			add(tu, movSrcAddrCmd);
-			Command movLenCmd = new Command(Commands.CMD_MOV, build(A_SR, X_ADD + 2L), build(A_NUM, byteCount));
+			Command movLenCmd = new Command(Commands.CMD_MOV, build2(A_XX, X_ADD + 2L), build2(A_NUM, byteCount));
 			add(tu, movLenCmd);
 		}
 	}
@@ -753,24 +748,24 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		while (remain > 0L) {
 			Param from;
 			if (srcOff != 0L || add != 0L) {
-				from = build(A_SR | B_NUM, REG_FUNC_STRUCT, srcOff + add);
+				from = build2(A_XX | B_NUM, REG_FUNC_STRUCT, srcOff + add);
 			} else {
-				from = build(A_SR | B_REG, REG_FUNC_STRUCT);
+				from = build2(A_XX | B_REG, REG_FUNC_STRUCT);
 			}
 			Param to;
 			int   reg = dstReg;
 			if (targetVar.hasOffset()) {
 				long off0 = targetVar.offset();
 				if (off0 == 0L || add != 0) {
-					to = build(A_SR | B_NUM, reg, off0 + add);
+					to = build2(A_XX | B_NUM, reg, off0 + add);
 				} else {
-					to = build(A_SR | B_REG, reg);
+					to = build2(A_XX | B_REG, reg);
 				}
 			} else {
 				if ((add & 7L) != 0L) {
-					to = build(A_NUM | B_REG, PrimAsmPreDefines.REGISTER_MEMORY_START + (reg << 3) + add);
+					to = build2(A_NUM | B_REG, PrimAsmPreDefines.REGISTER_MEMORY_START + (reg << 3) + add);
 				} else {
-					to = build(A_SR, reg + (add >>> 3));
+					to = build2(A_XX, reg + (add >>> 3));
 				}
 			}
 			Commands op;
@@ -925,44 +920,44 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 	private static void dleHandler(SimpleTU tu, long dleMsg0Pos, long dleMsg0Len, long dleMsg1Pos, long dleMsg1Len) {
 		tu.depLoad = tu.pos;
 		label(tu, "DEPENDENCY_LOAD_ERROR");
-		Param   x00             = build(A_SR, X_ADD);
-		Param   x01             = build(A_SR, X_ADD + 1);
-		Param   x02             = build(A_SR, X_ADD + 2);
-		Param   x03             = build(A_SR, X_ADD + 3);
-		Param   stdLog          = build(A_NUM, PrimAsmPreDefines.STD_LOG);
-		Command intStreamsWrite = new Command(Commands.CMD_INT, build(A_NUM, PrimAsmPreDefines.INT_STREAM_WRITE), null);
+		Param   x00             = build2(A_XX, X_ADD);
+		Param   x01             = build2(A_XX, X_ADD + 1);
+		Param   x02             = build2(A_XX, X_ADD + 2);
+		Param   x03             = build2(A_XX, X_ADD + 3);
+		Param   stdLog          = build2(A_NUM, PrimAsmPreDefines.STD_LOG);
+		Command intStreamsWrite = new Command(Commands.CMD_INT, build2(A_NUM, PrimAsmPreDefines.INT_STREAM_WRITE), null);
 		add(tu, new Command(Commands.CMD_MOV, x03, x00));
 		add(tu, new Command(Commands.CMD_MOV, x00, stdLog));
-		add(tu, new Command(Commands.CMD_MOV, x01, build(A_NUM, dleMsg0Len)));
-		add(tu, new Command(Commands.CMD_LEA, x02, build(A_NUM, dleMsg0Pos - tu.pos)));
+		add(tu, new Command(Commands.CMD_MOV, x01, build2(A_NUM, dleMsg0Len)));
+		add(tu, new Command(Commands.CMD_LEA, x02, build2(A_NUM, dleMsg0Pos - tu.pos)));
 		add(tu, intStreamsWrite);
 		add(tu, new Command(Commands.CMD_MOV, x00, x03));
-		add(tu, new Command(Commands.CMD_INT, build(A_NUM, PrimAsmPreDefines.INT_STR_LEN), null));
+		add(tu, new Command(Commands.CMD_INT, build2(A_NUM, PrimAsmPreDefines.INT_STR_LEN), null));
 		add(tu, new Command(Commands.CMD_MOV, x02, x03));
 		add(tu, new Command(Commands.CMD_MOV, x01, x00));
 		add(tu, new Command(Commands.CMD_MOV, x00, stdLog));
 		add(tu, intStreamsWrite);
-		add(tu, new Command(Commands.CMD_MOV, x01, build(A_NUM, dleMsg1Len)));
-		add(tu, new Command(Commands.CMD_LEA, x02, build(A_NUM, dleMsg1Pos - tu.pos)));
+		add(tu, new Command(Commands.CMD_MOV, x01, build2(A_NUM, dleMsg1Len)));
+		add(tu, new Command(Commands.CMD_LEA, x02, build2(A_NUM, dleMsg1Pos - tu.pos)));
 		add(tu, intStreamsWrite);
-		add(tu, new Command(Commands.CMD_LEA, x00, build(A_NUM, 7)));
-		add(tu, new Command(Commands.CMD_INT, build(A_NUM, PrimAsmPreDefines.INT_EXIT), null));
+		add(tu, new Command(Commands.CMD_LEA, x00, build2(A_NUM, 7)));
+		add(tu, new Command(Commands.CMD_INT, build2(A_NUM, PrimAsmPreDefines.INT_EXIT), null));
 	}
 	
 	private static void oomHandler(SimpleTU tu, long oomMsgPos, long oomMsgLen) throws AssertionError {
 		tu.outOfMem = tu.pos;
 		label(tu, "OUT_OF_MEMORY");
-		Command movIDCmd = new Command(Commands.CMD_MOV, build(A_SR, X_ADD), build(A_NUM, PrimAsmPreDefines.STD_LOG));
+		Command movIDCmd = new Command(Commands.CMD_MOV, build2(A_XX, X_ADD), build2(A_NUM, PrimAsmPreDefines.STD_LOG));
 		add(tu, movIDCmd);
-		Command movStrLen = new Command(Commands.CMD_MOV, build(A_SR, X_ADD + 1L), build(A_NUM, oomMsgLen));
+		Command movStrLen = new Command(Commands.CMD_MOV, build2(A_XX, X_ADD + 1L), build2(A_NUM, oomMsgLen));
 		add(tu, movStrLen);
-		Command leaAddrCmd = new Command(Commands.CMD_LEA, build(A_SR, X_ADD + 2L), build(A_NUM, oomMsgPos - tu.pos));
+		Command leaAddrCmd = new Command(Commands.CMD_LEA, build2(A_XX, X_ADD + 2L), build2(A_NUM, oomMsgPos - tu.pos));
 		add(tu, leaAddrCmd);
-		Command intOutOfMemErrCmd = new Command(Commands.CMD_INT, build(A_NUM, PrimAsmPreDefines.INT_STREAM_WRITE), null);
+		Command intOutOfMemErrCmd = new Command(Commands.CMD_INT, build2(A_NUM, PrimAsmPreDefines.INT_STREAM_WRITE), null);
 		add(tu, intOutOfMemErrCmd);
-		Command movExitNumCmd = new Command(Commands.CMD_MOV, build(A_SR, X_ADD), build(A_NUM, 8L));
+		Command movExitNumCmd = new Command(Commands.CMD_MOV, build2(A_XX, X_ADD), build2(A_NUM, 8L));
 		add(tu, movExitNumCmd);
-		Command intExitCmd = new Command(Commands.CMD_INT, build(A_NUM, PrimAsmPreDefines.INT_EXIT), null);
+		Command intExitCmd = new Command(Commands.CMD_INT, build2(A_NUM, PrimAsmPreDefines.INT_EXIT), null);
 		add(tu, intExitCmd);
 	}
 	
@@ -997,23 +992,23 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 			throw new IllegalArgumentException("main function type is invalid: expected '" + MAIN_TYPE + "' got '" + main.type + "' ('" + main + "')");
 		}
 		if (tu.pos != 0L) throw new AssertionError(tu.pos);
-		Command backupArgcCmd = new Command(Commands.CMD_MOV, build(A_SR, X_ADD + 2L), build(A_SR, X_ADD));
+		Command backupArgcCmd = new Command(Commands.CMD_MOV, build2(A_XX, X_ADD + 2L), build2(A_XX, X_ADD));
 		add(tu, backupArgcCmd);
-		Command movSizeCmd = new Command(Commands.CMD_MOV, build(A_SR, X_ADD), build(A_NUM, MAIN_LENGTH));
+		Command movSizeCmd = new Command(Commands.CMD_MOV, build2(A_XX, X_ADD), build2(A_NUM, MAIN_LENGTH));
 		add(tu, movSizeCmd);
-		Command intAllocCmd = new Command(Commands.CMD_INT, build(A_NUM, PrimAsmPreDefines.INT_MEMORY_ALLOC), null);
+		Command intAllocCmd = new Command(Commands.CMD_INT, build2(A_NUM, PrimAsmPreDefines.INT_MEMORY_ALLOC), null);
 		add(tu, intAllocCmd);
-		Command movArgcCmd = new Command(Commands.CMD_MOV, build(A_SR | B_REG, X_ADD), build(A_SR, X_ADD + 2L));
+		Command movArgcCmd = new Command(Commands.CMD_MOV, build2(A_XX | B_REG, X_ADD), build2(A_XX, X_ADD + 2L));
 		add(tu, movArgcCmd);
-		Command movArgvCmd = new Command(Commands.CMD_MOV, build(A_SR | B_NUM, X_ADD, 8), build(A_SR, X_ADD + 1L));
+		Command movArgvCmd = new Command(Commands.CMD_MOV, build2(A_XX | B_NUM, X_ADD, 8), build2(A_XX, X_ADD + 1L));
 		add(tu, movArgvCmd);
-		Command movFuncCmd = new Command(Commands.CMD_MOV, build(A_SR, REG_FUNC_STRUCT), build(A_SR, X_ADD));
+		Command movFuncCmd = new Command(Commands.CMD_MOV, build2(A_XX, REG_FUNC_STRUCT), build2(A_XX, X_ADD));
 		add(tu, movFuncCmd);
 		Command callCmd = new Command(Commands.CMD_CALL, Param.createLabel(main.name), null);
 		add(tu, callCmd);
-		Command movExitNumCmd = new Command(Commands.CMD_MOV, build(A_SR, X_ADD), build(A_SR | B_REG, REG_FUNC_STRUCT));
+		Command movExitNumCmd = new Command(Commands.CMD_MOV, build2(A_XX, X_ADD), build2(A_XX | B_REG, REG_FUNC_STRUCT));
 		add(tu, movExitNumCmd);
-		Command intExitCmd = new Command(Commands.CMD_INT, build(A_NUM, PrimAsmPreDefines.INT_EXIT), null);
+		Command intExitCmd = new Command(Commands.CMD_INT, build2(A_NUM, PrimAsmPreDefines.INT_EXIT), null);
 		add(tu, intExitCmd);
 	}
 	

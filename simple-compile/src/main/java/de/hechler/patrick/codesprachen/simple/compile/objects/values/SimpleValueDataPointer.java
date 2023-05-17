@@ -17,7 +17,7 @@
 package de.hechler.patrick.codesprachen.simple.compile.objects.values;
 
 import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.A_NUM;
-import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.build;
+import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.build2;
 
 import java.util.List;
 
@@ -66,7 +66,7 @@ public abstract class SimpleValueDataPointer extends SimpleValueNoConst {
 		if (this.addr == -1L) {
 			throw new AssertionError("not yet initilized");
 		}
-		Command leaCmd = new Command(Commands.CMD_LEA, reg, build(A_NUM, addr - pos));
+		Command leaCmd = new Command(Commands.CMD_LEA, reg, build2(A_NUM, this.addr - pos));
 		pos += leaCmd.length();
 		commands.add(leaCmd);
 		return pos;

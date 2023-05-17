@@ -17,7 +17,7 @@
 package de.hechler.patrick.codesprachen.simple.compile.objects.values;
 
 import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.A_NUM;
-import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.build;
+import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.build2;
 
 import java.util.List;
 
@@ -130,7 +130,7 @@ public class SimpleNumberValue extends SimpleValueConst {
 	
 	public static long loadValue(SimpleFile sf, long value, int targetRegister, boolean[] blockedRegisters, List <Command> commands, long pos) throws InternalError {
 		Param reg = SimpleValueNoConst.blockRegister(targetRegister, blockedRegisters);
-		Command addCmd = new Command(Commands.CMD_MOV, reg, build(A_NUM, value));
+		Command addCmd = new Command(Commands.CMD_MOV, reg, build2(A_NUM, value));
 		commands.add(addCmd);
 		return pos + addCmd.length();
 	}

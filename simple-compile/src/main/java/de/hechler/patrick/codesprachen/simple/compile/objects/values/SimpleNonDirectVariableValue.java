@@ -17,9 +17,9 @@
 package de.hechler.patrick.codesprachen.simple.compile.objects.values;
 
 import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.A_NUM;
-import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.A_SR;
+import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.A_XX;
 import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.B_NUM;
-import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.build;
+import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.build2;
 
 import java.util.List;
 
@@ -31,6 +31,7 @@ import de.hechler.patrick.codesprachen.simple.compile.objects.SimplePool;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleVariable.SimpleOffsetVariable;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleTypePointer;
 
+@SuppressWarnings("javadoc")
 public class SimpleNonDirectVariableValue extends SimpleValueNoConst {
 	
 	public final SimpleValue          val;
@@ -45,21 +46,20 @@ public class SimpleNonDirectVariableValue extends SimpleValueNoConst {
 	
 	@Override
 	public long loadValue(SimpleFile sf, int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader, StackUseListener sul) {
-		RegisterData rd = new RegisterData(fallbackRegister(targetRegister));
-		pos = findRegister(blockedRegisters, commands, pos, rd, rd.reg(), sul);
-		pos = val.loadValue(sf, rd.reg(), blockedRegisters, commands, pos, loader, sul);
-		Param reg = blockRegister(targetRegister, blockedRegisters);
-		if (t.isPrimitive() || t.isPointer()) {
-			Param from = build(A_SR | B_NUM, rd.reg(), sv.offset());
-			pos = addMovCmd(t, commands, pos, from, reg);
-		} else if (t.isStruct() || t.isArray()) {
-			Command movCmd = new Command(Commands.CMD_MVAD, reg, build(A_SR, rd.reg()), build(A_NUM, sv.offset()));
+		pos = this.val.loadValue(sf, targetRegister, blockedRegisters, commands, pos, loader, sul);
+		if (this.t.isPrimitive() || this.t.isPointer()) {
+			// move target, [target + offset]
+			Param from = build2(A_XX | B_NUM, targetRegister, sv.offset());
+			pos = addMovCmd(t, commands, pos, from, build2(A_XX, targetRegister));
+		} else if (this.t.isStruct() || this.t.isArray()) {
+			// ADD target, offset |> structure and array types are loaded as pointer to structure/array
+			Param reg = build2(A_XX, targetRegister);
+			Command movCmd = new Command(Commands.CMD_ADD, reg, build2(A_NUM, sv.offset()));
 			pos += movCmd.length();
 			commands.add(movCmd);
 		} else {
 			throw new AssertionError(t.getClass() + " : " + t);
 		}
-		pos = releaseRegister(commands, pos, rd, blockedRegisters, sul);
 		return pos;
 	}
 	
@@ -103,7 +103,7 @@ public class SimpleNonDirectVariableValue extends SimpleValueNoConst {
 		@Override
 		public long loadValue(SimpleFile sf, int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader, StackUseListener sul) {
 			pos = valPntr.loadValue(sf, targetRegister, blockedRegisters, commands, pos, loader, sul);
-			Command addCmd = new Command(Commands.CMD_ADD, build(A_SR, targetRegister), build(A_NUM, sv.offset()));
+			Command addCmd = new Command(Commands.CMD_ADD, build2(A_XX, targetRegister), build2(A_NUM, sv.offset()));
 			pos += addCmd.length();
 			commands.add(addCmd);
 			return pos;

@@ -15,7 +15,7 @@
 	<version>1.3.0</version>
 	<packaging>jar</packaging>
 	
-	<build>
+	<build2>
 		<plugins>
 			<plugin>
 				<groupId>org.antlr</groupId>
@@ -31,6 +31,6 @@
 				</executions>
 			</plugin>
 		</plugins>
-	</build>
+	</build2>
 
 </project>

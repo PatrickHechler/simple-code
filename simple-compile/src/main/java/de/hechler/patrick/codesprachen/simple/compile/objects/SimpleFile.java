@@ -497,7 +497,7 @@ public class SimpleFile implements SimplePool {
 		@Override public boolean isArray()                              { return false; }
 		@Override public boolean isFunc()                               { return false; }
 		@Override public long    byteCount()                            { throw new UnsupportedOperationException(); }
-		@Override public void    appendToExportStr(StringBuilder build) { throw new UnsupportedOperationException(); }
+		@Override public void    appendToExportStr(StringBuilder build2) { throw new UnsupportedOperationException(); }
 	}; // @formatter:on
 	
 	public abstract static class SimpleDependency extends SimpleVariable {

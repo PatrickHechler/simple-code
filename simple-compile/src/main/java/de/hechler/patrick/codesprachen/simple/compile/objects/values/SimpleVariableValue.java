@@ -17,9 +17,9 @@
 package de.hechler.patrick.codesprachen.simple.compile.objects.values;
 
 import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.A_NUM;
-import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.A_SR;
+import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.A_XX;
 import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.B_NUM;
-import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.build;
+import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.build2;
 
 import java.util.List;
 
@@ -49,7 +49,7 @@ public class SimpleVariableValue extends SimpleValueNoConst {
 	
 	@Override
 	public long loadValue(SimpleFile sf, int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader, StackUseListener sul) {
-		Param reg = blockRegister(targetRegister, blockedRegisters);
+		Param target = blockRegister(targetRegister, blockedRegisters);
 		if (this.sv instanceof SimpleFunctionVariable v) {
 			if (loader != null) {
 				long np = loader.loadVar(pos, targetRegister, commands, v);
@@ -60,19 +60,25 @@ public class SimpleVariableValue extends SimpleValueNoConst {
 			if (this.t.isPrimitive() || this.t.isPointer()) {
 				Param p;
 				if (v.hasOffset()) {
-					p = build(A_SR | B_NUM, v.reg(), v.offset());
+					p = build2(A_XX | B_NUM, v.reg(), v.offset());
 				} else {
-					p = build(A_SR, v.reg());
+					p = build2(A_XX, v.reg());
 				}
-				pos = addMovCmd(this.t, commands, pos, p, reg);
+				pos = addMovCmd(this.t, commands, pos, p, target);
 			} else if (this.t.isStruct() || this.t.isArray()) {
 				if (v.hasOffset()) {
-					Command movCmd = new Command(Commands.CMD_MOV, reg, build(A_SR | B_NUM, v.reg(), v.offset()));
+					long off = v.offset();
+					Command movCmd;
+					if (off == 0) {
+						movCmd = new Command(Commands.CMD_MOV, target, build2(A_XX, v.reg()));
+					} else {
+						movCmd = new Command(Commands.CMD_MVAD, target, build2(A_XX, v.reg()), build2(A_NUM, off));
+					}
 					pos += movCmd.length();
 					commands.add(movCmd);
 				} else {
 					long    addr   = PrimAsmPreDefines.REGISTER_MEMORY_START + (v.reg() << 3);
-					Command movCmd = new Command(Commands.CMD_MOV, reg, build(A_NUM, addr));
+					Command movCmd = new Command(Commands.CMD_MOV, target, build2(A_NUM, addr));
 					pos += movCmd.length();
 					commands.add(movCmd);
 				}
@@ -91,9 +97,9 @@ public class SimpleVariableValue extends SimpleValueNoConst {
 				throw new AssertionError("unknown relative: " + rel);
 			}
 			if (this.t.isPrimitive() || this.t.isPointer()) {
-				pos = addMovCmd(this.t, commands, pos, lambdaPos -> build(A_SR | B_NUM, PrimAsmConstants.IP, v.offset() - lambdaPos), reg);
+				pos = addMovCmd(this.t, commands, pos, lambdaPos -> build2(A_XX | B_NUM, PrimAsmConstants.IP, v.offset() - lambdaPos), target);
 			} else if (this.t.isStruct() || this.t.isArray()) {
-				Command leaCmd = new Command(Commands.CMD_LEA, reg, build(A_NUM, v.offset() - pos));
+				Command leaCmd = new Command(Commands.CMD_LEA, target, build2(A_NUM, v.offset() - pos));
 				pos += leaCmd.length();
 				commands.add(leaCmd);
 			} else {
@@ -140,12 +146,12 @@ public class SimpleVariableValue extends SimpleValueNoConst {
 					}
 				}
 				if (v.hasOffset()) {
-					cmd = new Command(Commands.CMD_MVAD, reg, build(A_SR, v.reg()), build(A_NUM, v.offset()));
+					cmd = new Command(Commands.CMD_MVAD, reg, build2(A_XX, v.reg()), build2(A_NUM, v.offset()));
 				} else {
-					cmd = new Command(Commands.CMD_MOV, reg, build(A_NUM, PrimAsmPreDefines.REGISTER_MEMORY_START + (v.reg() << 3)));
+					cmd = new Command(Commands.CMD_MOV, reg, build2(A_NUM, PrimAsmPreDefines.REGISTER_MEMORY_START + (v.reg() << 3)));
 				}
 			} else if (SimpleVariableValue.this.sv instanceof SimpleOffsetVariable v) {
-				cmd = new Command(Commands.CMD_LEA, reg, build(A_NUM, v.offset() - pos));
+				cmd = new Command(Commands.CMD_LEA, reg, build2(A_NUM, v.offset() - pos));
 			} else {
 				throw new AssertionError(SimpleVariableValue.this.sv.getClass() + " : " + SimpleVariableValue.this.sv);
 			}

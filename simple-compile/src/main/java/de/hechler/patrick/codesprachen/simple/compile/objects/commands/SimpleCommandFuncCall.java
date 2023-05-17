@@ -18,6 +18,8 @@ package de.hechler.patrick.codesprachen.simple.compile.objects.commands;
 
 import de.hechler.patrick.codesprachen.simple.compile.objects.SimplePool;
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleValue;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleFuncType;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleTypePointer;
 
 @SuppressWarnings("javadoc")
 public class SimpleCommandFuncCall implements SimpleCommand {
@@ -35,8 +37,11 @@ public class SimpleCommandFuncCall implements SimpleCommand {
 	}
 	
 	public static SimpleCommandFuncCall create(SimplePool pool, String fn, String sn, SimpleValue val) {
-		if (!val.type().isFunc()) {
-			throw new IllegalArgumentException("a function call needs a function structure as argument! (arg-type: " + val.type() + " arg: '" + val + "')");
+		if (val.type().isFunc()) {
+			return create(pool, fn, sn, val.mkPointer(pool));
+		}
+		if (!val.type().isPointer() || !((SimpleTypePointer) val.type()).target.isFunc()) {
+			throw new IllegalArgumentException("a function call needs a function structure (or a pointer to one) as argument! (arg-type: " + val.type() + " arg: '" + val + "')");
 		}
 		return new SimpleCommandFuncCall(pool, fn, sn, val);
 	}

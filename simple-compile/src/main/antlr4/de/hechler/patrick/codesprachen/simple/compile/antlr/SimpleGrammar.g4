@@ -14,6 +14,7 @@
 //
 //You should have received a copy of the GNU General Public License
 //along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 /**
  * regex for grammar only:
  * '\s*returns' -> '' 
@@ -39,6 +40,7 @@
 //
 //You should have received a copy of the GNU General Public License
 //along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 import java.util.function.*;
 import java.util.*;
 import java.io.*;
