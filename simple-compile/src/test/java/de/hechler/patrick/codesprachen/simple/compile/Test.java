@@ -16,6 +16,7 @@
 //along with this program.  If not, see <https://www.gnu.org/licenses/>.
 package de.hechler.patrick.codesprachen.simple.compile;
 
+import de.hechler.patrick.codesprachen.simple.compile.objects.compiler.SimpleCompiler;
 import de.hechler.patrick.zeugs.check.objects.BigCheckResult;
 import de.hechler.patrick.zeugs.check.objects.BigChecker;
 
@@ -28,6 +29,7 @@ public class Test {
 	
 	public static void main(String[] args) {
 		System.out.println(System.getProperty("java.version"));
+		SimpleCompiler.nop();
 		BigCheckResult check = BigChecker.tryCheckAll(true, Test.class.getPackage(), Test.class.getClassLoader());
 		check.print();
 		if (check.wentUnexpected()) {

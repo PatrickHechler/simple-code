@@ -102,6 +102,15 @@ import de.hechler.patrick.zeugs.pfs.interfaces.File;
 @SuppressWarnings({ "javadoc" })
 public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 	
+	static {
+		System.out.println("SimpleCompiler:init");
+	}
+	
+	public static Void nop() {
+		System.out.println("SimpleCompiler:nop");
+		return null;
+	}
+	
 	// X00 .. X1F are reserved for interrupts and asm blocks
 	// X20 .. X3F are reserved for special compiler registers
 	// X40 .. X3F are reserved for variables (there are not variable registers
@@ -115,7 +124,8 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 	public static final int MIN_TMP_VAL_REG       = MAX_VAR_REGISTER + 1;
 	public static final int MAX_TMP_VAL_REG       = 0xFF;
 	
-	// when changed the compilers main call has most likely to be changed too
+	private static final Void VAL = nop();
+	
 	public static final SimpleFuncType MAIN_TYPE   = new SimpleFuncType(
 			List.of(new SimpleOffsetVariable(SimpleType.NUM, "argc"),
 					new SimpleOffsetVariable(new SimpleTypePointer(new SimpleTypePointer(SimpleType.BYTE)), "argv")),
@@ -124,6 +134,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 	private static final long          JMP_LENGTH  = 8L;
 	
 	static {
+		if (VAL != null) throw new AssertionError();
 		if (MAIN_LENGTH != MAIN_TYPE.byteCount()) throw new AssertionError(MAIN_TYPE.byteCount() + " : " + MAIN_TYPE);
 		if (JMP_LENGTH != new Command(Commands.CMD_JMP, Param.createLabel(""), null).length()) throw new AssertionError("JMP_LENGTH has the wrong value");
 		if (JMP_LENGTH != new Command(Commands.CMD_JMPAB, Param.createLabel(""), null).length()) throw new AssertionError("JMP_LENGTH has the wrong value");
@@ -137,6 +148,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 	private final Path[]  lockups;
 	
 	public SimpleCompiler(Charset cs, Path srcRoot, Path[] lockups) {
+		System.out.println("simple compiler allocated");
 		this.cs      = cs;
 		this.srcRoot = srcRoot;
 		this.lockups = lockups.clone();
@@ -480,11 +492,11 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 			if (func instanceof StdLibFunc slf) {
 				int reg = X_ADD;
 				for (SimpleOffsetVariable sov : slf.type.arguments) {
-					Commands mov = switch (sov.type.byteCount()) {
-					case 1L -> Commands.CMD_MVB;
-					case 2L -> Commands.CMD_MVW;
-					case 4L -> Commands.CMD_MVDW;
-					case 8L -> Commands.CMD_MOV;
+					Commands mov = switch ((int) sov.type.byteCount()) {
+					case 1 -> Commands.CMD_MVB;
+					case 2 -> Commands.CMD_MVW;
+					case 4 -> Commands.CMD_MVDW;
+					case 8 -> Commands.CMD_MOV;
 					default -> throw new AssertionError(sov.type);
 					};
 					
@@ -965,11 +977,11 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 	private static void writeExports(SimpleTU tu) throws IOException {
 		Iterator<SimpleExportable> iter = tu.sf.exportsIter();
 		if (!iter.hasNext()) return;
-		try (tu.expOut) {
+		try (Writer w = tu.expOut) {
 			while (iter.hasNext()) {
 				SimpleExportable se = iter.next();
-				tu.expOut.write(se.toExportString());
-				tu.expOut.write('\n');
+				w.write(se.toExportString());
+				w.write('\n');
 			}
 		}
 	}

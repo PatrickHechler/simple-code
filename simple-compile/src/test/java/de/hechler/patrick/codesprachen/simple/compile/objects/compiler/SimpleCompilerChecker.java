@@ -22,8 +22,12 @@ import static de.hechler.patrick.zeugs.check.Assert.assertTrue;
 import java.io.IOError;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.StringReader;
 import java.lang.reflect.Method;
+import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.URL;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -93,16 +97,32 @@ public class SimpleCompilerChecker {
 	private void checkAdd() throws IOException, InterruptedException, URISyntaxException {
 		try (FS fs = this.patrFsProv.loadFS(new PatrFSOptions(ADD_PFS, true, 4096L, 1024))) {
 			System.out.println("opened fs, compile now");
-			SimpleCompiler compiler = new SimpleCompiler(StandardCharsets.UTF_8, Path.of(getClass().getResource(SRC_RES).toURI()), new Path[0]);
+			Charset cs = StandardCharsets.UTF_8;
+			Class<?> cls = getClass();
+			URL res = cls.getResource(SRC_RES);
+			URI uri = res.toURI();
+			Path p = Path.of(uri);
+			Path[] ps = new Path[0];
+			System.out.println("load now the class");
+			SimpleCompiler.nop();
+			SimpleCompiler compiler = new SimpleCompiler(cs, p, ps);
+			System.out.println("simple compiler created");
 			fs.stream(ADD_PMF, new StreamOpenOptions(false, true, false, ElementType.FILE, true, true)).close();
+			System.out.println("file created");
 			try (File file = fs.file(ADD_PMF)) {
 				file.flag(FSElement.FLAG_EXECUTABLE, 0);
-				compiler.addTranslationUnit(Path.of(getClass().getResource(ADD_RES).toURI()), file);
+				System.out.println("file marked as executable");
+				compiler.addTranslationUnit(Path.of(cls.getResource(ADD_RES).toURI()), file);
+				System.out.println("compile now");
 				compiler.compile();
+				System.out.println("finish compile");
 			}
 			try (File file = fs.file(ADD_PMF)) {
 				System.out.println("finished compile, close now fs, binary-length: " + file.length());
 			}
+		} catch (Throwable t) {
+			t.printStackTrace();
+			System.exit(1);
 		}
 		System.out.println("execute now the program");
 		execute(ADD_PFS, ADD_PMF, 9, EMPTY_BARR, EMPTY_BARR, EMPTY_BARR);
