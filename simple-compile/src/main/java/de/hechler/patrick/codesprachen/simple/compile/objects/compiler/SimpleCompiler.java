@@ -92,6 +92,7 @@ import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleValue
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleVariableValue;
 import de.hechler.patrick.codesprachen.simple.compile.utils.StdLib.StdLibIntFunc;
 import de.hechler.patrick.codesprachen.simple.compile.utils.StdLib.StdLibIntFunc2;
+import de.hechler.patrick.codesprachen.simple.compile.utils.StdLib;
 import de.hechler.patrick.codesprachen.simple.compile.utils.TwoInts;
 import de.hechler.patrick.codesprachen.simple.symbol.interfaces.SimpleExportable;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleConstant;
@@ -112,13 +113,13 @@ import de.hechler.patrick.zeugs.pfs.interfaces.File;
 public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 	
 	// X00 .. X1F are reserved for interrupts and asm blocks
-	// X20 .. X3F are reserved for special compiler registers
-	// X40 .. X60 are reserved for variables
-	// X60 .. XF9 are reserved for temporary values
+	// X20 .. X21 are reserved for special compiler registers
+	// X22 .. X60 are reserved for variables
+	// X61 .. XF9 are reserved for temporary values
 	public static final int MIN_COMPILER_REGISTER = X_ADD + 0x20;
 	public static final int REG_FUNC_STRUCT       = MIN_COMPILER_REGISTER;
 	public static final int REG_VAR_PNTR          = X_ADD + 0x21;
-	public static final int MIN_VAR_REGISTER      = X_ADD + 0x40;         // TODO remove hole
+	public static final int MIN_VAR_REGISTER      = REG_VAR_PNTR + 1;
 	public static final int MAX_VAR_REGISTER      = X_ADD + 0x60;
 	public static final int MIN_TMP_VAL_REG       = MAX_VAR_REGISTER + 1;
 	public static final int MAX_TMP_VAL_REG       = 0xFF;
@@ -314,6 +315,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 			SimpleExportable.ImportHelp.convertConst(res, null, sc, tu.source);
 		}
 		for (SimpleDependency sd : tu.sf.dependencies()) {
+			if (sd == StdLib.DEP) continue;
 			String depName = SimpleExportable.ImportHelp.DEPENDENCY_PREFIX + sd.name;
 			String comment = "dependency: " + sd.name + "\ndata: " + sd.path;
 			res.put(depName, new PrimitiveConstant(depName, comment, sd.path.addr(), tu.source, -1));
@@ -737,13 +739,13 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 	}
 	
 	private static void addCmdWhile(SimpleTU tu, SimpleCommandWhile c) {
-		// loopStart:
+		// @L
 		// MOV TMP0, condition
 		// SGN TMP0
-		// JMPNE end
-		// - loopBody
-		// - JMP loopStart:
-		// end:
+		// JMPNE E
+		// ~ loopBody
+		// ~ JMP L
+		// @E
 		long      loopStartPos = tu.pos;
 		boolean[] regs         = new boolean[256];
 		tu.pos = c.condition.loadValue(tu.sf, MIN_TMP_VAL_REG, regs, tu.commands, tu.pos, null, null);
@@ -760,14 +762,14 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		}
 		Command cmp = new Command(cmpCmd, build2(A_XX, MIN_TMP_VAL_REG), null);
 		add(tu, cmp);
-		long jmpPos = tu.pos;
+		long breakingJumpPos = tu.pos;
 		tu.pos += JMP_LENGTH;
 		List<Command> cmds = tu.commands;
 		tu.commands = new ArrayList<>();
 		addCmd(tu, c.whileCmd);
 		Command gotoStart = new Command(Commands.CMD_JMP, build2(A_NUM, loopStartPos - tu.pos), null);
 		tu.pos += gotoStart.length();
-		cmds.add(new Command(jofCmd, build2(A_NUM, tu.pos - jmpPos), null));
+		cmds.add(new Command(jofCmd, build2(A_NUM, tu.pos - breakingJumpPos), null));
 		cmds.addAll(tu.commands);
 		cmds.add(gotoStart);
 		tu.commands = cmds;

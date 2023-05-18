@@ -52,12 +52,12 @@ public class SimpleCommandBlock implements SimpleCommand {
 	}
 	
 	public void addCmd(SimpleCommand cmd) {
-		if (this.sealed) { throw new IllegalStateException("already sealed"); }
+		if (this.sealed) { throw new IllegalStateException("already sealed (me: " + this + ")"); }
 		this.cmds.add(cmd);
 	}
 	
 	public void seal() {
-		if (this.sealed) { throw new IllegalStateException("already sealed"); }
+		if (this.sealed) { throw new IllegalStateException("already sealed (me: " + this + ")"); }
 		this.sealed = true;
 	}
 	
@@ -88,10 +88,10 @@ public class SimpleCommandBlock implements SimpleCommand {
 	@Override
 	public void toString(StringBuilder b, String indention) {
 		b.append('{');
-		if (!this.cmds.isEmpty()) {
+		if (!this.commands.isEmpty()) {
 			String newIndention = indention.concat("\t");
 			b.append('\n');
-			for (SimpleCommand sc : this.cmds) {
+			for (SimpleCommand sc : this.commands) {
 				b.append(newIndention);
 				sc.toString(b, newIndention);
 				b.append('\n');

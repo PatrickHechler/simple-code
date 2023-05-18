@@ -17,9 +17,9 @@
 
 /**
  * regex for grammar only:
- * '\s*returns' -> '' 
- * '\s*\[([^\[\]"]|("([^"\r\n]|\\")*"))*\]' -> '' 
- * '\s*{[^({}]|("([^"\r\n]|\\")*")|({[^({}]|("([^"\r\n]|\\")*")|({[^({}]|("([^"\r\n]|\\")*"))*}))*}))*}' -> '' 
+ * '\s*returns' -> ''
+ * '\s*\[([^\[\]"]|("([^"\r\n]|\\.)*"))*\]' -> ''
+ * '\s*\{([^\{\}]*|"([^'\\]*|\\.)*"|'([^'\\]*|\\.)*')*\}' -> ''
  */
  grammar SimpleGrammar;
 
@@ -611,23 +611,29 @@ commandFuncCall [SimplePool pool] returns [SimpleCommandFuncCall cmd]:
 ;
 commandWhile [SimplePool pool] returns [SimpleCommandWhile cmd]:
 	WHILE OPEN_SMALL_BLOCK value [pool] CLOSE_SMALL_BLOCK
-	{SimpleCommand whileCmd;}
-	(
-		command [pool]
-		{whileCmd = $command.cmd;}
-	)
-	{$cmd = SimpleCommandWhile.create(pool.snapshot(), $value.val, whileCmd);}
+	{SimplePool subPool = pool.newSubPool();}
+	command [subPool]
+	{
+		subPool.addCmd($command.cmd);
+		subPool.seal();
+		$cmd = SimpleCommandWhile.create(pool.snapshot(), $value.val, ((SimpleSubPool)subPool).block);
+	}
 ;
 commandIf [SimplePool pool] returns [SimpleCommandIf cmd]:
 	IF OPEN_SMALL_BLOCK value [pool] CLOSE_SMALL_BLOCK
-	ic = command [pool]
-	{SimpleCommand elseCmd = null;}
+	{
+		SimplePool ifPool = pool.newSubPool();
+		SimplePool elsePool = null;
+	}
+	command [ifPool]
+	{ifPool.addCmd($command.cmd);}
 	(
 		ELSE
-		ec = command [pool]
-		{elseCmd = $ec.cmd;}
+		{elsePool = pool.newSubPool();}
+		command [elsePool]
+		{elsePool.addCmd($command.cmd);}
 	)?
-	{$cmd = SimpleCommandIf.create(pool.snapshot(), $value.val, $ic.cmd, elseCmd);}
+	{$cmd = SimpleCommandIf.create(pool.snapshot(), $value.val, ((SimpleSubPool)ifPool).block, ((SimpleSubPool)elsePool).block);}
 ;
 commandAsm [SimplePool pool] returns [SimpleCommandAsm cmd]:
 	{

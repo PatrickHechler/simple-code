@@ -1239,7 +1239,7 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 			public long loadValue(SimpleFile sf, int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader,
 					StackUseListener sul) {
 				pos = me.loadValue(sf, targetRegister, blockedRegisters, commands, pos, loader, sul);
-				addMovCmd(this.t, commands, pos, build2(A_XX, targetRegister), build2(A_XX | B_REG, targetRegister));
+				pos = addMovCmd(this.t, commands, pos, build2(A_XX, targetRegister), build2(A_XX | B_REG, targetRegister));
 				return pos;
 			}
 			

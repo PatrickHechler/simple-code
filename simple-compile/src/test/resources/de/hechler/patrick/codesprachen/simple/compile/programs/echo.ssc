@@ -15,7 +15,7 @@
 //You should have received a copy of the GNU General Public License
 //along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// this function prints hello world and exits with 0 if the print was successful
+// this function prints its arguments and exits with 0 if the print was successful
 func main hello_world_main(num argc, char## argv) --> <num exitnum> {
 	var std:streamWrite write;
 	var std:strLen strLen;
@@ -24,7 +24,7 @@ func main hello_world_main(num argc, char## argv) --> <num exitnum> {
 	while (argv#) {
 		strLen:str <-- argv#;
 		call std:strLen strLen;
-		write:len <-- strLen:length;
+		write:len <-- strLen:len;
 		write:data <-- argv#;
 		call std:streamWrite write;
 		argv <-- argv + 1;

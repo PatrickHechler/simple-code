@@ -425,7 +425,7 @@ public class SimpleFile implements SimplePool {
 		
 		@Override
 		public SimpleSubPool newSubPool() {
-			return new SimpleSubPool(this, this.block);
+			return new SimpleSubPool(this);
 		}
 		
 		@Override
