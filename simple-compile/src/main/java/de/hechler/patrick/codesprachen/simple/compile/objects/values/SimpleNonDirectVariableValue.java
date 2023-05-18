@@ -47,14 +47,14 @@ public class SimpleNonDirectVariableValue extends SimpleValueNoConst {
 	@Override
 	public long loadValue(SimpleFile sf, int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader, StackUseListener sul) {
 		pos = this.val.loadValue(sf, targetRegister, blockedRegisters, commands, pos, loader, sul);
+		Param target = build2(A_XX, targetRegister);
 		if (this.t.isPrimitive() || this.t.isPointer()) {
 			// move target, [target + offset]
 			Param from = build2(A_XX | B_NUM, targetRegister, sv.offset());
-			pos = addMovCmd(t, commands, pos, from, build2(A_XX, targetRegister));
+			pos = addMovCmd(t, commands, pos, from, target);
 		} else if (this.t.isStruct() || this.t.isArray()) {
 			// ADD target, offset |> structure and array types are loaded as pointer to structure/array
-			Param reg = build2(A_XX, targetRegister);
-			Command movCmd = new Command(Commands.CMD_ADD, reg, build2(A_NUM, sv.offset()));
+			Command movCmd = new Command(Commands.CMD_ADD, target, build2(A_NUM, sv.offset()));
 			pos += movCmd.length();
 			commands.add(movCmd);
 		} else {

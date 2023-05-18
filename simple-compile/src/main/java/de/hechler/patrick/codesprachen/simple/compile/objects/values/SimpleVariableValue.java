@@ -146,7 +146,12 @@ public class SimpleVariableValue extends SimpleValueNoConst {
 					}
 				}
 				if (v.hasOffset()) {
-					cmd = new Command(Commands.CMD_MVAD, reg, build2(A_XX, v.reg()), build2(A_NUM, v.offset()));
+					long off = v.offset();
+					if (off == 0) {
+						cmd = new Command(Commands.CMD_MOV, reg, build2(A_XX, v.reg()));
+					} else {
+						cmd = new Command(Commands.CMD_MVAD, reg, build2(A_XX, v.reg()), build2(A_NUM, off));
+					}
 				} else {
 					cmd = new Command(Commands.CMD_MOV, reg, build2(A_NUM, PrimAsmPreDefines.REGISTER_MEMORY_START + (v.reg() << 3)));
 				}

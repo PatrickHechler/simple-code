@@ -23,6 +23,7 @@ import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.P
 import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.B_XX;
 import static de.hechler.patrick.codesprachen.primitive.assemble.objects.Param.ParamBuilder.build2;
 
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.function.LongFunction;
@@ -170,7 +171,7 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 			}
 		} else if (type.isPointer()) {
 			if (from == to) { return pos; }
-			Command cmd = new Command(Commands.CMD_MOV, get(pos, from), get(pos, to));
+			Command cmd = new Command(Commands.CMD_MOV, get(pos, to), get(pos, from));
 			pos += cmd.length();
 			commands.add(cmd);
 		} else {
@@ -797,36 +798,54 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 			this.jmpOnTrue  = jmpOnTrue;
 			this.trueValue  = trueValue;
 			this.falseValue = falseValue;
+			if ("(((writeArg):wrote) == ((strLenArg):l)) != (0)".equals(toString())) {
+				System.out.println("break");
+			}
 		}
 		
 		@Override
 		public long loadValue(SimpleFile sf, int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader,
 				StackUseListener sul) {
-			Param targetReg = build2(A_XX, targetRegister);
+			// move target, valA
+			// move other, valB
+			// compare target, other
+			// if needed: free other
+			// jmpTrue @T
+			// move target, false
+			// JMP @F
+			// @T move target, true
+			// @F
 			pos = valA.loadValue(sf, targetRegister, blockedRegisters, commands, pos, loader, sul);
 			RegisterData rd = new RegisterData(fallbackRegister(targetRegister));
 			pos = findRegister(blockedRegisters, commands, pos, rd, rd.reg, sul);
 			pos = valB.loadValue(sf, rd.reg, blockedRegisters, commands, pos, loader, sul);
-			Command cmpCmd = new Command(compare, targetReg, build2(A_XX, rd.reg));
-			pos += cmpCmd.length();
-			long    jmpTruePos = pos;
-			Command jmpTrueCmd;
+			Command cmp = new Command(compare, build2(A_XX, targetRegister), build2(A_XX, rd.reg));
+			pos += cmp.length();
+			pos = releaseRegister(commands, pos, rd, blockedRegisters, sul);
+			Command gotoTrue;
+			List<Command> loadFalse = new ArrayList<>();
+			Command afterFalse;
+			List<Command> loadTrue = new ArrayList<>();
+			// jmpTrue @T
+			// move target, false
+			// JMP @F
+			// @T move target, true
+			// @F
+			long gotoTruePos = pos;
 			pos += JMP_LEN;
-			List<Command> loadFalse = newList();
 			blockedRegisters[targetRegister] = false;
-			pos                              = falseValue.loadValue(sf, targetRegister, blockedRegisters, loadFalse, pos, loader, sul);
-			long    jmpEndPos = pos;
-			Command jmpEndCmd;
-			pos        += JMP_LEN;
-			jmpTrueCmd  = new Command(jmpOnTrue, build2(A_NUM, jmpTruePos - pos), null);
-			List<Command> loadTrue = newList();
+			pos = falseValue.loadValue(sf, targetRegister, blockedRegisters, loadFalse, pos, loader, sul);
+			long afterFalsePos = pos;
+			pos += JMP_LEN;
+			long trueLabel = pos;
 			blockedRegisters[targetRegister] = false;
-			pos                              = trueValue.loadValue(sf, targetRegister, blockedRegisters, loadTrue, pos, loader, sul);
-			jmpEndCmd                        = new Command(Commands.CMD_JMP, build2(A_NUM, jmpEndPos - pos), null);
-			commands.add(cmpCmd);
-			commands.add(jmpTrueCmd);
+			pos = trueValue.loadValue(sf, targetRegister, blockedRegisters, loadTrue, pos, loader, sul);
+			gotoTrue = new Command(jmpOnTrue, build2(A_NUM, trueLabel - gotoTruePos), null);
+			afterFalse = new Command(Commands.CMD_JMP, build2(A_NUM, pos - afterFalsePos), null);
+			commands.add(cmp);
+			commands.add(gotoTrue);
 			commands.addAll(loadFalse);
-			commands.add(jmpEndCmd);
+			commands.add(afterFalse);
 			commands.addAll(loadTrue);
 			return pos;
 		}
@@ -835,17 +854,17 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		public String toString() {
 			switch (jmpOnTrue) {
 			case CMD_JMPEQ:
-				return "(" + valA + ") == (" + valB + ')';
+				return "((" + valA + ") == (" + valB + ")) ? " + trueValue + " : " + falseValue;
 			case CMD_JMPNE:
-				return "(" + valA + ") != (" + valB + ')';
+				return "((" + valA + ") != (" + valB + ")) ? " + trueValue + " : " + falseValue;
 			case CMD_JMPGE:
-				return "(" + valA + ") >= (" + valB + ')';
+				return "((" + valA + ") >= (" + valB + ")) ? " + trueValue + " : " + falseValue;
 			case CMD_JMPGT:
-				return "(" + valA + ") > (" + valB + ')';
+				return "((" + valA + ") > (" + valB + ")) ? " + trueValue + " : " + falseValue;
 			case CMD_JMPLE:
-				return "(" + valA + ") <= (" + valB + ')';
+				return "((" + valA + ") <= (" + valB + ")) ? " + trueValue + " : " + falseValue;
 			case CMD_JMPLT:
-				return "(" + valA + ") < (" + valB + ')';
+				return "((" + valA + ") < (" + valB + ")) ? " + trueValue + " : " + falseValue;
 			// $CASES-OMITTED$
 			default:
 				return "(" + valA + ") <" + compare + "  " + jmpOnTrue + "> (" + valB + ')';

@@ -15,9 +15,29 @@
 //You should have received a copy of the GNU General Public License
 //along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// this function exits with the sum of 5 and 4 (9)
-func main add_main(num argc, char## argv) --> <num exitnum> {
-	var num a <-- 50;
-	var num b <-- 40;
-	exitnum <-- a + b;
+// this function prints hello world and exits with 0 if the print was successful
+func main hello_world_main(num argc, char## argv) --> <num exitnum> {
+	var std:streamWrite write;
+	var std:strLen strLen;
+	write:id <-- std:out;
+	argv <-- argv + 1;
+	while (argv#) {
+		strLen:str <-- argv#;
+		call std:strLen strLen;
+		write:len <-- strLen:length;
+		write:data <-- argv#;
+		call std:streamWrite write;
+		argv <-- argv + 1;
+	}
+	write:data <-- "\n";
+	write:len <-- 1;
+	call std:streamWrite write;
+	asm ::
+			JMPERR SOME_ERROR
+			XOR X00, X00
+			JMP END
+		@SOME_ERROR
+			MOV X00, 1
+		@END
+	>> X00 --> exitnum ;
 }

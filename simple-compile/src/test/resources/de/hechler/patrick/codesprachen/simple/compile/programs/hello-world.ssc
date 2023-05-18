@@ -18,12 +18,12 @@
 // this function prints hello world and exits with 0 if the print was successful
 func main hello_world_main(num argc, char## argv) --> <num exitnum> {
 	var std:streamWrite writeArg;
-	var (ubyte# data) --> <num l> strLenArg;
+	var (char# string) --> <num length> strlenData;
 	writeArg:id <-- std:out;
 	writeArg:data <-- "hello world\n";
-	strLenArg:data <-- writeArg:data;
-	call std:strLen strLenArg;
-	writeArg:len <-- strLenArg:l;
+	strlenData:string <-- writeArg:data;
+	call std:strLen strlenData;
+	writeArg:len <-- strlenData:length;
 	call std:streamWrite writeArg;
-	exitnum <-- writeArg:wrote == strLenArg:l ? 0 : 1;
+	exitnum <-- writeArg:wrote != strlenData:length;
 }

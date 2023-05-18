@@ -90,7 +90,8 @@ import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleValue
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleValueDataPointer;
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleValueNoConst;
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleVariableValue;
-import de.hechler.patrick.codesprachen.simple.compile.utils.StdLib.StdLibFunc;
+import de.hechler.patrick.codesprachen.simple.compile.utils.StdLib.StdLibIntFunc;
+import de.hechler.patrick.codesprachen.simple.compile.utils.StdLib.StdLibIntFunc2;
 import de.hechler.patrick.codesprachen.simple.compile.utils.TwoInts;
 import de.hechler.patrick.codesprachen.simple.symbol.interfaces.SimpleExportable;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleConstant;
@@ -112,13 +113,12 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 	
 	// X00 .. X1F are reserved for interrupts and asm blocks
 	// X20 .. X3F are reserved for special compiler registers
-	// X40 .. X3F are reserved for variables (there are not variable registers
-	// supported yet)
-	// X40 .. XF9 are reserved for temporary values
+	// X40 .. X60 are reserved for variables
+	// X60 .. XF9 are reserved for temporary values
 	public static final int MIN_COMPILER_REGISTER = X_ADD + 0x20;
 	public static final int REG_FUNC_STRUCT       = MIN_COMPILER_REGISTER;
 	public static final int REG_VAR_PNTR          = X_ADD + 0x21;
-	public static final int MIN_VAR_REGISTER      = X_ADD + 0x40;
+	public static final int MIN_VAR_REGISTER      = X_ADD + 0x40;         // TODO remove hole
 	public static final int MAX_VAR_REGISTER      = X_ADD + 0x60;
 	public static final int MIN_TMP_VAL_REG       = MAX_VAR_REGISTER + 1;
 	public static final int MAX_TMP_VAL_REG       = 0xFF;
@@ -265,7 +265,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		}
 		addCmdBlock(tu, func.body);
 		if (ud.maxaddr != 0L) {
-			Command movFromReg = new Command(Commands.CMD_MOV, build2(A_XX, REG_VAR_PNTR), build2(A_XX, X_ADD));
+			Command movFromReg = new Command(Commands.CMD_MOV, build2(A_XX, X_ADD), build2(A_XX, REG_VAR_PNTR));
 			add(tu, movFromReg);
 			Command intFreeCmd = new Command(Commands.CMD_INT, build2(A_NUM, PrimAsmPreDefines.INT_MEMORY_FREE), null);
 			add(tu, intFreeCmd);
@@ -542,13 +542,13 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 	
 	private static void addCmdFuncCall(SimpleTU tu, SimpleCommandFuncCall c) {
 		// load value before pushing to stack, so when modifying values are supported, the changes are saved
-		tu.pos = c.function.loadValue(tu.sf, MIN_TMP_VAL_REG, new boolean[256], tu.commands, tu.pos, null, null);
 		int min    = MIN_COMPILER_REGISTER;
 		int max    = c.pool.regMax();
 		int regLen = max - min + 1;
 		if (c.secondName == null) {
-			push(tu, min, max, regLen);
 			SimpleFunction func = tu.sf.getFunction(c.firstName);
+			loadFuncStruct(tu, c, func);
+			push(tu, min, max, regLen);
 			checkFuncType(c, func);
 			// MOV FUNC, TMP0
 			// CALL func.name
@@ -561,8 +561,9 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 				throw new IllegalArgumentException("the export " + c.firstName + ':' + c.secondName + " is no function: " + exp);
 			}
 			checkFuncType(c, func);
-			if (func instanceof StdLibFunc slf) {
-				regLen = 0;
+			if (func instanceof StdLibIntFunc slf) {
+				loadFuncStruct(tu, c, func);
+				regLen = -1;
 				int reg = X_ADD;
 				for (SimpleOffsetVariable sov : slf.type.arguments) {
 					Commands mov = switch ((int) sov.type.byteCount()) {
@@ -573,10 +574,61 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 					default -> throw new AssertionError(sov.type);
 					};
 					
-					Param p = sov.offset() == 0 ? build2(A_XX | B_REG, MIN_TMP_VAL_REG) : build2(A_XX | B_NUM, MIN_TMP_VAL_REG, sov.offset());
-					add(tu, new Command(mov, build2(A_XX, reg++), p));
+					add(tu, new Command(mov, build2(A_XX, reg++), build2(A_XX | B_NUM, MIN_TMP_VAL_REG, sov.offset())));
+				}
+				add(tu, new Command(Commands.CMD_INT, build2(A_NUM, slf.intnum), null));
+				reg = X_ADD;
+				int len = slf.type.results.length;
+				if (slf instanceof StdLibIntFunc2) len--;
+				for (int i = 0; i < len; i++) {
+					SimpleOffsetVariable sov = slf.type.results[i];
+					
+					Commands mov = switch ((int) sov.type.byteCount()) {
+					case 1 -> Commands.CMD_MVB;
+					case 2 -> Commands.CMD_MVW;
+					case 4 -> Commands.CMD_MVDW;
+					case 8 -> Commands.CMD_MOV;
+					default -> throw new AssertionError(sov.type);
+					};
+					add(tu, new Command(mov, build2(A_XX | B_NUM, MIN_TMP_VAL_REG, sov.offset()), build2(A_XX, reg++)));
+				}
+				if (slf instanceof StdLibIntFunc2 f2) {
+					if (f2.flags != (PrimAsmPreDefines.STATUS_GREATER | PrimAsmPreDefines.STATUS_EQUAL | PrimAsmPreDefines.STATUS_LOWER)) {
+						throw new AssertionError("unknown status flags: 0x" + Long.toHexString(f2.flags));
+					}
+					SimpleOffsetVariable sov = slf.type.results[slf.type.results.length - 1];
+					if (sov.type != SimpleType.NUM) {
+						throw new AssertionError("unknown status variable type: " + sov.type);
+					}
+					// JMPGT G
+					// JMPLT L
+					// MOV target, 0
+					// JMP F
+					// @G MOV target, 1
+					// JMNP F
+					// @L MOV target, -1
+					// @F
+					Param   target    = build2(A_XX | B_NUM, MIN_TMP_VAL_REG, sov.offset());
+					Command setLow    = new Command(Commands.CMD_MOV, target, build2(A_NUM, -1L));                                                 // use XOR when
+																																					// target has no
+																																					// offset
+					Command setEq     = (target.art & B_NUM) != 0 ? new Command(Commands.CMD_MOV, target, build2(A_NUM, 0L))
+							: new Command(Commands.CMD_XOR, target, target);
+					Command setHigh   = new Command(Commands.CMD_MOV, target, build2(A_NUM, 0L));
+					Command afterHigh = new Command(Commands.CMD_JMP, build2(A_NUM, JMP_LENGTH + setLow.length()), null);
+					Command afterEq   = new Command(Commands.CMD_JMP, build2(A_NUM, (JMP_LENGTH * 2) + setHigh.length() + setLow.length()), null);
+					Command gotoLow   = new Command(Commands.CMD_JMPLT, build2(A_NUM, (JMP_LENGTH * 3) + setEq.length() + setHigh.length()), null);
+					Command gotoHigh  = new Command(Commands.CMD_JMPGT, build2(A_NUM, (JMP_LENGTH * 3) + setEq.length()), null);
+					add(tu, gotoHigh);
+					add(tu, gotoLow);
+					add(tu, setEq);
+					add(tu, afterEq);
+					add(tu, setHigh);
+					add(tu, afterHigh);
+					add(tu, setLow);
 				}
 			} else {
+				loadFuncStruct(tu, c, func);
 				push(tu, min, max, regLen);
 				// LEA X00, (dep.pos - tu.pos)
 				// INT INT_LOAD_LIB
@@ -592,13 +644,21 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 			}
 		}
 		if (regLen <= 4) {
-			for (int i = max; i >= min; i--) {
-				Command cmd = new Command(Commands.CMD_POP, build2(A_XX, i), null);
-				add(tu, cmd);
+			if (regLen != -1) {
+				for (int i = max; i >= min; i--) {
+					Command cmd = new Command(Commands.CMD_POP, build2(A_XX, i), null);
+					add(tu, cmd);
+				}
 			}
 		} else {
 			Command cmd = new Command(Commands.CMD_POPBLK, build2(A_NUM, PrimAsmPreDefines.REGISTER_MEMORY_START + (min << 3)), build2(A_NUM, regLen << 3));
 			add(tu, cmd);
+		}
+	}
+	
+	private static void loadFuncStruct(SimpleTU tu, SimpleCommandFuncCall c, SimpleFunctionSymbol func) {
+		if (func.type.byteCount() > 0) {
+			tu.pos = c.function.loadValue(tu.sf, MIN_TMP_VAL_REG, new boolean[256], tu.commands, tu.pos, null, null);
 		}
 	}
 	

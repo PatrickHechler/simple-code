@@ -1,19 +1,19 @@
-//This file is part of the Simple Code Project
-//DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
-//Copyright (C) 2023  Patrick Hechler
+// This file is part of the Simple Code Project
+// DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+// Copyright (C) 2023 Patrick Hechler
 //
-//This program is free software: you can redistribute it and/or modify
-//it under the terms of the GNU General Public License as published by
-//the Free Software Foundation, either version 3 of the License, or
-//(at your option) any later version.
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
 //
-//This program is distributed in the hope that it will be useful,
-//but WITHOUT ANY WARRANTY; without even the implied warranty of
-//MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//GNU General Public License for more details.
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
 //
-//You should have received a copy of the GNU General Public License
-//along with this program.  If not, see <https://www.gnu.org/licenses/>.
+// You should have received a copy of the GNU General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
 package de.hechler.patrick.codesprachen.simple.compile.objects.compiler;
 
 import static de.hechler.patrick.zeugs.check.Assert.assertEquals;
@@ -62,13 +62,13 @@ public class SimpleCompilerChecker {
 	
 	@Start
 	protected void start(@MethodParam Method met) throws NoSuchProviderException {
-		System.out.println("check now " + met.getName());
+		System.err.println("check now " + met.getName());
 		this.patrFsProv = FSProvider.ofName(FSProvider.PATR_FS_PROVIDER_NAME);
 	}
 	
 	@End
 	protected void end(@MethodParam Method met) {
-		System.out.println("finished " + met.getName() + " check");
+		System.err.println("finished " + met.getName() + " check");
 		this.patrFsProv.loadedFS().forEach(fs -> {
 			try {
 				fs.close();
@@ -93,16 +93,20 @@ public class SimpleCompilerChecker {
 	private static final String HW_PFS = "./testout/hello-world.pfs";
 	private static final String HW_RES = "/de/hechler/patrick/codesprachen/simple/compile/programs/hello-world.ssc";
 	
+	private static final String ECHO_PMF = "/echo";
+	private static final String ECHO_PFS = "./testout/echo.pfs";
+	private static final String ECHO_RES = "/de/hechler/patrick/codesprachen/simple/compile/programs/echo.ssc";
+	
 	@Check
 	private void checkAdd() throws IOException, InterruptedException, URISyntaxException {
 		try (FS fs = this.patrFsProv.loadFS(new PatrFSOptions(ADD_PFS, true, 4096L, 1024))) {
-			System.out.println("opened fs, compile now");
-			Charset cs = StandardCharsets.UTF_8;
-			Class<?> cls = getClass();
-			URL res = cls.getResource(SRC_RES);
-			URI uri = res.toURI();
-			Path p = Path.of(uri);
-			Path[] ps = new Path[0];
+			System.err.println("opened fs, compile now");
+			Charset        cs       = StandardCharsets.UTF_8;
+			Class<?>       cls      = getClass();
+			URL            res      = cls.getResource(SRC_RES);
+			URI            uri      = res.toURI();
+			Path           p        = Path.of(uri);
+			Path[]         ps       = new Path[0];
 			SimpleCompiler compiler = new SimpleCompiler(cs, p, ps);
 			fs.stream(ADD_PMF, new StreamOpenOptions(false, true, false, ElementType.FILE, true, true)).close();
 			try (File file = fs.file(ADD_PMF)) {
@@ -114,44 +118,64 @@ public class SimpleCompilerChecker {
 			t.printStackTrace();
 			System.exit(1);
 		}
-		System.out.println("execute now the program");
-		execute(ADD_PFS, ADD_PMF, 9, EMPTY_BARR, EMPTY_BARR, EMPTY_BARR);
+		System.err.println("execute now the program");
+		execute(ADD_PFS, ADD_PMF, 90, EMPTY_BARR, EMPTY_BARR, EMPTY_BARR);
 	}
 	
 	@Check
 	private void checkAdd2() throws IOException, URISyntaxException, InterruptedException {
 		try (FS fs = this.patrFsProv.loadFS(new PatrFSOptions(ADD2_PFS, true, 4096L, 1024))) {
-			System.out.println("opened fs, compile now");
+			System.err.println("opened fs, compile now");
 			SimpleCompiler compiler = new SimpleCompiler(StandardCharsets.UTF_8, Path.of(getClass().getResource(SRC_RES).toURI()), new Path[0]);
 			fs.stream(ADD2_PMF, new StreamOpenOptions(false, true, false, ElementType.FILE, true, true)).close();
 			File file = fs.file(ADD2_PMF);
 			file.flag(FSElement.FLAG_EXECUTABLE, 0);
 			compiler.addTranslationUnit(Path.of(getClass().getResource(ADD2_RES).toURI()), file);
 			compiler.compile();
-			System.out.println("finished compile, close now fs");
+			System.err.println("finished compile, close now fs");
 		}
-		System.out.println("execute now the program");
-		execute(ADD2_PFS, ADD2_PMF, 0, EMPTY_BARR, "5 + 4 = 9".getBytes(StandardCharsets.UTF_8), EMPTY_BARR);
+		System.err.println("execute now the program");
+		execute(ADD2_PFS, ADD2_PMF, 0, EMPTY_BARR, "5 + 4 = 9\n".getBytes(StandardCharsets.UTF_8), EMPTY_BARR);
 	}
 	
 	@Check
 	private void checkHelloWorld() throws IOException, URISyntaxException, InterruptedException {
 		try (FS fs = this.patrFsProv.loadFS(new PatrFSOptions(HW_PFS, true, 4096L, 1024))) {
-			System.out.println("opened fs, compile now");
+			System.err.println("opened fs, compile now");
 			SimpleCompiler compiler = new SimpleCompiler(StandardCharsets.UTF_8, Path.of(getClass().getResource(SRC_RES).toURI()), new Path[0]);
 			fs.stream(HW_PMF, new StreamOpenOptions(false, true, false, ElementType.FILE, true, true)).close();
 			File file = fs.file(HW_PMF);
 			file.flag(FSElement.FLAG_EXECUTABLE, 0);
 			compiler.addTranslationUnit(Path.of(getClass().getResource(HW_RES).toURI()), file);
 			compiler.compile();
-			System.out.println("finished compile, close now fs");
+			try (File f = fs.file(HW_PMF)) {
+				System.err.println("finished compile, close now fs file length: " + f.length());
+			}
 		}
-		System.out.println("execute now the program");
+		System.err.println("execute now the program");
 		execute(HW_PFS, HW_PMF, 0, EMPTY_BARR, "hello world\n".getBytes(StandardCharsets.UTF_8), EMPTY_BARR);
 	}
 	
+	@Check
+	private void checkEcho() throws IOException, URISyntaxException, InterruptedException {
+		try (FS fs = this.patrFsProv.loadFS(new PatrFSOptions(ECHO_PFS, true, 4096L, 1024))) {
+			System.err.println("opened fs, compile now");
+			SimpleCompiler compiler = new SimpleCompiler(StandardCharsets.UTF_8, Path.of(getClass().getResource(SRC_RES).toURI()), new Path[0]);
+			fs.stream(ECHO_PMF, new StreamOpenOptions(false, true, false, ElementType.FILE, true, true)).close();
+			File file = fs.file(ECHO_PMF);
+			file.flag(FSElement.FLAG_EXECUTABLE, 0);
+			compiler.addTranslationUnit(Path.of(getClass().getResource(ECHO_RES).toURI()), file);
+			compiler.compile();
+			try (File f = fs.file(ECHO_PMF)) {
+				System.err.println("finished compile, close now fs file length: " + f.length());
+			}
+		}
+		System.err.println("execute now the program");
+		execute(ECHO_PFS, ECHO_PMF, 0, EMPTY_BARR, "echo text\n".getBytes(StandardCharsets.UTF_8), EMPTY_BARR, "echo", "text");
+	}
+	
 	protected void execute(String pfsFile, String pmfFile, int exitCode, byte[] stdin, byte[] stdout, byte[] stderr, String... programArgs)
-		throws IOException, InterruptedException {
+			throws IOException, InterruptedException {
 		Runtime  r    = Runtime.getRuntime();
 		String[] args = new String[] { "pvm", "--pfs=" + pfsFile, "--pmf=" + pmfFile };
 		if (programArgs.length != 0) {
@@ -159,9 +183,9 @@ public class SimpleCompilerChecker {
 			args = Arrays.copyOf(args, olen + programArgs.length);
 			System.arraycopy(programArgs, 0, args, olen, programArgs.length);
 		}
-		System.out.println("args: " + Arrays.toString(args));
+		System.err.println("args: " + Arrays.toString(args));
 		Process process = r.exec(args);
-		System.out.println("started process pid: " + process.pid() + "   " + process);
+		System.err.println("started process pid: " + process.pid() + "   " + process);
 		if (stdin.length > 0) { process.getOutputStream().write(stdin); }
 		TwoBools b1 = new TwoBools(), b2 = new TwoBools();
 		Thread   t  = Thread.ofVirtual().unstarted(() -> check(() -> process.isAlive(), process.getErrorStream(), stderr, b1));
@@ -188,7 +212,7 @@ public class SimpleCompilerChecker {
 	
 	@SuppressWarnings("static-method")
 	protected void check(BooleanSupplier cond, InputStream stream, byte[] value, TwoBools b) {
-		System.out.println(logStart() + "start");
+		System.err.println(logStart() + "start");
 		try {
 			b.result = false;
 			byte[] other = new byte[value.length];
@@ -202,21 +226,24 @@ public class SimpleCompilerChecker {
 						}
 						throw new IOException("reached EOF too early");
 					}
-					System.err.print(logStart() + "little read: ");
-					System.err.write(other, i, reat);
-					System.err.println("\nreat: " + reat);
+					synchronized (System.err) {
+						System.err.print(logStart() + "little read: ");
+						System.err.write(other, i, reat);
+						System.err.println("\n" + logStart() + "    length: " + reat);
+					}
 					i += reat;
 				} catch (IOException e) {
 					throw new IOError(e);
 				}
 			}
 			if (other.length != 0) {
-				System.err.print(logStart() + "read: ");
-				try {
-					System.err.write(other);
-				} catch (IOException e) {
+				synchronized (System.err) {
+					System.err.print(logStart() + "read: ");
+					try {
+						System.err.write(other);
+					} catch (IOException e) {}
+					System.err.println();
 				}
-				System.err.println();
 			}
 			b.result = Arrays.equals(value, other);
 			try {
@@ -238,7 +265,7 @@ public class SimpleCompilerChecker {
 			synchronized (b) {
 				b.notifyAll();
 			}
-			System.out.println(logStart() + "finish");
+			System.err.println(logStart() + "finish");
 		}
 	}
 	

@@ -43,11 +43,11 @@ public class StdLib {
 	
 	private static final long COMPARE_FLAGS = PrimAsmPreDefines.STATUS_GREATER | PrimAsmPreDefines.STATUS_EQUAL | PrimAsmPreDefines.STATUS_LOWER;
 	
-	public static class StdLibFunc extends SimpleFunctionSymbol {
+	public static class StdLibIntFunc extends SimpleFunctionSymbol {
 		
 		public final long intnum;
 		
-		public StdLibFunc(long intnum, String name, List<SimpleOffsetVariable> args, List<SimpleOffsetVariable> results) {
+		public StdLibIntFunc(long intnum, String name, List<SimpleOffsetVariable> args, List<SimpleOffsetVariable> results) {
 			super(true, name, args, results);
 			this.intnum = intnum;
 		}
@@ -59,11 +59,11 @@ public class StdLib {
 		
 	}
 	
-	public static class StdLibFunc2 extends StdLibFunc {
+	public static class StdLibIntFunc2 extends StdLibIntFunc {
 		
 		public final long flags;
 		
-		public StdLibFunc2(long intnum, String name, List<SimpleOffsetVariable> args, List<SimpleOffsetVariable> results, long statusFlags) {
+		public StdLibIntFunc2(long intnum, String name, List<SimpleOffsetVariable> args, List<SimpleOffsetVariable> results, long statusFlags) {
 			super(intnum, name, args, results);
 			if (statusFlags != COMPARE_FLAGS) throw new AssertionError(Long.toHexString(statusFlags));
 			this.flags = statusFlags;
@@ -84,7 +84,7 @@ public class StdLib {
 	private static final SimpleType UBYTE  = SimpleType.UBYTE;
 	private static final SimpleType CHAR   = SimpleType.UBYTE;
 	
-	public static final Map<String, StdLibFunc>           ALL_INTERRUPTS = Collections.unmodifiableMap(allInts());
+	public static final Map<String, StdLibIntFunc>           ALL_INTERRUPTS = Collections.unmodifiableMap(allInts());
 	public static final Map<String, SimpleConstant>       ALL_CONSTANTS  = Collections.unmodifiableMap(allConsts());
 	public static final Map<String, SimpleOffsetVariable> ALL_VARS       = Collections.unmodifiableMap(allVars());
 	public static final Map<String, SimpleStructType>     ALL_STRUCTS    = Collections.unmodifiableMap(allStructs());
@@ -116,7 +116,7 @@ public class StdLib {
 				case @SuppressWarnings("preview") SimpleOffsetVariable sov -> sov.init(-2L, this);
 				case @SuppressWarnings("preview") SimpleConstant sc -> {/**/}
 				case @SuppressWarnings("preview") SimpleStructType sst -> {/**/}
-				case @SuppressWarnings("preview") StdLibFunc slf -> slf.init(-2L, this);
+				case @SuppressWarnings("preview") StdLibIntFunc slf -> slf.init(-2L, this);
 				default -> throw new AssertionError("unknown type: " + se.getClass().getName());
 				}
 			}
@@ -144,8 +144,8 @@ public class StdLib {
 	
 	// GENERATED-CODE-START
 	// this code-block is automatic generated, do not modify
-	private static Map<String, StdLibFunc> allInts() {
-		Map<String, StdLibFunc> res = new HashMap<>();
+	private static Map<String, StdLibIntFunc> allInts() {
+		Map<String, StdLibIntFunc> res = new HashMap<>();
 		res.put("errorIllegalInterrupt", slf(0, "errorIllegalInterrupt", of(sv(NUM, 0, "intnum")), of()));
 		res.put("errorUnknownCommand", slf(1, "errorUnknownCommand", of(), of()));
 		res.put("errorIllegalMemory", slf(2, "errorIllegalMemory", of(), of()));
@@ -214,7 +214,7 @@ public class StdLib {
 		res.put("loadLib", slf(65, "loadLib", of(sv(CHAR, 1, "file")), of(sv(UBYTE, 1, "data"), sv(NUM, 0, "len"), sv(NUM, 0, "loaded"))));
 		res.put("unloadLib", slf(66, "unloadLib", of(sv(UBYTE, 1, "data")), of()));
 		return res;
-}
+	}
 	
 	// here is the end of the automatic generated code-block
 	// GENERATED-CODE-END
@@ -261,12 +261,12 @@ public class StdLib {
 		return b.toString();
 	}
 	
-	private static StdLibFunc slf(long intnum, String name, List<SimpleOffsetVariable> args, List<SimpleOffsetVariable> ress) {
-		return new StdLibFunc(intnum, name, args, ress);
+	private static StdLibIntFunc slf(long intnum, String name, List<SimpleOffsetVariable> args, List<SimpleOffsetVariable> ress) {
+		return new StdLibIntFunc(intnum, name, args, ress);
 	}
 	
-	private static StdLibFunc slf(long intnum, String name, List<SimpleOffsetVariable> args, List<SimpleOffsetVariable> ress, long flags) {
-		return new StdLibFunc2(intnum, name, args, ress, flags);
+	private static StdLibIntFunc slf(long intnum, String name, List<SimpleOffsetVariable> args, List<SimpleOffsetVariable> ress, long flags) {
+		return new StdLibIntFunc2(intnum, name, args, ress, flags);
 	}
 	
 	private static SimpleOffsetVariable sv(SimpleType type, int deapth, String name) {
