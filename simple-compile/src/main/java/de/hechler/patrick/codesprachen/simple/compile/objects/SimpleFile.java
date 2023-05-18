@@ -1,19 +1,19 @@
-//This file is part of the Simple Code Project
-//DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
-//Copyright (C) 2023  Patrick Hechler
+// This file is part of the Simple Code Project
+// DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+// Copyright (C) 2023 Patrick Hechler
 //
-//This program is free software: you can redistribute it and/or modify
-//it under the terms of the GNU General Public License as published by
-//the Free Software Foundation, either version 3 of the License, or
-//(at your option) any later version.
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
 //
-//This program is distributed in the hope that it will be useful,
-//but WITHOUT ANY WARRANTY; without even the implied warranty of
-//MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//GNU General Public License for more details.
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
 //
-//You should have received a copy of the GNU General Public License
-//along with this program.  If not, see <https://www.gnu.org/licenses/>.
+// You should have received a copy of the GNU General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
 package de.hechler.patrick.codesprachen.simple.compile.objects;
 
 import static de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleStructType.align;
@@ -32,7 +32,9 @@ import de.hechler.patrick.codesprachen.primitive.assemble.enums.FileTypes;
 import de.hechler.patrick.codesprachen.simple.compile.interfaces.TriFunction;
 import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommand;
 import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommandBlock;
+import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommandIf;
 import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommandVarDecl;
+import de.hechler.patrick.codesprachen.simple.compile.objects.commands.SimpleCommandWhile;
 import de.hechler.patrick.codesprachen.simple.compile.objects.compiler.SimpleCompiler;
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleNumberValue;
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleStringValue;
@@ -70,7 +72,7 @@ public class SimpleFile implements SimplePool {
 	
 	private void checkName(String name) {
 		if (this.dependencies.containsKey(name) || this.vars.containsKey(name) || this.structs.containsKey(name) || this.funcs.containsKey(name)
-			|| this.consts.containsKey(name)) {
+				|| this.consts.containsKey(name)) {
 			throw new IllegalArgumentException("name already in use! name: '" + name + "'");
 		}
 	}
@@ -95,9 +97,9 @@ public class SimpleFile implements SimplePool {
 	}
 	
 	private static final SimpleFuncType MAIN_TYPE = new SimpleFuncType(
-		Arrays.asList(new SimpleOffsetVariable(SimpleType.NUM, "argc"),
-			new SimpleOffsetVariable(new SimpleTypePointer(new SimpleTypePointer(SimpleType.UWORD)), "argv")),
-		Arrays.asList(new SimpleOffsetVariable(SimpleType.NUM, "exitnum")));
+			Arrays.asList(new SimpleOffsetVariable(SimpleType.NUM, "argc"),
+					new SimpleOffsetVariable(new SimpleTypePointer(new SimpleTypePointer(SimpleType.UWORD)), "argv")),
+			Arrays.asList(new SimpleOffsetVariable(SimpleType.NUM, "exitnum")));
 	
 	public void addFunction(SimpleFunction func) {
 		checkName(func.name);
@@ -165,13 +167,21 @@ public class SimpleFile implements SimplePool {
 		count(used, countTarget.commands, countTarget);
 	}
 	
+	@SuppressWarnings("preview")
 	public static void count(UsedData used, Iterable<?> countTarget, SimpleCommandBlock blk) {
 		final int  startRegs = used.regs;
 		final long startAddr = used.currentaddr;
 		for (Object obj : countTarget) {
-			if (obj instanceof SimpleCommandBlock scb) {
-				count(used, scb.commands, scb);
-			} else if (obj instanceof SimpleFunctionVariable sv) {
+			switch (obj) {
+			case SimpleCommandBlock scb -> count(used, scb.commands, scb);
+			case SimpleCommandWhile scw -> count(used, scw.whileCmd.commands, scw.whileCmd);
+			case SimpleCommandIf sci -> {
+				count(used, sci.ifCmd.commands, sci.ifCmd);
+				if (sci.elseCmd != null) {
+					count(used, sci.elseCmd.commands, sci.elseCmd);
+				}
+			}
+			case SimpleFunctionVariable sv -> {
 				long regLen = (sv.type.byteCount() >>> 3) + ((sv.type.byteCount() & 7) != 0 ? 1 : 0);
 				if (used.regs < SimpleCompiler.MAX_VAR_REGISTER - regLen && !sv.watsPointer()) {
 					sv.init(-1L, used.regs);
@@ -182,10 +192,10 @@ public class SimpleFile implements SimplePool {
 					sv.init(used.currentaddr, SimpleCompiler.REG_VAR_PNTR);
 					used.currentaddr += bc;
 				}
-			} else if (obj instanceof SimpleCommand sc) {
-				sc.pool().initRegMax(used.regs);
-			} else {
-				throw new AssertionError("unknown class: '" + obj.getClass().getName() + "' of object: '" + obj + "'");
+			}
+			case SimpleCommand sc -> sc.pool().initRegMax(used.regs);
+			case null -> throw new AssertionError("got a null command");
+			default -> throw new AssertionError("unknown class: '" + obj.getClass().getName() + "' of object: '" + obj + "'");
 			}
 		}
 		if (used.currentaddr > used.maxaddr) {
@@ -259,7 +269,7 @@ public class SimpleFile implements SimplePool {
 	
 	public Iterator<SimpleExportable> exportsIter() {
 		return new FilteringIter<>(new MultiIter<>(consts.values().iterator(), funcs.values().iterator(), structs.values().iterator(), vars.values().iterator()),
-			SimpleExportable::isExport);
+				SimpleExportable::isExport);
 	}
 	
 	@Override
@@ -388,7 +398,7 @@ public class SimpleFile implements SimplePool {
 		
 		public final SimplePool         parent;
 		public final SimpleCommandBlock block;
-		private SimpleSubPool snap;
+		private SimpleSubPool           snap;
 		
 		public SimpleSubPool(SimplePool parent) {
 			this.parent = parent;
@@ -417,7 +427,7 @@ public class SimpleFile implements SimplePool {
 		public SimpleSubPool snapshot() {
 			SimpleSubPool sn = this.snap; // reuse snapshots
 			if (sn == null || sn.block.commands.size() != this.block.commands.size()) {
-				sn = new SimpleSubPool(this.parent, this.block);
+				sn        = new SimpleSubPool(this.parent, this.block);
 				this.snap = sn;
 			}
 			return sn;

@@ -798,9 +798,6 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 			this.jmpOnTrue  = jmpOnTrue;
 			this.trueValue  = trueValue;
 			this.falseValue = falseValue;
-			if ("(((writeArg):wrote) == ((strLenArg):l)) != (0)".equals(toString())) {
-				System.out.println("break");
-			}
 		}
 		
 		@Override

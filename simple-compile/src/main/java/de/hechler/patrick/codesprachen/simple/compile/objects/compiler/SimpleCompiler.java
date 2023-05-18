@@ -44,6 +44,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.regex.Pattern;
 
 import org.antlr.v4.runtime.ANTLRInputStream;
 import org.antlr.v4.runtime.BailErrorStrategy;
@@ -112,6 +113,8 @@ import de.hechler.patrick.zeugs.pfs.interfaces.File;
 @SuppressWarnings({ "javadoc" })
 public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 	
+	private static final Pattern IGNORE_PATTERN = Pattern.compile("^ignore[0-9]+$");
+	
 	// X00 .. X1F are reserved for interrupts and asm blocks
 	// X20 .. X21 are reserved for special compiler registers
 	// X22 .. X60 are reserved for variables
@@ -145,7 +148,6 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 	private final Path[]  lockups;
 	
 	public SimpleCompiler(Charset cs, Path srcRoot, Path[] lockups) {
-		System.out.println("simple compiler allocated");
 		this.cs      = cs;
 		this.srcRoot = srcRoot;
 		this.lockups = lockups.clone();
@@ -281,6 +283,8 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		TwoInts minMax = new TwoInts(-1, Integer.MAX_VALUE);
 		findMaxAndMinRegs(minMax, c.asmArguments);
 		findMaxAndMinRegs(minMax, c.asmResults);
+		minMax.a = Math.max(minMax.a, MIN_COMPILER_REGISTER);
+		minMax.b = Math.min(minMax.b, c.pool.regMax());
 		push(tu, minMax);
 		boolean[] blockedRegs = new boolean[256];
 		for (int i = 0; i < minMax.a; i++) {
@@ -296,13 +300,27 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		}
 		ParseContext context = PREASSEMBLER.preassemble(tu.source, new ANTLRInputStream(c.asmCode.substring(2, c.asmCode.length() - 2)), consts(tu, c), tu.pos);
 		tu.pos = context.pos;
+		tu.commands.addAll(context.commands);
 		context.labels.forEach((name, addr) -> {
 			Long old = tu.labels.put(name, addr);
 			if (old != null) {
 				throw new IllegalStateException("label already set: " + name);
 			}
 		});
-		
+		// TODO
+		for (AsmParam res : c.asmResults) {
+			switch (res.value) {
+			case SimpleVariableValue svv -> {
+				
+			}
+			case SimpleNonDirectVariableValue sndvv -> {
+				
+			}
+			default -> {
+				SimpleValue val = res.value.mkPointer(c.pool);
+			}
+			}
+		}
 		pop(tu, minMax);
 	}
 	
@@ -584,6 +602,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 				if (slf instanceof StdLibIntFunc2) len--;
 				for (int i = 0; i < len; i++) {
 					SimpleOffsetVariable sov = slf.type.results[i];
+					if (IGNORE_PATTERN.matcher(sov.name).matches()) continue;
 					
 					Commands mov = switch ((int) sov.type.byteCount()) {
 					case 1 -> Commands.CMD_MVB;

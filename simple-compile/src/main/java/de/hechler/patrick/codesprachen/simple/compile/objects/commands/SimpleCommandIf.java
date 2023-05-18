@@ -19,21 +19,22 @@ package de.hechler.patrick.codesprachen.simple.compile.objects.commands;
 import de.hechler.patrick.codesprachen.simple.compile.objects.SimplePool;
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleValue;
 
+@SuppressWarnings("javadoc")
 public class SimpleCommandIf implements SimpleCommand {
 	
-	public final SimplePool    pool;
-	public final SimpleValue   condition;
-	public final SimpleCommand ifCmd;
-	public final SimpleCommand elseCmd;
+	public final SimplePool         pool;
+	public final SimpleValue        condition;
+	public final SimpleCommandBlock ifCmd;
+	public final SimpleCommandBlock elseCmd;
 	
-	public SimpleCommandIf(SimplePool pool, SimpleValue condition, SimpleCommand ifCmd, SimpleCommand elseCmd) {
+	public SimpleCommandIf(SimplePool pool, SimpleValue condition, SimpleCommandBlock ifCmd, SimpleCommandBlock elseCmd) {
 		this.pool      = pool;
 		this.condition = condition;
 		this.ifCmd     = ifCmd;
 		this.elseCmd   = elseCmd;
 	}
 	
-	public static SimpleCommandIf create(SimplePool pool, SimpleValue val, SimpleCommand cmd, SimpleCommand elseCmd) {
+	public static SimpleCommandIf create(SimplePool pool, SimpleValue val, SimpleCommandBlock cmd, SimpleCommandBlock elseCmd) {
 		return new SimpleCommandIf(pool, val, cmd, elseCmd);
 	}
 	
