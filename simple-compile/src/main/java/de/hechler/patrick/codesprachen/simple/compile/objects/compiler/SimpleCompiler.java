@@ -279,6 +279,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 	// only used to preassemble asm blocks
 	private static final PrimitiveAssembler PREASSEMBLER = new PrimitiveAssembler(null, null, null, false, true);
 	
+	@SuppressWarnings("preview")
 	private static void addCmdAsm(SimpleTU tu, SimpleCommandAsm c) {
 		TwoInts minMax = new TwoInts(-1, Integer.MAX_VALUE);
 		findMaxAndMinRegs(minMax, c.asmArguments);
@@ -307,19 +308,58 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 				throw new IllegalStateException("label already set: " + name);
 			}
 		});
-		// TODO
 		for (AsmParam res : c.asmResults) {
+			blockedRegs[res.register] = true;
+			Commands mov = switch ((int) res.value.type().byteCount()) {
+			case 1 -> Commands.CMD_MVB;
+			case 2 -> Commands.CMD_MVW;
+			case 4 -> Commands.CMD_MVDW;
+			case 8 -> Commands.CMD_MOV;
+			default -> throw new AssertionError("illegal byte count: " + res.value.type().byteCount());
+			};
 			switch (res.value) {
-			case @SuppressWarnings("preview") SimpleVariableValue svv -> {
-				
+			case SimpleVariableValue svv when svv.sv instanceof SimpleFunctionVariable sfv -> {
+				if (sfv.reg() < minMax.a || sfv.reg() > minMax.b) {
+					if (sfv.hasOffset()) {
+						add(tu, new Command(mov, build2(A_XX | B_NUM, sfv.reg(), sfv.offset()), build2(A_XX, res.register)));
+					} else {
+						add(tu, new Command(mov, build2(A_XX, sfv.reg()), build2(A_XX, res.register)));
+					}
+				} else {
+					if (sfv.hasOffset()) {
+						int treg = res.register == MIN_TMP_VAL_REG ? MIN_TMP_VAL_REG + 1 : MIN_TMP_VAL_REG;
+						add(tu, new Command(mov, build2(A_XX, treg), build2(A_XX | B_NUM, SP, ((sfv.reg() - minMax.b) << 3) - 8)));
+						add(tu, new Command(mov, build2(A_XX | B_NUM, treg, sfv.offset()), build2(A_XX, res.register)));
+					} else {
+						add(tu, new Command(mov, build2(A_XX | B_NUM, SP, ((sfv.reg() - minMax.b) << 3) - 8), build2(A_XX, res.register)));
+					}
+				}
 			}
-			case @SuppressWarnings("preview") SimpleNonDirectVariableValue sndvv -> {
-				
+			case SimpleNonDirectVariableValue sndvv when sndvv.val instanceof SimpleVariableValue svv && svv.sv instanceof SimpleFunctionVariable sfv -> {
+				long off = sndvv.sv.offset();
+				if (sfv.reg() < minMax.a || sfv.reg() > minMax.b) {
+					if (sfv.hasOffset()) {
+						add(tu, new Command(mov, build2(A_XX | B_NUM, sfv.reg(), sfv.offset() + off), build2(A_XX, res.register)));
+					} else if ((off & 7) == 0) {
+						add(tu, new Command(mov, build2(A_XX, sfv.reg() + (off >>> 3)), build2(A_XX, res.register)));
+					} else {
+						add(tu, new Command(mov, build2(A_XX, PrimAsmPreDefines.REGISTER_MEMORY_START + (sfv.reg() << 3) + off), build2(A_XX, res.register)));
+					}
+				} else {
+					if (sfv.hasOffset()) {
+						int treg = res.register == MIN_TMP_VAL_REG ? MIN_TMP_VAL_REG + 1 : MIN_TMP_VAL_REG;
+						add(tu, new Command(mov, build2(A_XX, treg), build2(A_XX | B_NUM, SP, ((sfv.reg() - minMax.b) << 3) - 8)));
+						add(tu, new Command(mov, build2(A_XX | B_NUM, treg, sfv.offset() + off), build2(A_XX, res.register)));
+					} else {
+						add(tu, new Command(mov, build2(A_XX | B_NUM, SP, ((sfv.reg() - minMax.b) << 3) - 8 + off), build2(A_XX, res.register)));
+					}
+				}
 			}
 			default -> {
-				SimpleValue val = res.value.mkPointer(c.pool);
-				tu.pos = val.loadValue(tu.sf, MIN_TMP_VAL_REG, blockedRegs, tu.commands, tu.pos, varLoader, sul);
-				
+				int         treg = res.register == MIN_TMP_VAL_REG ? MIN_TMP_VAL_REG + 1 : MIN_TMP_VAL_REG;
+				SimpleValue val  = res.value.mkPointer(c.pool);
+				tu.pos = val.loadValue(tu.sf, treg, blockedRegs, tu.commands, tu.pos, varLoader, sul);
+				add(tu, new Command(mov, build2(A_XX | B_REG, treg), build2(A_XX, res.register)));
 			}
 			}
 		}
