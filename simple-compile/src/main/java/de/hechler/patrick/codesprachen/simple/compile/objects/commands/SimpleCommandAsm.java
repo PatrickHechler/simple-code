@@ -17,11 +17,13 @@
 package de.hechler.patrick.codesprachen.simple.compile.objects.commands;
 
 import java.util.List;
+import java.util.regex.Pattern;
 
 import de.hechler.patrick.codesprachen.primitive.core.utils.PrimAsmConstants;
 import de.hechler.patrick.codesprachen.simple.compile.objects.SimplePool;
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleValue;
 
+@SuppressWarnings("javadoc")
 public class SimpleCommandAsm implements SimpleCommand {
 	
 	public final SimplePool pool;
@@ -38,10 +40,17 @@ public class SimpleCommandAsm implements SimpleCommand {
 	}
 	
 	public SimpleCommandAsm(SimplePool pool, AsmParam[] asmArguments, String asmCode, AsmParam[] asmResults) {
+		if (!asmCode.startsWith("::")||!asmCode.endsWith(">>")) throw new AssertionError("asm block is invalid: '"+asmCode+"'");
+		for (AsmParam ap : asmArguments) {
+			if (ap.value.type().isPrimitive() || ap.value.type().isPointer()) continue;
+			throw new IllegalStateException("invalid asm argument type: " + ap.value.type() + " (only primitive values and pointers are supported)");
+		}
+		for (AsmParam ap : asmResults) {
+			if (ap.value.type().isPrimitive() || ap.value.type().isPointer()) continue;
+			throw new IllegalStateException("invalid asm result type: " + ap.value.type() + " (only primitive values and pointers are supported)");
+		}
 		this.pool         = pool;
 		this.asmArguments = asmArguments;
-		assert asmCode.startsWith("::");
-		assert asmCode.endsWith(">>");
 		this.asmCode    = asmCode.substring(2, asmCode.length() - 2);
 		this.asmResults = asmResults;
 	}
@@ -53,6 +62,7 @@ public class SimpleCommandAsm implements SimpleCommand {
 	
 	public static class AsmParam {
 		
+		private static final Pattern XNN_PATTERN = Pattern.compile("^(X[0-9A-E][0-9A-F]|XF[0-9])$");
 		public final SimpleValue value;
 		public final int         register;
 		
@@ -62,7 +72,7 @@ public class SimpleCommandAsm implements SimpleCommand {
 		}
 		
 		public static AsmParam create(SimpleValue val, String xnn) {
-			assert xnn.matches("^(X[0-9A-E][0-9A-F]|XF[0-9])$");
+			if (!XNN_PATTERN.matcher(xnn).matches()) throw new AssertionError("illegal XNN: " + xnn);
 			int reg = PrimAsmConstants.X_ADD + Integer.parseInt(xnn.substring(1), 16);
 			return new AsmParam(val, reg);
 		}

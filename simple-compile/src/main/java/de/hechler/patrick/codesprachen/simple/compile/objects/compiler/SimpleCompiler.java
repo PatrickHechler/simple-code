@@ -310,14 +310,16 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		// TODO
 		for (AsmParam res : c.asmResults) {
 			switch (res.value) {
-			case SimpleVariableValue svv -> {
+			case @SuppressWarnings("preview") SimpleVariableValue svv -> {
 				
 			}
-			case SimpleNonDirectVariableValue sndvv -> {
+			case @SuppressWarnings("preview") SimpleNonDirectVariableValue sndvv -> {
 				
 			}
 			default -> {
 				SimpleValue val = res.value.mkPointer(c.pool);
+				tu.pos = val.loadValue(tu.sf, MIN_TMP_VAL_REG, blockedRegs, tu.commands, tu.pos, varLoader, sul);
+				
 			}
 			}
 		}
