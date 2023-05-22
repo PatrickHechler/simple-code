@@ -16,14 +16,14 @@
 //along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 // this function prints its arguments and exits with 0 if the print was successful
-func main hello_world_main(num first, char## argv) --> <num exitnum> {
-	var std:streamWrite write;
+func main hello_world_main(num firstArg, char## argv) --> <num exitnum> {
+	var std:streamWrite write; // use argc/firstArg as boolean
 	var std:strLen strLen;
 	write:id <-- std:out;
 	argv <-- argv + 1;
 	while (argv#) {
-		if (first) {
-			first <-- 0;
+		if (firstArg) {
+			firstArg <-- 0;
 		} else {
 			write:len <-- 1;
 			write:data <-- " ";
