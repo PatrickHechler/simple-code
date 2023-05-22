@@ -172,6 +172,12 @@ public class SimpleCompilerChecker {
 		}
 		System.err.println("execute now the program");
 		execute(ECHO_PFS, ECHO_PMF, 0, EMPTY_BARR, "echo text\n".getBytes(StandardCharsets.UTF_8), EMPTY_BARR, "echo", "text");
+		execute(ECHO_PFS, ECHO_PMF, 0, EMPTY_BARR, "echo text\n".getBytes(StandardCharsets.UTF_8), EMPTY_BARR, "echo text");
+		execute(ECHO_PFS, ECHO_PMF, 0, EMPTY_BARR,
+				"this is a large echo text, containing many characters and arguments, which will/should be printed to stdout by the echo program\n"
+						.getBytes(StandardCharsets.UTF_8),
+				EMPTY_BARR, "this", "is", "a", "large", "echo", "text,", "containing", "many", "characters", "and", "arguments,", "which", "will/should", "be",
+				"printed", "to", "stdout", "by", "the", "echo", "program");
 	}
 	
 	protected void execute(String pfsFile, String pmfFile, int exitCode, byte[] stdin, byte[] stdout, byte[] stderr, String... programArgs)
