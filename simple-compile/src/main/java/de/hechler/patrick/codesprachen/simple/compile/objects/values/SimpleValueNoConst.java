@@ -226,21 +226,22 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 			pos = valA.loadValue(sf, targetRegister, blockedRegisters, commands, pos, loader, sul);
 			long mul = this.t.byteCount();
 			if (mul < 1L) throw new AssertionError("target type is too small! valA: " + valA.type());
+			Param target = build2(A_XX, targetRegister);
 			if (valB instanceof SimpleValueConst c) {
 				long val = c.getNumber() * mul;
 				if (this.t.isPrimitive()) {
 					Commands mov = getMovCmd((int) mul);
 					if (val != 0L) {
-						Command mv = new Command(mov, build2(A_XX, targetRegister), build2(A_XX | B_NUM, targetRegister, val));
+						Command mv = new Command(mov, target, build2(A_XX | B_NUM, targetRegister, val));
 						pos += mv.length();
 						commands.add(mv);
 					} else { // zero index can be optimized (no need to add zero)
-						Command mv = new Command(mov, build2(A_XX, targetRegister), build2(A_XX | B_REG, targetRegister));
+						Command mv = new Command(mov, target, build2(A_XX | B_REG, targetRegister));
 						pos += mv.length();
 						commands.add(mv);
 					}
 				} else if (val != 0L) {
-					Command add = new Command(Commands.CMD_ADD, build2(A_XX, targetRegister), build2(A_NUM, val));
+					Command add = new Command(Commands.CMD_ADD, target, build2(A_NUM, val));
 					pos += add.length();
 					commands.add(add);
 				}
@@ -248,9 +249,9 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 				RegisterData rd = new RegisterData(fallbackRegister(targetRegister));
 				pos = findRegister(blockedRegisters, commands, pos, rd, rd.reg, sul);
 				pos = valB.loadValue(sf, rd.reg, blockedRegisters, commands, pos, loader, sul);
-				if (mul != 1L) { // byte arrays don't need this
+				if (mul != 1L) { // byte arrays and similar don't need this
 					Command mulCmd;
-					if (Long.bitCount(mul) == 1) {
+					if (Long.bitCount(mul) != 1) {
 						mulCmd = new Command(Commands.CMD_MUL, build2(A_XX, rd.reg), build2(A_NUM, mul));
 					} else {
 						long shift;
@@ -262,11 +263,11 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 				}
 				if (this.t.isPrimitive()) {
 					Commands mov    = getMovCmd((int) mul);
-					Command  movCmd = new Command(mov, build2(A_XX, targetRegister), build2(A_XX | B_XX, targetRegister, rd.reg));
+					Command  movCmd = new Command(mov, target, build2(A_XX | B_XX, targetRegister, rd.reg));
 					pos += movCmd.length();
 					commands.add(movCmd);
 				} else {
-					Command add = new Command(Commands.CMD_ADD, build2(A_XX, targetRegister), build2(A_XX, rd.reg));
+					Command add = new Command(Commands.CMD_ADD, target, build2(A_XX, rd.reg));
 					pos += add.length();
 					commands.add(add);
 				}
@@ -286,11 +287,11 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 									case 4 -> 0x0000000080000000L;
 									default -> throw new AssertionError(mul);
 									};
-					Command cmp  = new Command(Commands.CMD_CMPL, build2(A_XX, targetRegister), build2(A_NUM, test));
+					Command cmp  = new Command(Commands.CMD_CMPL, target, build2(A_NUM, test));
 					Command jmpNB;
-					Command or   = new Command(Commands.CMD_OR, build2(A_XX, targetRegister), build2(A_NUM, ~andVal));
+					Command or   = new Command(Commands.CMD_OR, target, build2(A_NUM, ~andVal));
 					Command jmp;
-					Command and  = new Command(Commands.CMD_AND, build2(A_XX, targetRegister), build2(A_NUM, andVal));
+					Command and  = new Command(Commands.CMD_AND, target, build2(A_NUM, andVal));
 					jmp    = new Command(Commands.CMD_JMP, build2(A_NUM, FORWARD_JMP_BASE_LEN + and.length()), null);
 					jmpNB  = new Command(Commands.CMD_JMPNB, build2(A_NUM, FORWARD_JMP_BASE_LEN + or.length() + jmp.length() + and.length()), null);
 					pos   += cmp.length();
@@ -304,7 +305,7 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 					pos += and.length();
 					commands.add(and);
 				} else {
-					Command cmd = new Command(Commands.CMD_AND, build2(A_XX, targetRegister), build2(A_NUM, andVal));
+					Command cmd = new Command(Commands.CMD_AND, target, build2(A_NUM, andVal));
 					pos += cmd.length();
 					commands.add(cmd);
 				}
@@ -1236,7 +1237,7 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 			public long loadValue(SimpleFile sf, int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader,
 					StackUseListener sul) {
 				pos = me.loadValue(sf, targetRegister, blockedRegisters, commands, pos, loader, sul);
-				pos = addMovCmd(this.t, commands, pos, build2(A_XX, targetRegister), build2(A_XX | B_REG, targetRegister));
+				pos = addMovCmd(this.t, commands, pos, build2(A_XX | B_REG, targetRegister), build2(A_XX, targetRegister));
 				return pos;
 			}
 			

@@ -633,7 +633,7 @@ commandIf [SimplePool pool] returns [SimpleCommandIf cmd]:
 		command [elsePool]
 		{elsePool.addCmd($command.cmd);}
 	)?
-	{$cmd = SimpleCommandIf.create(pool.snapshot(), $value.val, ((SimpleSubPool)ifPool).block, ((SimpleSubPool)elsePool).block);}
+	{$cmd = SimpleCommandIf.create(pool.snapshot(), $value.val, ((SimpleSubPool)ifPool).block, elsePool == null ? null : ((SimpleSubPool)elsePool).block);}
 ;
 commandAsm [SimplePool pool] returns [SimpleCommandAsm cmd]:
 	{

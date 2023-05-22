@@ -520,7 +520,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 			assignVar(tu, c, blockedRegs, svv, sndvv.sv.offset());
 		}
 		default -> {
-			Commands    mov = mov(c, (int) c.target.type().byteCount());
+			Commands    mov = mov(c.target.type());
 			SimpleValue t   = c.target.mkPointer(c.pool);
 			tu.pos = t.loadValue(tu.sf, MIN_TMP_VAL_REG, blockedRegs, tu.commands, tu.pos, null, null);
 			tu.pos = c.value.loadValue(tu.sf, MIN_TMP_VAL_REG + 1, blockedRegs, tu.commands, tu.pos, null, null);
@@ -535,13 +535,13 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 	private static void assignVar(SimpleTU tu, SimpleCommandAssign c, boolean[] blockedRegs, SimpleVariableValue svv, final long addOff) throws AssertionError {
 		switch (svv.sv) {
 		case SimpleOffsetVariable sov when sov.relative() == tu.sf -> {
-			Commands mov = mov(c, (int) c.target.type().byteCount());
+			Commands mov = mov(c.target.type());
 			tu.pos = c.value.loadValue(tu.sf, MIN_TMP_VAL_REG, blockedRegs, tu.commands, tu.pos, null, null);
 			// MOV [IP + (offset - pos)], value
 			add(tu, new Command(mov, build2(A_XX | B_NUM, PrimAsmConstants.IP, addOff + sov.offset() - tu.pos), build2(A_XX, MIN_TMP_VAL_REG)));
 		}
 		case SimpleOffsetVariable sov when sov.relative() instanceof SimpleDependency dep -> {
-			Commands mov = mov(c, (int) c.target.type().byteCount());
+			Commands mov = mov(c.target.type());
 			tu.pos = c.value.loadValue(tu.sf, MIN_TMP_VAL_REG, blockedRegs, tu.commands, tu.pos, null, null);
 			// LEA X00, (posInFile - tu.pos)
 			// INT INT_LOAD_LIB
@@ -553,14 +553,14 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 			add(tu, new Command(mov, build2(A_XX | B_NUM, PrimAsmConstants.X_ADD, addOff + sov.offset()), build2(A_XX, MIN_TMP_VAL_REG)));
 		}
 		case SimpleFunctionVariable sfv when sfv.hasOffset() -> {
-			Commands mov = mov(c, (int) c.target.type().byteCount());
+			Commands mov = mov(c.target.type());
 			tu.pos = c.value.loadValue(tu.sf, MIN_TMP_VAL_REG, blockedRegs, tu.commands, tu.pos, null, null);
 			// MOV [sfv.reg + offset], value
 			long off = addOff + sfv.offset();
 			add(tu, new Command(mov, build2(A_XX | B_NUM, sfv.reg(), off), build2(A_XX, MIN_TMP_VAL_REG)));
 		}
 		case SimpleFunctionVariable sfv when (addOff & 7) != 0 -> {
-			Commands mov = mov(c, (int) c.target.type().byteCount());
+			Commands mov = mov(c.target.type());
 			tu.pos = c.value.loadValue(tu.sf, MIN_TMP_VAL_REG, blockedRegs, tu.commands, tu.pos, null, null);
 			// MOV [sfv.reg + offset], value
 			Command cmd = new Command(mov, build2(A_NUM, PrimAsmPreDefines.REGISTER_MEMORY_START + (sfv.reg() << 3) + addOff), build2(A_XX, MIN_TMP_VAL_REG));
@@ -573,13 +573,13 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		}
 	}
 	
-	private static Commands mov(SimpleCommandAssign c, int bc) throws AssertionError {
-		return switch (bc) {
+	private static Commands mov(SimpleType st) throws AssertionError {
+		return switch ((int) st.byteCount()) {
 		case 1 -> Commands.CMD_MVB;
 		case 2 -> Commands.CMD_MVW;
 		case 4 -> Commands.CMD_MVDW;
 		case 8 -> Commands.CMD_MOV;
-		default -> throw new AssertionError("invalid byte cont type: " + c.target.type());
+		default -> throw new AssertionError("invalid byte cont type: " + st);
 		};
 	}
 	
@@ -747,6 +747,18 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 	private static void addCmdIf(SimpleTU tu, SimpleCommandIf c) {
 		boolean[] regs = new boolean[256];
 		tu.pos = c.condition.loadValue(tu.sf, MIN_TMP_VAL_REG, regs, tu.commands, tu.pos, null, null);
+		// if + else:
+		// // SGN condition
+		// // JMP_TRUE @I
+		// // else block
+		// // JMP @E
+		// // @I if block
+		// // @E
+		// if:
+		// // SGN condition
+		// // JMP_FALSE @E
+		// // if block
+		// // @E
 		Commands jotCmd;
 		Commands jofCmd;
 		Commands cmpCmd;
@@ -761,36 +773,43 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		} else {
 			throw new IllegalStateException("unknown condition type: " + c.condition);
 		}
+		// SGN condition
 		Command cmp = new Command(cmpCmd, build2(A_XX, MIN_TMP_VAL_REG), null);
 		add(tu, cmp);
-		long jmpPos = tu.pos;
-		tu.pos += JMP_LENGTH;
-		List<Command> cmds = tu.commands;
-		tu.commands = new ArrayList<>();
-		if (c.elseCmd == null) {
-			// jmpOnFalse end
-			// - ifBlock
-			// end:
-			addCmd(tu, c.ifCmd);
-			cmds.add(new Command(jofCmd, build2(A_NUM, tu.pos - jmpPos), null));
-			cmds.addAll(tu.commands);
+		if (c.elseCmd != null) {
+			// JMP_TRUE @I
+			// else block
+			// JMP @E
+			// @I if block
+			// @E
+			long jmpToTruePos = tu.pos;
+			tu.pos += JMP_LENGTH;
+			List<Command> allCommands = tu.commands;
+			tu.commands = new ArrayList<>();
+			addCmdBlock(tu, c.elseCmd);
+			long jmpToEndPos = tu.pos;
+			tu.pos += JMP_LENGTH;
+			List<Command> elseCommands = tu.commands;
+			tu.commands = new ArrayList<>();
+			long truePos = tu.pos;
+			addCmdBlock(tu, c.ifCmd);
+			allCommands.add(new Command(jotCmd, build2(A_NUM, truePos - jmpToTruePos), null));
+			allCommands.addAll(elseCommands);
+			allCommands.add(new Command(Commands.CMD_JMP, build2(A_NUM, tu.pos - jmpToEndPos), null));
+			allCommands.addAll(tu.commands);
+			tu.commands = allCommands;
 		} else {
-			// jmpOnTrue trueLabel
-			// - elseBlock
-			// - JMP end
-			// trueLabel:
-			// - ifBlock
-			// end:
-			addCmd(tu, c.elseCmd);
-			cmds.add(new Command(jotCmd, build2(A_NUM, tu.pos - jmpPos), null));
-			cmds.addAll(tu.commands);
-			jmpPos = tu.pos;
-			tu.commands.clear();
-			addCmd(tu, c.ifCmd);
-			cmds.add(new Command(Commands.CMD_JMP, build2(A_NUM, tu.pos - jmpPos), null));
-			cmds.addAll(tu.commands);
+			// JMP_FALSE @E
+			// if block
+			// @E
+			long jmpToEndPos = tu.pos;
+			tu.pos += JMP_LENGTH;
+			List<Command> allCommands = tu.commands;
+			tu.commands = new ArrayList<>();
+			addCmdBlock(tu, c.ifCmd);
+			allCommands.add(new Command(jofCmd, build2(A_NUM, tu.pos - jmpToEndPos), null));
+			allCommands.addAll(tu.commands);
 		}
-		tu.commands = cmds;
 	}
 	
 	private static void addCmdVarDecl(SimpleTU tu, SimpleCommandVarDecl c) {
@@ -827,7 +846,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		tu.pos += JMP_LENGTH;
 		List<Command> cmds = tu.commands;
 		tu.commands = new ArrayList<>();
-		addCmd(tu, c.whileCmd);
+		addCmdBlock(tu, c.whileCmd);
 		Command gotoStart = new Command(Commands.CMD_JMP, build2(A_NUM, loopStartPos - tu.pos), null);
 		tu.pos += gotoStart.length();
 		cmds.add(new Command(jofCmd, build2(A_NUM, tu.pos - breakingJumpPos), null));

@@ -52,12 +52,11 @@ public class SimpleCommandIf implements SimpleCommand {
 	
 	@Override
 	public void toString(StringBuilder b, String indention) {
-		String newIndention = indention.concat("\t");
 		b.append("if (").append(this.condition).append(") ");
-		this.ifCmd.toString(b, newIndention);
+		this.ifCmd.toString(b, indention);
 		if (this.elseCmd != null) {
-			b.append('\n').append(indention).append("else ");
-			this.elseCmd.toString(b, newIndention);
+			b.append(" else ");
+			this.elseCmd.toString(b, indention);
 		}
 	}
 	

@@ -51,7 +51,7 @@ public class SimpleCommandWhile implements SimpleCommand {
 	@Override
 	public void toString(StringBuilder b, String indention) { 
 		b.append("while (").append(this.condition).append(") ");
-		this.whileCmd.toString(b, indention.concat("\t"));
+		this.whileCmd.toString(b, indention);
 	 }
 	
 }
