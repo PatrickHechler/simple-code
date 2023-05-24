@@ -91,9 +91,10 @@ import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleValue
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleValueDataPointer;
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleValueNoConst;
 import de.hechler.patrick.codesprachen.simple.compile.objects.values.SimpleVariableValue;
+import de.hechler.patrick.codesprachen.simple.compile.utils.StdLib;
+import de.hechler.patrick.codesprachen.simple.compile.utils.StdLib.StdLibFuncCmd;
 import de.hechler.patrick.codesprachen.simple.compile.utils.StdLib.StdLibIntFunc;
 import de.hechler.patrick.codesprachen.simple.compile.utils.StdLib.StdLibIntFunc2;
-import de.hechler.patrick.codesprachen.simple.compile.utils.StdLib;
 import de.hechler.patrick.codesprachen.simple.compile.utils.TwoInts;
 import de.hechler.patrick.codesprachen.simple.symbol.interfaces.SimpleExportable;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleConstant;
@@ -624,7 +625,18 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 				throw new IllegalArgumentException("the export " + c.firstName + ':' + c.secondName + " is no function: " + exp);
 			}
 			checkFuncType(c, func);
-			if (func instanceof StdLibIntFunc slf) {
+			switch (func) {
+			case @SuppressWarnings("preview") StdLibFuncCmd slf -> {
+				loadFuncStruct(tu, c, func);
+				Param param0 = build2(A_XX | B_REG, MIN_TMP_VAL_REG);
+				Param param1 = switch (slf.type.arguments.length) {
+								case 1 -> null;
+								case 2 -> build2(A_XX | B_NUM, MIN_TMP_VAL_REG, slf.type.arguments[1].offset());
+								default -> throw new AssertionError();
+								};
+				add(tu, new Command(slf.command, param0, param1));
+			}
+			case @SuppressWarnings("preview") StdLibIntFunc slf -> {
 				loadFuncStruct(tu, c, func);
 				regLen = -1;
 				int reg = X_ADD;
@@ -636,7 +648,6 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 					case 8 -> Commands.CMD_MOV;
 					default -> throw new AssertionError(sov.type);
 					};
-					
 					add(tu, new Command(mov, build2(A_XX, reg++), build2(A_XX | B_NUM, MIN_TMP_VAL_REG, sov.offset())));
 				}
 				add(tu, new Command(Commands.CMD_INT, build2(A_NUM, slf.intnum), null));
@@ -646,7 +657,6 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 				for (int i = 0; i < len; i++) {
 					SimpleOffsetVariable sov = slf.type.results[i];
 					if (IGNORE_PATTERN.matcher(sov.name).matches()) continue;
-					
 					Commands mov = switch ((int) sov.type.byteCount()) {
 					case 1 -> Commands.CMD_MVB;
 					case 2 -> Commands.CMD_MVW;
@@ -674,8 +684,6 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 					// @F
 					Param   target    = build2(A_XX | B_NUM, MIN_TMP_VAL_REG, sov.offset());
 					Command setLow    = new Command(Commands.CMD_MOV, target, build2(A_NUM, -1L));                                                 // use XOR when
-																									                                                 // target has no
-																									                                                 // offset
 					Command setEq     =
 						(target.art & B_NUM) != 0 ? new Command(Commands.CMD_MOV, target, build2(A_NUM, 0L)) : new Command(Commands.CMD_XOR, target, target);
 					Command setHigh   = new Command(Commands.CMD_MOV, target, build2(A_NUM, 0L));
@@ -691,7 +699,8 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 					add(tu, afterHigh);
 					add(tu, setLow);
 				}
-			} else {
+			}
+			default -> {
 				loadFuncStruct(tu, c, func);
 				push(tu, min, max, regLen);
 				// LEA X00, (dep.pos - tu.pos)
@@ -705,6 +714,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 				add(tu, new Command(Commands.CMD_JMPERR, build2(A_NUM, tu.depLoad - tu.pos), null));
 				add(tu, new Command(Commands.CMD_MOV, build2(A_XX, REG_FUNC_STRUCT), build2(A_XX, MIN_TMP_VAL_REG)));
 				add(tu, new Command(Commands.CMD_CALO, build2(A_XX, X_ADD), build2(A_NUM, func.address())));
+			}
 			}
 		}
 		if (regLen <= 4) {
@@ -1064,9 +1074,9 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		tu.depLoad = tu.pos;
 		label(tu, "DEPENDENCY_LOAD_ERROR");
 		Param   x00             = build2(A_XX, X_ADD);
-		Param   x01             = build2(A_XX, X_ADD + 1);
-		Param   x02             = build2(A_XX, X_ADD + 2);
-		Param   x03             = build2(A_XX, X_ADD + 3);
+		Param   x01             = build2(A_XX, X_ADD + 1L);
+		Param   x02             = build2(A_XX, X_ADD + 2L);
+		Param   x03             = build2(A_XX, X_ADD + 3L);
 		Param   stdLog          = build2(A_NUM, PrimAsmPreDefines.STD_LOG);
 		Command intStreamsWrite = new Command(Commands.CMD_INT, build2(A_NUM, PrimAsmPreDefines.INT_STREAM_WRITE), null);
 		add(tu, new Command(Commands.CMD_MOV, x03, x00));
@@ -1166,7 +1176,9 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 	protected boolean skipCompile() { return true; }
 	
 	@Override
-	protected void compile(SimpleTU tu) throws IOException { throw new AssertionError("compile should be skipped"); }
+	protected void compile(@SuppressWarnings("unused") SimpleTU tu) throws IOException {
+		throw new AssertionError("compile should be skipped");
+	}
 	
 	@Override
 	protected void finish(SimpleTU tu) throws IOException {

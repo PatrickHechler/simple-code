@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 
+import de.hechler.patrick.codesprachen.primitive.assemble.enums.Commands;
 import de.hechler.patrick.codesprachen.primitive.core.objects.PrimitiveConstant;
 import de.hechler.patrick.codesprachen.primitive.core.utils.PrimAsmConstants;
 import de.hechler.patrick.codesprachen.primitive.core.utils.PrimAsmPreDefines;
@@ -43,18 +44,50 @@ public class StdLib {
 	
 	private static final long COMPARE_FLAGS = PrimAsmPreDefines.STATUS_GREATER | PrimAsmPreDefines.STATUS_EQUAL | PrimAsmPreDefines.STATUS_LOWER;
 	
-	public static class StdLibIntFunc extends SimpleFunctionSymbol {
+	public abstract static class StdLibFunc extends SimpleFunctionSymbol {
 		
-		public final long intnum;
-		
-		public StdLibIntFunc(long intnum, String name, List<SimpleOffsetVariable> args, List<SimpleOffsetVariable> results) {
+		public StdLibFunc(String name, List<SimpleOffsetVariable> args, List<SimpleOffsetVariable> results) {
 			super(true, name, args, results);
-			this.intnum = intnum;
 		}
 		
 		@Override
 		public SimpleExportable changeRelative(Object relative) {
 			throw new AssertionError("change relative called on a std lib function");
+		}
+		
+	}
+	
+	public static class StdLibFuncCmd extends StdLibFunc {
+		
+		public final Commands command;
+		
+		public StdLibFuncCmd(Commands cmd, String name, SimpleOffsetVariable arg, SimpleOffsetVariable result) {
+			super(name, of(arg), of(result));
+			if (cmd.params != 1) throw new AssertionError();
+			this.command = cmd;
+		}
+
+		public StdLibFuncCmd(Commands cmd, String name, SimpleOffsetVariable arg, SimpleOffsetVariable arg2, SimpleOffsetVariable result) {
+			super(name, of(arg, arg2), of(result));
+			if (cmd.params != 2) throw new AssertionError();
+			this.command = cmd;
+		}
+
+		public StdLibFuncCmd(Commands cmd, String name, SimpleOffsetVariable arg, SimpleOffsetVariable arg2, SimpleOffsetVariable result, SimpleOffsetVariable result2) {
+			super(name, of(arg, arg2), of(result));
+			if (cmd.params != 2) throw new AssertionError();
+			this.command = cmd;
+		}
+		
+	}
+	
+	public static class StdLibIntFunc extends StdLibFunc {
+		
+		public final long intnum;
+		
+		public StdLibIntFunc(long intnum, String name, List<SimpleOffsetVariable> args, List<SimpleOffsetVariable> results) {
+			super(name, args, results);
+			this.intnum = intnum;
 		}
 		
 	}
@@ -84,10 +117,10 @@ public class StdLib {
 	private static final SimpleType UBYTE  = SimpleType.UBYTE;
 	private static final SimpleType CHAR   = SimpleType.UBYTE;
 	
-	public static final Map<String, StdLibIntFunc>           ALL_INTERRUPTS = Collections.unmodifiableMap(allInts());
-	public static final Map<String, SimpleConstant>       ALL_CONSTANTS  = Collections.unmodifiableMap(allConsts());
-	public static final Map<String, SimpleOffsetVariable> ALL_VARS       = Collections.unmodifiableMap(allVars());
-	public static final Map<String, SimpleStructType>     ALL_STRUCTS    = Collections.unmodifiableMap(allStructs());
+	public static final Map<String, SimpleConstant>       ALL_CONSTANTS = Collections.unmodifiableMap(allConsts());
+	public static final Map<String, SimpleOffsetVariable> ALL_VARS      = Collections.unmodifiableMap(allVars());
+	public static final Map<String, SimpleStructType>     ALL_STRUCTS   = Collections.unmodifiableMap(allStructs());
+	public static final Map<String, StdLibFunc>           ALL_FUNCS     = Collections.unmodifiableMap(allFuncs());
 	
 	public static final SimpleDependency DEP = new SimpleDependency("std", null, true) {
 		
@@ -95,7 +128,7 @@ public class StdLib {
 		
 		private Map<String, SimpleExportable> init() {
 			Map<String, SimpleExportable> res = new HashMap<>();
-			res.putAll(ALL_INTERRUPTS);
+			res.putAll(ALL_FUNCS);
 			for (SimpleConstant sc : ALL_CONSTANTS.values()) {
 				if (res.put(sc.name(), sc) != null) {
 					throw new AssertionError("multiple values in StdLib with same name: " + sc.name());
@@ -125,14 +158,14 @@ public class StdLib {
 		
 		@Override
 		public SimpleExportable get(String name) {
-			SimpleExportable val = map.get(name);
+			SimpleExportable val = this.map.get(name);
 			if (val != null) return val;
 			throw new NoSuchElementException("there is no export with the name '" + name + "' in the std dependency");
 		}
 		
 		@Override
 		public Iterator<SimpleExportable> getAll() {
-			return map.values().iterator();
+			return this.map.values().iterator();
 		}
 		
 		@Override
@@ -142,10 +175,21 @@ public class StdLib {
 		
 	};
 	
+	private static Map<String, StdLibFunc> allFuncs() {
+		Map<String, StdLibFunc> res    = allInts();
+		SimpleStructType        bigNum = ALL_STRUCTS.get("bigNum");
+		res.put("bigAdd", new StdLibFuncCmd(Commands.CMD_BADD, "bigAdd", sv(bigNum, 0, "valA"), sv(bigNum, 0, "valB"), sv(bigNum, 0, "res")));
+		res.put("bigSub", new StdLibFuncCmd(Commands.CMD_BSUB, "bigSub", sv(bigNum, 0, "valA"), sv(bigNum, 0, "valB"), sv(bigNum, 0, "res")));
+		res.put("bigMul", new StdLibFuncCmd(Commands.CMD_BMUL, "bigMul", sv(bigNum, 0, "valA"), sv(bigNum, 0, "valB"), sv(bigNum, 0, "res")));
+		res.put("bigDiv", new StdLibFuncCmd(Commands.CMD_BDIV, "bigDiv", sv(bigNum, 0, "valA"), sv(bigNum, 0, "valB"), sv(bigNum, 0, "res"), sv(bigNum, 0, "mod")));
+		res.put("bigNeg", new StdLibFuncCmd(Commands.CMD_BNEG, "bigNeg", sv(bigNum, 0, "val"), sv(bigNum, 0, "res")));
+		return res;
+	}
+	
 	// GENERATED-CODE-START
 	// this code-block is automatic generated, do not modify
-	private static Map<String, StdLibIntFunc> allInts() {
-		Map<String, StdLibIntFunc> res = new HashMap<>();
+	private static Map<String, StdLibFunc> allInts() {
+		Map<String, StdLibFunc> res = new HashMap<>();
 		res.put("errorIllegalInterrupt", slf(0, "errorIllegalInterrupt", of(sv(NUM, 0, "intnum")), of()));
 		res.put("errorUnknownCommand", slf(1, "errorUnknownCommand", of(), of()));
 		res.put("errorIllegalMemory", slf(2, "errorIllegalMemory", of(), of()));
@@ -223,7 +267,7 @@ public class StdLib {
 		Map<String, SimpleConstant> res = new HashMap<>();
 		for (PrimitiveConstant pc : PrimAsmConstants.START_CONSTANTS.values()) {
 			if (pc.name().startsWith("INT_")) continue;
-			String name; 
+			String name;
 			if (pc.name().startsWith("STD_")) {
 				name = name(pc.name().substring(4));
 			} else {
@@ -237,7 +281,7 @@ public class StdLib {
 	private static Map<String, SimpleStructType> allStructs() {
 		Map<String, SimpleStructType> res = new HashMap<>();
 		res.put("bignum",
-				new SimpleStructType("bignum", true, List.of(new SimpleOffsetVariable(UNUM, "lowbits", true), new SimpleOffsetVariable(NUM, "highbits", true))));
+			new SimpleStructType("bignum", true, List.of(new SimpleOffsetVariable(UNUM, "lowbits", true), new SimpleOffsetVariable(NUM, "highbits", true))));
 		return res;
 	}
 	
