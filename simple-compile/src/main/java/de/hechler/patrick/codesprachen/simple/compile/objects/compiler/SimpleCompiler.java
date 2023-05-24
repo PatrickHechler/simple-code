@@ -108,7 +108,9 @@ import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleTypePoi
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleTypePrimitive;
 import de.hechler.patrick.zeugs.pfs.FSProvider;
 import de.hechler.patrick.zeugs.pfs.interfaces.FS;
+import de.hechler.patrick.zeugs.pfs.interfaces.FSElement;
 import de.hechler.patrick.zeugs.pfs.interfaces.File;
+import de.hechler.patrick.zeugs.pfs.interfaces.Folder;
 
 @SuppressWarnings({ "javadoc" })
 public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
@@ -128,9 +130,8 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 	public static final int MAX_TMP_VAL_REG       = 0xFF;
 	
 	public static final SimpleFuncType MAIN_TYPE   = new SimpleFuncType(
-			List.of(new SimpleOffsetVariable(SimpleType.NUM, "argc"),
-					new SimpleOffsetVariable(new SimpleTypePointer(new SimpleTypePointer(SimpleType.BYTE)), "argv")),
-			List.of(new SimpleOffsetVariable(SimpleType.NUM, "exitnum")));
+		List.of(new SimpleOffsetVariable(SimpleType.NUM, "argc"), new SimpleOffsetVariable(new SimpleTypePointer(new SimpleTypePointer(SimpleType.BYTE)), "argv")),
+		List.of(new SimpleOffsetVariable(SimpleType.NUM, "exitnum")));
 	private static final long          MAIN_LENGTH = 16L;
 	private static final long          JMP_LENGTH  = 8L;
 	
@@ -673,10 +674,10 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 					// @F
 					Param   target    = build2(A_XX | B_NUM, MIN_TMP_VAL_REG, sov.offset());
 					Command setLow    = new Command(Commands.CMD_MOV, target, build2(A_NUM, -1L));                                                 // use XOR when
-																																					// target has no
-																																					// offset
-					Command setEq     = (target.art & B_NUM) != 0 ? new Command(Commands.CMD_MOV, target, build2(A_NUM, 0L))
-							: new Command(Commands.CMD_XOR, target, target);
+																									                                                 // target has no
+																									                                                 // offset
+					Command setEq     =
+						(target.art & B_NUM) != 0 ? new Command(Commands.CMD_MOV, target, build2(A_NUM, 0L)) : new Command(Commands.CMD_XOR, target, target);
 					Command setHigh   = new Command(Commands.CMD_MOV, target, build2(A_NUM, 0L));
 					Command afterHigh = new Command(Commands.CMD_JMP, build2(A_NUM, JMP_LENGTH + setLow.length()), null);
 					Command afterEq   = new Command(Commands.CMD_JMP, build2(A_NUM, (JMP_LENGTH * 2) + setHigh.length() + setLow.length()), null);
@@ -728,7 +729,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 	private static void checkFuncType(SimpleCommandFuncCall c, SimpleFunctionSymbol func) {
 		if (!func.type.equals(((SimpleTypePointer) c.function.type()).target)) {
 			throw new IllegalArgumentException(
-					"the function call argument needs to have the same type as the functions type! (arg-type: " + c.function.type() + " func: " + func.type + ")");
+				"the function call argument needs to have the same type as the functions type! (arg-type: " + c.function.type() + " func: " + func.type + ")");
 		}
 	}
 	
@@ -1344,26 +1345,60 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		
 		@Override
 		public SimpleDependency apply(String name, String compileDepend, String runtimeDepend) {
-			Path   path = SimpleCompiler.this.srcRoot.resolve(compileDepend);
-			String dep;
-			if (runtimeDepend != null) {
-				dep = runtimeDepend;
-			} else {
-				dep = SimpleDependency.runtimeName(compileDepend);
-			}
-			SimpleDependency res = null;
+			Path             path = SimpleCompiler.this.srcRoot.resolve(compileDepend).normalize();
+			SimpleDependency res  = null;
 			if (Files.exists(path)) {
+				SimpleTU tu = SimpleCompiler.super.tus.get(path);
+				String   dep;
+				if (tu != null) {
+					if (runtimeDepend != null) {
+						throw new IllegalStateException("runtime path set for a source dependency");
+					}
+					dep = path(tu.target);
+				} else {
+					dep = dep(compileDepend, runtimeDepend);
+				}
 				res = new SimpleSourceDependency(name, dep, path.normalize());
 			} else {
+				String dep = dep(compileDepend, runtimeDepend);
 				for (Path p : SimpleCompiler.this.lockups) {
 					if (Files.exists(p)) {
 						res = SimpleSymbolDependency.create(name, dep, path, SimpleCompiler.this.cs);
 						break;
 					}
 				}
-				if (res == null) { throw new NoSuchElementException("could not find the dependency " + name + "; '" + compileDepend + "'"); }
+				if (res == null) {
+					throw new NoSuchElementException("could not find the dependency " + name + "; '" + compileDepend + "'");
+				}
 			}
 			return res;
+		}
+		
+		private String dep(String compileDepend, String runtimeDepend) {
+			if (runtimeDepend != null) {
+				return runtimeDepend;
+			} else {
+				return SimpleDependency.runtimeName(compileDepend);
+			}
+		}
+		
+		private String path(File f) {
+			StringBuilder b = new StringBuilder();
+			path(b, f);
+			return b.toString();
+		}
+		
+		private void path(StringBuilder b, FSElement e) {
+			try {
+				try (Folder p = e.parent()) {
+					path(b, p);
+					b.append('/');
+				} catch (@SuppressWarnings("unused") IllegalStateException root) {//
+				}
+				b.append(e.name());
+			} catch (IOException err) {
+				throw new IOError(err);
+			}
 		}
 		
 	}

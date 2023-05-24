@@ -150,7 +150,7 @@ public class StdLib {
 		res.put("errorUnknownCommand", slf(1, "errorUnknownCommand", of(), of()));
 		res.put("errorIllegalMemory", slf(2, "errorIllegalMemory", of(), of()));
 		res.put("errorArithmeticError", slf(3, "errorArithmeticError", of(), of()));
-		res.put("exit", slf(4, "exit", of(sv(NUM, 0, "exitnum")), of()));
+		res.put("exit", slf(4, "exit", of(sv(UBYTE, 0, "exitnum")), of()));
 		res.put("memoryAlloc", slf(5, "memoryAlloc", of(sv(UNUM, 0, "len")), of(sv(UBYTE, 1, "mem"))));
 		res.put("memoryRealloc", slf(6, "memoryRealloc", of(sv(UBYTE, 1, "oldMem"), sv(UNUM, 0, "newLen")), of(sv(NUM, 0, "ignored0"), sv(UBYTE, 1, "newMem"))));
 		res.put("memoryFree", slf(7, "memoryFree", of(sv(UBYTE, 1, "mem")), of()));
@@ -214,7 +214,7 @@ public class StdLib {
 		res.put("loadLib", slf(65, "loadLib", of(sv(CHAR, 1, "file")), of(sv(UBYTE, 1, "data"), sv(NUM, 0, "len"), sv(NUM, 0, "loaded"))));
 		res.put("unloadLib", slf(66, "unloadLib", of(sv(UBYTE, 1, "data")), of()));
 		return res;
-	}
+}
 	
 	// here is the end of the automatic generated code-block
 	// GENERATED-CODE-END
