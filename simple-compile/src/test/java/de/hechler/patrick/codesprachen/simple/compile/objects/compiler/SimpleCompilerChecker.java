@@ -221,16 +221,20 @@ public class SimpleCompilerChecker {
 		System.err.println(logStart() + "start");
 		try {
 			b.result = false;
-			byte[] other = new byte[value.length];
+			byte[]  other = new byte[value.length];
+			boolean oo    = false;
 			for (int i = 0; i < value.length;) {
 				try {
 					int reat = stream.read(other, i, other.length - i);
 					if (reat == -1) {
-						if (cond.getAsBoolean()) {
-							sleep();
-							continue;
+						if (oo) {
+							throw new IOException("reached EOF too early (only reat '" + new String(other, 0, i) + "' but expected '" + new String(value) + "'");
 						}
-						throw new IOException("reached EOF too early");
+						if (!cond.getAsBoolean()) {
+							oo = true;
+						}
+						sleep();
+						continue;
 					}
 					synchronized (System.err) {
 						System.err.print(logStart() + "little read: ");
