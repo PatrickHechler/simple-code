@@ -210,7 +210,7 @@ public class SimpleCompilerChecker {
 		while (!res.finish) {
 			synchronized (res) {
 				if (res.finish) { break; }
-				res.wait(1000L);
+				res.wait();
 			}
 		}
 		assertTrue(res.result);
@@ -222,16 +222,18 @@ public class SimpleCompilerChecker {
 		try {
 			b.result = false;
 			byte[]  other = new byte[value.length];
-			boolean oo    = false;
 			for (int i = 0; i < value.length;) {
 				try {
 					int reat = stream.read(other, i, other.length - i);
 					if (reat == -1) {
-						if (oo) {
-							throw new IOException("reached EOF too early (only reat '" + new String(other, 0, i) + "' but expected '" + new String(value) + "'");
-						}
 						if (!cond.getAsBoolean()) {
-							oo = true;
+							reat = stream.read(other, i, other.length - i);
+							if (reat != -1) {
+								i += reat;
+								continue;
+							}
+							throw new IOException("reached EOF too early (only reat '" + new String(other, 0, i) + "' but expected '" + new String(value)
+									+ "' (stream: '" + stream + "')");
 						}
 						sleep();
 						continue;
