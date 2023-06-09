@@ -569,7 +569,8 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 			add(tu, cmd);
 		}
 		case SimpleFunctionVariable sfv -> {
-			tu.pos = c.value.loadValue(tu.sf, sfv.reg() + (int) (addOff >>> 3), blockedRegs, tu.commands, tu.pos, null, null);
+			tu.pos = c.value.loadValue(tu.sf, MIN_TMP_VAL_REG, blockedRegs, tu.commands, tu.pos, null, null);
+			add(tu, new Command(Commands.CMD_MOV, build2(A_XX, sfv.reg() + (int) (addOff >>> 3)), build2(A_XX, MIN_TMP_VAL_REG)));
 		}
 		default -> throw new AssertionError("unknown variable type: " + svv.sv.getClass());
 		}
