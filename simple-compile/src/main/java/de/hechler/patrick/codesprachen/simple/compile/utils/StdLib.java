@@ -246,19 +246,20 @@ public class StdLib {
 		res.put("memMov", slf(51, "memMov", of(sv(UBYTE, 1, "srcMem"), sv(UBYTE, 1, "dstMem"), sv(NUM, 0, "len")), of()));
 		res.put("memBset", slf(52, "memBset", of(sv(UBYTE, 1, "mem"), sv(UBYTE, 0, "val"), sv(NUM, 0, "len")), of()));
 		res.put("strLen", slf(53, "strLen", of(sv(CHAR, 1, "str")), of(sv(NUM, 0, "len"))));
-		res.put("strCmp", slf(54, "strCmp", of(sv(CHAR, 1, "strA"), sv(CHAR, 1, "strB")), of(sv(0x7L, "cmpRes")), 0x7L));
-		res.put("strFromNum", slf(55, "strFromNum", of(sv(NUM, 0, "val"), sv(CHAR, 1, "buf"), sv(NUM, 0, "base"), sv(UNUM, 0, "bufLen")), of(sv(NUM, 0, "strLen"), sv(CHAR, 1, "str"), sv(NUM, 0, "ignored0"), sv(NUM, 0, "newBufLen"))));
-		res.put("strFromFpnum", slf(56, "strFromFpnum", of(sv(FPNUM, 0, "val"), sv(CHAR, 1, "buf"), sv(UNUM, 0, "bufLen")), of(sv(NUM, 0, "strLen"), sv(CHAR, 1, "str"), sv(NUM, 0, "newBufLen"))));
-		res.put("strToNum", slf(57, "strToNum", of(sv(CHAR, 1, "str"), sv(NUM, 0, "base")), of(sv(NUM, 0, "val"), sv(NUM, 0, "success"))));
-		res.put("strToFpnum", slf(58, "strToFpnum", of(sv(CHAR, 1, "str")), of(sv(FPNUM, 0, "val"), sv(NUM, 0, "success"))));
-		res.put("strToU16str", slf(59, "strToU16str", of(sv(CHAR, 1, "u8str"), sv(UWORD, 1, "u16str"), sv(NUM, 0, "bufLen")), of(sv(CHAR, 1, "u8strUnconcStart"), sv(UWORD, 1, "u16strUnconvStart"), sv(NUM, 0, "remBufLen"), sv(NUM, 0, "remU8Len"))));
-		res.put("strToU32str", slf(60, "strToU32str", of(sv(CHAR, 1, "u8str"), sv(UDWORD, 1, "u32str"), sv(NUM, 0, "bufLen")), of(sv(CHAR, 1, "u8strUnconcStart"), sv(UDWORD, 1, "u32strUnconvStart"), sv(NUM, 0, "remBufLen"), sv(NUM, 0, "remU8Len"))));
-		res.put("strFromU16str", slf(61, "strFromU16str", of(sv(UWORD, 1, "u16str"), sv(CHAR, 1, "u8str"), sv(NUM, 0, "bufLen")), of(sv(UWORD, 1, "u16strUnconcStart"), sv(CHAR, 1, "u8strUnconvStart"), sv(NUM, 0, "remBufLen"), sv(NUM, 0, "remU8Len"))));
-		res.put("strFromU32str", slf(62, "strFromU32str", of(sv(UWORD, 1, "u32str"), sv(CHAR, 1, "u8str"), sv(NUM, 0, "bufLen")), of(sv(UWORD, 1, "u32strUnconcStart"), sv(CHAR, 1, "u8strUnconvStart"), sv(NUM, 0, "remBufLen"), sv(NUM, 0, "remU8Len"))));
-		res.put("strFormat", slf(63, "strFormat", of(sv(CHAR, 1, "frmtStr"), sv(CHAR, 1, "outStr"), sv(NUM, 0, "bufLen"), sv(NUM, 1, "args")), of(sv(NUM, 0, "outLen"))));
-		res.put("loadFile", slf(64, "loadFile", of(sv(CHAR, 1, "file")), of(sv(UBYTE, 1, "data"), sv(NUM, 0, "len"))));
-		res.put("loadLib", slf(65, "loadLib", of(sv(CHAR, 1, "file")), of(sv(UBYTE, 1, "data"), sv(NUM, 0, "len"), sv(NUM, 0, "loaded"))));
-		res.put("unloadLib", slf(66, "unloadLib", of(sv(UBYTE, 1, "data")), of()));
+		res.put("strIndex", slf(54, "strIndex", of(sv(CHAR, 1, "str"), sv(CHAR, 0, "chr")), of(sv(NUM, 0, "index"))));
+		res.put("strCmp", slf(55, "strCmp", of(sv(CHAR, 1, "strA"), sv(CHAR, 1, "strB")), of(sv(0x7L, "cmpRes")), 0x7L));
+		res.put("strFromNum", slf(56, "strFromNum", of(sv(NUM, 0, "val"), sv(CHAR, 1, "buf"), sv(NUM, 0, "base"), sv(UNUM, 0, "bufLen")), of(sv(NUM, 0, "strLen"), sv(CHAR, 1, "str"), sv(NUM, 0, "ignored0"), sv(NUM, 0, "newBufLen"))));
+		res.put("strFromFpnum", slf(57, "strFromFpnum", of(sv(FPNUM, 0, "val"), sv(CHAR, 1, "buf"), sv(UNUM, 0, "bufLen")), of(sv(NUM, 0, "strLen"), sv(CHAR, 1, "str"), sv(NUM, 0, "newBufLen"))));
+		res.put("strToNum", slf(58, "strToNum", of(sv(CHAR, 1, "str"), sv(NUM, 0, "base")), of(sv(NUM, 0, "val"), sv(NUM, 0, "success"))));
+		res.put("strToFpnum", slf(59, "strToFpnum", of(sv(CHAR, 1, "str")), of(sv(FPNUM, 0, "val"), sv(NUM, 0, "success"))));
+		res.put("strToU16str", slf(60, "strToU16str", of(sv(CHAR, 1, "u8str"), sv(UWORD, 1, "u16str"), sv(NUM, 0, "bufLen")), of(sv(CHAR, 1, "u8strUnconcStart"), sv(UWORD, 1, "u16strUnconvStart"), sv(NUM, 0, "remBufLen"), sv(NUM, 0, "remU8Len"))));
+		res.put("strToU32str", slf(61, "strToU32str", of(sv(CHAR, 1, "u8str"), sv(UDWORD, 1, "u32str"), sv(NUM, 0, "bufLen")), of(sv(CHAR, 1, "u8strUnconcStart"), sv(UDWORD, 1, "u32strUnconvStart"), sv(NUM, 0, "remBufLen"), sv(NUM, 0, "remU8Len"))));
+		res.put("strFromU16str", slf(62, "strFromU16str", of(sv(UWORD, 1, "u16str"), sv(CHAR, 1, "u8str"), sv(NUM, 0, "bufLen")), of(sv(UWORD, 1, "u16strUnconcStart"), sv(CHAR, 1, "u8strUnconvStart"), sv(NUM, 0, "remBufLen"), sv(NUM, 0, "remU8Len"))));
+		res.put("strFromU32str", slf(63, "strFromU32str", of(sv(UWORD, 1, "u32str"), sv(CHAR, 1, "u8str"), sv(NUM, 0, "bufLen")), of(sv(UWORD, 1, "u32strUnconcStart"), sv(CHAR, 1, "u8strUnconvStart"), sv(NUM, 0, "remBufLen"), sv(NUM, 0, "remU8Len"))));
+		res.put("strFormat", slf(64, "strFormat", of(sv(CHAR, 1, "frmtStr"), sv(CHAR, 1, "outStr"), sv(NUM, 0, "bufLen"), sv(NUM, 1, "args")), of(sv(NUM, 0, "outLen"))));
+		res.put("loadFile", slf(65, "loadFile", of(sv(CHAR, 1, "file")), of(sv(UBYTE, 1, "data"), sv(NUM, 0, "len"))));
+		res.put("loadLib", slf(66, "loadLib", of(sv(CHAR, 1, "file")), of(sv(UBYTE, 1, "data"), sv(NUM, 0, "len"), sv(NUM, 0, "loaded"))));
+		res.put("unloadLib", slf(67, "unloadLib", of(sv(UBYTE, 1, "data")), of()));
 		return res;
 }
 	
