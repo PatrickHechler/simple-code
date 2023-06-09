@@ -201,10 +201,8 @@ public class StdLib {
 		res.put("memoryRealloc", slf(6, "memoryRealloc", of(sv(UBYTE, 1, "oldMem"), sv(UNUM, 0, "newLen")), of(sv(NUM, 0, "ignored0"), sv(UBYTE, 1, "newMem"))));
 		res.put("memoryFree", slf(7, "memoryFree", of(sv(UBYTE, 1, "mem")), of()));
 		res.put("streamOpen", slf(8, "streamOpen", of(sv(CHAR, 1, "fileName"), sv(UNUM, 0, "flags")), of(sv(NUM, 0, "id"))));
-		res.put("streamWrite",
-				slf(9, "streamWrite", of(sv(NUM, 0, "id"), sv(UNUM, 0, "len"), sv(UBYTE, 1, "data")), of(sv(NUM, 0, "ignored0"), sv(NUM, 0, "wrote"))));
-		res.put("streamRead",
-				slf(10, "streamRead", of(sv(NUM, 0, "id"), sv(UNUM, 0, "len"), sv(UBYTE, 1, "data")), of(sv(NUM, 0, "ignored0"), sv(UNUM, 0, "read"))));
+		res.put("streamWrite", slf(9, "streamWrite", of(sv(NUM, 0, "id"), sv(UNUM, 0, "len"), sv(UBYTE, 1, "data")), of(sv(NUM, 0, "ignored0"), sv(NUM, 0, "wrote"))));
+		res.put("streamRead", slf(10, "streamRead", of(sv(NUM, 0, "id"), sv(UNUM, 0, "len"), sv(UBYTE, 1, "data")), of(sv(NUM, 0, "ignored0"), sv(UNUM, 0, "read"))));
 		res.put("streamClose", slf(11, "streamClose", of(sv(NUM, 0, "id")), of(sv(NUM, 0, "success"))));
 		res.put("streamFileGetPos", slf(12, "streamFileGetPos", of(sv(NUM, 0, "id")), of(sv(NUM, 0, "ignored0"), sv(NUM, 0, "pos"))));
 		res.put("streamFileSetPos", slf(13, "streamFileSetPos", of(sv(NUM, 0, "id"), sv(UNUM, 0, "pos")), of(sv(NUM, 0, "ignored0"), sv(NUM, 0, "success"))));
@@ -219,28 +217,19 @@ public class StdLib {
 		res.put("elementGetLastMod", slf(22, "elementGetLastMod", of(sv(NUM, 0, "id")), of(sv(NUM, 0, "ignored0"), sv(NUM, 0, "date"))));
 		res.put("elementSetCreate", slf(23, "elementSetCreate", of(sv(NUM, 0, "id"), sv(NUM, 0, "date")), of(sv(NUM, 0, "ignored0"), sv(NUM, 0, "success"))));
 		res.put("elementSetLastMod", slf(24, "elementSetLastMod", of(sv(NUM, 0, "id"), sv(NUM, 0, "date")), of(sv(NUM, 0, "ignored0"), sv(NUM, 0, "success"))));
-		res.put("elementDelete", slf(25, "elementDelete", of(sv(NUM, 0, "id")), of(sv(NUM, 0, "ignored0"), sv(NUM, 0, "success"))));
-		res.put("elementMove",
-				slf(26, "elementMove", of(sv(NUM, 0, "id"), sv(CHAR, 1, "newName"), sv(NUM, 0, "newParentId")), of(sv(NUM, 0, "ignored0"), sv(NUM, 0, "success"))));
+		res.put("elementDelete", slf(25, "elementDelete", of(sv(NUM, 0, "id"), sv(NUM, 0, "force")), of(sv(NUM, 0, "ignored0"), sv(NUM, 0, "success"))));
+		res.put("elementMove", slf(26, "elementMove", of(sv(NUM, 0, "id"), sv(CHAR, 1, "newName"), sv(NUM, 0, "newParentId")), of(sv(NUM, 0, "ignored0"), sv(NUM, 0, "success"))));
 		res.put("elementGetName", slf(27, "elementGetName", of(sv(NUM, 0, "id"), sv(CHAR, 1, "buffer")), of(sv(NUM, 0, "ignored0"), sv(CHAR, 1, "name"))));
 		res.put("elementGetFlags", slf(28, "elementGetFlags", of(sv(NUM, 0, "id")), of(sv(NUM, 0, "ignored0"), sv(NUM, 0, "flags"))));
-		res.put("elementModifyFlags", slf(29, "elementModifyFlags", of(sv(NUM, 0, "id"), sv(UDWORD, 0, "addFlags"), sv(UDWORD, 0, "remFlags")),
-				of(sv(NUM, 0, "ignored0"), sv(NUM, 0, "success"))));
+		res.put("elementModifyFlags", slf(29, "elementModifyFlags", of(sv(NUM, 0, "id"), sv(UDWORD, 0, "addFlags"), sv(UDWORD, 0, "remFlags")), of(sv(NUM, 0, "ignored0"), sv(NUM, 0, "success"))));
 		res.put("folderChildCount", slf(30, "folderChildCount", of(sv(NUM, 0, "id")), of(sv(NUM, 0, "ignored0"), sv(NUM, 0, "childCount"))));
-		res.put("folderOpenChildOfName",
-				slf(31, "folderOpenChildOfName", of(sv(NUM, 0, "id"), sv(CHAR, 1, "name")), of(sv(NUM, 0, "ignored0"), sv(NUM, 0, "childId"))));
-		res.put("folderOpenChildFolderOfName",
-				slf(32, "folderOpenChildFolderOfName", of(sv(NUM, 0, "id"), sv(CHAR, 1, "name")), of(sv(NUM, 0, "ignored0"), sv(NUM, 0, "childId"))));
-		res.put("folderOpenChildFileOfName",
-				slf(33, "folderOpenChildFileOfName", of(sv(NUM, 0, "id"), sv(CHAR, 1, "name")), of(sv(NUM, 0, "ignored0"), sv(NUM, 0, "childId"))));
-		res.put("folderOpenChildPipeOfName",
-				slf(34, "folderOpenChildPipeOfName", of(sv(NUM, 0, "id"), sv(CHAR, 1, "name")), of(sv(NUM, 0, "ignored0"), sv(NUM, 0, "childId"))));
-		res.put("folderCreateChildFolder",
-				slf(35, "folderCreateChildFolder", of(sv(NUM, 0, "id"), sv(CHAR, 1, "name")), of(sv(NUM, 0, "ignored0"), sv(NUM, 0, "childId"))));
-		res.put("folderCreateChildFile",
-				slf(36, "folderCreateChildFile", of(sv(NUM, 0, "id"), sv(CHAR, 1, "name")), of(sv(NUM, 0, "ignored0"), sv(NUM, 0, "childId"))));
-		res.put("folderCreateChildPipe",
-				slf(37, "folderCreateChildPipe", of(sv(NUM, 0, "id"), sv(CHAR, 1, "name")), of(sv(NUM, 0, "ignored0"), sv(NUM, 0, "childId"))));
+		res.put("folderOpenChildOfName", slf(31, "folderOpenChildOfName", of(sv(NUM, 0, "id"), sv(CHAR, 1, "name")), of(sv(NUM, 0, "ignored0"), sv(NUM, 0, "childId"))));
+		res.put("folderOpenChildFolderOfName", slf(32, "folderOpenChildFolderOfName", of(sv(NUM, 0, "id"), sv(CHAR, 1, "name")), of(sv(NUM, 0, "ignored0"), sv(NUM, 0, "childId"))));
+		res.put("folderOpenChildFileOfName", slf(33, "folderOpenChildFileOfName", of(sv(NUM, 0, "id"), sv(CHAR, 1, "name")), of(sv(NUM, 0, "ignored0"), sv(NUM, 0, "childId"))));
+		res.put("folderOpenChildPipeOfName", slf(34, "folderOpenChildPipeOfName", of(sv(NUM, 0, "id"), sv(CHAR, 1, "name")), of(sv(NUM, 0, "ignored0"), sv(NUM, 0, "childId"))));
+		res.put("folderCreateChildFolder", slf(35, "folderCreateChildFolder", of(sv(NUM, 0, "id"), sv(CHAR, 1, "name")), of(sv(NUM, 0, "ignored0"), sv(NUM, 0, "childId"))));
+		res.put("folderCreateChildFile", slf(36, "folderCreateChildFile", of(sv(NUM, 0, "id"), sv(CHAR, 1, "name")), of(sv(NUM, 0, "ignored0"), sv(NUM, 0, "childId"))));
+		res.put("folderCreateChildPipe", slf(37, "folderCreateChildPipe", of(sv(NUM, 0, "id"), sv(CHAR, 1, "name")), of(sv(NUM, 0, "ignored0"), sv(NUM, 0, "childId"))));
 		res.put("folderOpenIter", slf(38, "folderOpenIter", of(sv(NUM, 0, "id"), sv(NUM, 0, "showHidden")), of(sv(NUM, 0, "ignored0"), sv(NUM, 0, "iterId"))));
 		res.put("fileLength", slf(39, "fileLength", of(sv(NUM, 0, "id")), of(sv(NUM, 0, "ignored0"), sv(NUM, 0, "len"))));
 		res.put("fileTruncate", slf(40, "fileTruncate", of(sv(NUM, 0, "id"), sv(NUM, 0, "len")), of(sv(NUM, 0, "ignored0"), sv(NUM, 0, "success"))));
@@ -248,10 +237,8 @@ public class StdLib {
 		res.put("pipeLength", slf(42, "pipeLength", of(sv(NUM, 0, "id")), of(sv(NUM, 0, "ignored0"), sv(NUM, 0, "len"))));
 		res.put("timeGet", slf(43, "timeGet", of(), of(sv(NUM, 0, "secs"), sv(NUM, 0, "nanos"), sv(NUM, 0, "success"))));
 		res.put("timeRes", slf(44, "timeRes", of(), of()));
-		res.put("timeSleep",
-				slf(45, "timeSleep", of(sv(NUM, 0, "secs"), sv(NUM, 0, "nanos")), of(sv(NUM, 0, "remainSecs"), sv(NUM, 0, "remainNanos"), sv(NUM, 0, "success"))));
-		res.put("timeWait",
-				slf(46, "timeWait", of(sv(NUM, 0, "secs"), sv(NUM, 0, "nanos")), of(sv(NUM, 0, "ignored0"), sv(NUM, 0, "ignored1"), sv(NUM, 0, "success"))));
+		res.put("timeSleep", slf(45, "timeSleep", of(sv(NUM, 0, "secs"), sv(NUM, 0, "nanos")), of(sv(NUM, 0, "remainSecs"), sv(NUM, 0, "remainNanos"), sv(NUM, 0, "success"))));
+		res.put("timeWait", slf(46, "timeWait", of(sv(NUM, 0, "secs"), sv(NUM, 0, "nanos")), of(sv(NUM, 0, "ignored0"), sv(NUM, 0, "ignored1"), sv(NUM, 0, "success"))));
 		res.put("rndOpen", slf(47, "rndOpen", of(), of(sv(NUM, 0, "id"))));
 		res.put("rndNum", slf(48, "rndNum", of(), of(sv(NUM, 0, "rnd"))));
 		res.put("memCmp", slf(49, "memCmp", of(sv(UBYTE, 1, "memA"), sv(UBYTE, 1, "memB"), sv(NUM, 0, "len")), of(sv(0x7L, "cmpRes")), 0x7L));
@@ -260,27 +247,20 @@ public class StdLib {
 		res.put("memBset", slf(52, "memBset", of(sv(UBYTE, 1, "mem"), sv(UBYTE, 0, "val"), sv(NUM, 0, "len")), of()));
 		res.put("strLen", slf(53, "strLen", of(sv(CHAR, 1, "str")), of(sv(NUM, 0, "len"))));
 		res.put("strCmp", slf(54, "strCmp", of(sv(CHAR, 1, "strA"), sv(CHAR, 1, "strB")), of(sv(0x7L, "cmpRes")), 0x7L));
-		res.put("strFromNum", slf(55, "strFromNum", of(sv(NUM, 0, "val"), sv(CHAR, 1, "buf"), sv(NUM, 0, "base"), sv(UNUM, 0, "bufLen")),
-				of(sv(NUM, 0, "strLen"), sv(CHAR, 1, "str"), sv(NUM, 0, "ignored0"), sv(NUM, 0, "newBufLen"))));
-		res.put("strFromFpnum", slf(56, "strFromFpnum", of(sv(FPNUM, 0, "val"), sv(CHAR, 1, "buf"), sv(UNUM, 0, "bufLen")),
-				of(sv(NUM, 0, "strLen"), sv(CHAR, 1, "str"), sv(NUM, 0, "newBufLen"))));
+		res.put("strFromNum", slf(55, "strFromNum", of(sv(NUM, 0, "val"), sv(CHAR, 1, "buf"), sv(NUM, 0, "base"), sv(UNUM, 0, "bufLen")), of(sv(NUM, 0, "strLen"), sv(CHAR, 1, "str"), sv(NUM, 0, "ignored0"), sv(NUM, 0, "newBufLen"))));
+		res.put("strFromFpnum", slf(56, "strFromFpnum", of(sv(FPNUM, 0, "val"), sv(CHAR, 1, "buf"), sv(UNUM, 0, "bufLen")), of(sv(NUM, 0, "strLen"), sv(CHAR, 1, "str"), sv(NUM, 0, "newBufLen"))));
 		res.put("strToNum", slf(57, "strToNum", of(sv(CHAR, 1, "str"), sv(NUM, 0, "base")), of(sv(NUM, 0, "val"), sv(NUM, 0, "success"))));
 		res.put("strToFpnum", slf(58, "strToFpnum", of(sv(CHAR, 1, "str")), of(sv(FPNUM, 0, "val"), sv(NUM, 0, "success"))));
-		res.put("strToU16str", slf(59, "strToU16str", of(sv(CHAR, 1, "u8str"), sv(UWORD, 1, "u16str"), sv(NUM, 0, "bufLen")),
-				of(sv(CHAR, 1, "u8strUnconcStart"), sv(UWORD, 1, "u16strUnconvStart"), sv(NUM, 0, "remBufLen"), sv(NUM, 0, "remU8Len"))));
-		res.put("strToU32str", slf(60, "strToU32str", of(sv(CHAR, 1, "u8str"), sv(UDWORD, 1, "u32str"), sv(NUM, 0, "bufLen")),
-				of(sv(CHAR, 1, "u8strUnconcStart"), sv(UDWORD, 1, "u32strUnconvStart"), sv(NUM, 0, "remBufLen"), sv(NUM, 0, "remU8Len"))));
-		res.put("strFromU16str", slf(61, "strFromU16str", of(sv(UWORD, 1, "u16str"), sv(CHAR, 1, "u8str"), sv(NUM, 0, "bufLen")),
-				of(sv(UWORD, 1, "u16strUnconcStart"), sv(CHAR, 1, "u8strUnconvStart"), sv(NUM, 0, "remBufLen"), sv(NUM, 0, "remU8Len"))));
-		res.put("strFromU32str", slf(62, "strFromU32str", of(sv(UWORD, 1, "u32str"), sv(CHAR, 1, "u8str"), sv(NUM, 0, "bufLen")),
-				of(sv(UWORD, 1, "u32strUnconcStart"), sv(CHAR, 1, "u8strUnconvStart"), sv(NUM, 0, "remBufLen"), sv(NUM, 0, "remU8Len"))));
-		res.put("strFormat",
-				slf(63, "strFormat", of(sv(CHAR, 1, "frmtStr"), sv(CHAR, 1, "outStr"), sv(NUM, 0, "bufLen"), sv(NUM, 1, "args")), of(sv(NUM, 0, "outLen"))));
+		res.put("strToU16str", slf(59, "strToU16str", of(sv(CHAR, 1, "u8str"), sv(UWORD, 1, "u16str"), sv(NUM, 0, "bufLen")), of(sv(CHAR, 1, "u8strUnconcStart"), sv(UWORD, 1, "u16strUnconvStart"), sv(NUM, 0, "remBufLen"), sv(NUM, 0, "remU8Len"))));
+		res.put("strToU32str", slf(60, "strToU32str", of(sv(CHAR, 1, "u8str"), sv(UDWORD, 1, "u32str"), sv(NUM, 0, "bufLen")), of(sv(CHAR, 1, "u8strUnconcStart"), sv(UDWORD, 1, "u32strUnconvStart"), sv(NUM, 0, "remBufLen"), sv(NUM, 0, "remU8Len"))));
+		res.put("strFromU16str", slf(61, "strFromU16str", of(sv(UWORD, 1, "u16str"), sv(CHAR, 1, "u8str"), sv(NUM, 0, "bufLen")), of(sv(UWORD, 1, "u16strUnconcStart"), sv(CHAR, 1, "u8strUnconvStart"), sv(NUM, 0, "remBufLen"), sv(NUM, 0, "remU8Len"))));
+		res.put("strFromU32str", slf(62, "strFromU32str", of(sv(UWORD, 1, "u32str"), sv(CHAR, 1, "u8str"), sv(NUM, 0, "bufLen")), of(sv(UWORD, 1, "u32strUnconcStart"), sv(CHAR, 1, "u8strUnconvStart"), sv(NUM, 0, "remBufLen"), sv(NUM, 0, "remU8Len"))));
+		res.put("strFormat", slf(63, "strFormat", of(sv(CHAR, 1, "frmtStr"), sv(CHAR, 1, "outStr"), sv(NUM, 0, "bufLen"), sv(NUM, 1, "args")), of(sv(NUM, 0, "outLen"))));
 		res.put("loadFile", slf(64, "loadFile", of(sv(CHAR, 1, "file")), of(sv(UBYTE, 1, "data"), sv(NUM, 0, "len"))));
 		res.put("loadLib", slf(65, "loadLib", of(sv(CHAR, 1, "file")), of(sv(UBYTE, 1, "data"), sv(NUM, 0, "len"), sv(NUM, 0, "loaded"))));
 		res.put("unloadLib", slf(66, "unloadLib", of(sv(UBYTE, 1, "data")), of()));
 		return res;
-	}
+}
 	
 	// here is the end of the automatic generated code-block
 	// GENERATED-CODE-END
