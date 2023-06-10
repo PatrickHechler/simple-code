@@ -23,11 +23,11 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Stream;
 
-import de.hechler.patrick.codesprachen.simple.compile.interfaces.Compiler;
+import de.hechler.patrick.codesprachen.simple.compile.interfaces.SCompiler;
 import de.hechler.patrick.codesprachen.simple.compile.interfaces.ThrowingConsumer;
 import de.hechler.patrick.zeugs.pfs.interfaces.File;
 
-public abstract class StepCompiler<T extends TranslationUnit> implements Compiler {
+public abstract class StepCompiler<T extends TranslationUnit> implements SCompiler {
 	
 	/**
 	 * this map saves all translation units with their {@link TranslationUnit#source source} path as key

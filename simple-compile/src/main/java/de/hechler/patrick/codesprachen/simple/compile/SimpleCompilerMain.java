@@ -1,19 +1,19 @@
-//This file is part of the Simple Code Project
-//DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
-//Copyright (C) 2023  Patrick Hechler
+// This file is part of the Simple Code Project
+// DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+// Copyright (C) 2023 Patrick Hechler
 //
-//This program is free software: you can redistribute it and/or modify
-//it under the terms of the GNU General Public License as published by
-//the Free Software Foundation, either version 3 of the License, or
-//(at your option) any later version.
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
 //
-//This program is distributed in the hope that it will be useful,
-//but WITHOUT ANY WARRANTY; without even the implied warranty of
-//MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//GNU General Public License for more details.
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
 //
-//You should have received a copy of the GNU General Public License
-//along with this program.  If not, see <https://www.gnu.org/licenses/>.
+// You should have received a copy of the GNU General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
 package de.hechler.patrick.codesprachen.simple.compile;
 
 import java.io.IOException;
@@ -34,8 +34,8 @@ import org.antlr.v4.runtime.misc.ParseCancellationException;
 
 import de.hechler.patrick.codesprachen.primitive.assemble.exceptions.AssembleError;
 import de.hechler.patrick.codesprachen.simple.compile.antlr.SimpleGrammarLexer;
+import de.hechler.patrick.codesprachen.simple.compile.interfaces.SCompiler;
 import de.hechler.patrick.codesprachen.simple.compile.objects.compiler.DefMultiCompiler;
-import de.hechler.patrick.codesprachen.simple.compile.objects.compiler.MultiCompiler;
 import de.hechler.patrick.zeugs.pfs.FSProvider;
 import de.hechler.patrick.zeugs.pfs.interfaces.FS;
 import de.hechler.patrick.zeugs.pfs.interfaces.FSElement;
@@ -53,11 +53,11 @@ public class SimpleCompilerMain {
 	
 	public static final Logger LOGGER = Logger.getLogger("simple-compile");
 	
-	private static FS            pfs;
-	private static MultiCompiler compiler;
-	private static Path          src;
-	private static Folder        bin;
-	private static boolean       force;
+	private static FS        pfs;
+	private static SCompiler compiler;
+	private static Path      src;
+	private static Folder    bin;
+	private static boolean   force;
 	
 	public static void main(String[] args) {
 		setup(args);
@@ -65,7 +65,7 @@ public class SimpleCompilerMain {
 			if (force) {
 				deleteChilds(bin);
 			}
-			compileRecursive(src, bin);
+			registerRecursive(src, bin);
 			compiler.compile();
 		} catch (Throwable t) {
 			System.err.println("erron while compiling: " + t);
@@ -102,28 +102,41 @@ public class SimpleCompilerMain {
 	
 	private static void deleteChilds(Folder bin) throws IOException {
 		try (FolderIter iter = bin.iter(true)) {
-			FSElement e = iter.next();
-			if (e.isFolder()) {
-				deleteChilds(e.getFolder());
+			while (iter.hasNext()) {
+				FSElement e = iter.next();
+				if (e.isFolder()) {
+					deleteChilds(e.getFolder());
+				}
+				iter.delete();
 			}
-			iter.delete();
 		}
 	}
 	
-	private static void compileRecursive(Path src, Folder bin) throws IOException {
+	private static void registerRecursive(Path src, Folder bin) throws IOException {
 		for (Path sub : Files.newDirectoryStream(src)) {
 			String name = sub.getFileName().toString();
 			if (Files.isDirectory(sub)) {
 				Folder target = bin.createFolder(name);
-				compileRecursive(sub, target);
+				registerRecursive(sub, target);
 			} else {
-				File out = bin.createFile(name);
+				File out = bin.createFile(name(name));
 				if (LOGGER.isLoggable(Level.INFO)) {
 					System.out.println("register: '" + sub + "' will be compiled to '" + out + '\'');
 				}
 				compiler.addTranslationUnit(sub, out);
 			}
 		}
+	}
+	
+	private static String name(String name) {
+		int i = name.lastIndexOf('.');
+		if (i == -1) return name;
+		return switch (name.substring(i + 1)) {
+		case DefMultiCompiler.PRIMITIVE_SOURCE_CODE_END, DefMultiCompiler.PRIMITIVE_SYMBOL_FILE_END, DefMultiCompiler.SIMPLE_SOURCE_CODE_END,
+				DefMultiCompiler.SIMPLE_SYMBOL_FILE_END ->
+			name.substring(0, i);
+		default -> name;
+		};
 	}
 	
 	private static void closePFS() {
@@ -162,7 +175,7 @@ public class SimpleCompilerMain {
 		if (cs == null) {
 			cs = StandardCharsets.UTF_8;
 		}
-		force = recreateOutput;
+		force    = recreateOutput;
 		compiler = new DefMultiCompiler(cs, src, lookups);
 	}
 	

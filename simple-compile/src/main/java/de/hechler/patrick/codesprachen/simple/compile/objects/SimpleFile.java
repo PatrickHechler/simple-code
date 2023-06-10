@@ -248,7 +248,7 @@ public class SimpleFile implements SimplePool {
 	@Override
 	public SimpleFunction getFunction(String name) {
 		SimpleFunction func = funcs.get(name);
-		if (func == null) { throw new NoSuchElementException("there is no function with the name '" + name + "'"); }
+		if (func == null) { throw new NoSuchElementException("there is no function with the name '" + name + '\''); }
 		return func;
 	}
 	

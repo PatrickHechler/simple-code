@@ -398,6 +398,9 @@ expPostfix [SimplePool pool] returns [SimpleValue val]:
 		|
 		OPEN_ARRAY_BLOCK o = value [pool] CLOSE_ARRAY_BLOCK
 		{$val = $val.addExpArrayRef(pool.snapshot(), $o.val);}
+		|
+		COLON t = NAME
+		{$val = $val.addExpNameRef(pool, $t.getText());}
 	)*
 ;
 expDirect [SimplePool pool] returns [SimpleValue val]:
@@ -448,10 +451,6 @@ expDirect [SimplePool pool] returns [SimpleValue val]:
 	{
 		$val = pool.newNameUseValue($t.getText());
 	}
-	(
-		COLON t = NAME
-		{$val = $val.addExpNameRef(pool, $t.getText());}
-	)*
 	|
 	OPEN_SMALL_BLOCK v = value [pool] CLOSE_SMALL_BLOCK
 	{$val = $v.val;}
@@ -473,7 +472,7 @@ type [SimplePool pool] returns [SimpleType t]:
 			COLON
 			sn = NAME
 		)?
-		{$t = pool.getFuncType($fn.getText(), $sn.getText());}
+		{$t = pool.getFuncType($fn.getText(), $sn != null ? $sn.getText() : null);}
 	)
 	(
 		DIAMOND
@@ -521,7 +520,7 @@ typePrim returns [SimpleType t]:
 
 typeStruct [SimplePool pool] returns [SimpleStructType t]:
 	STRUCT t1 = NAME ( COLON t2 = NAME )?
-	{$t = pool.getStructure($t1.getText(), $t2.getText());}
+	{$t = pool.getStructure($t1.getText(), $t2 != null ? $t2.getText() : null);}
 ;
 
 typeFunc [SimplePool pool] returns [SimpleType t]:
@@ -599,7 +598,8 @@ commandAssign [SimplePool pool] returns [SimpleCommandAssign cmd]:
 	{$cmd = SimpleCommandAssign.create(pool.snapshot(), $expPostfix.val, $value.val);}
 ;
 commandFuncCall [SimplePool pool] returns [SimpleCommandFuncCall cmd]:
-	CALL fn = NAME
+	CALL
+	fn = NAME
 	{String sn = null;}
 	(
 		COLON
@@ -768,9 +768,9 @@ UNUM : 'unum' ;
 DWORD : 'dword' ;
 UDWORD : 'udword' ;
 WORD : 'word' ;
-UWORD : 'uword' | 'char' ;
+UWORD : 'uword' ;
 BYTE : 'byte' ;
-UBYTE : 'ubyte' ;
+UBYTE : 'ubyte' | 'char' ;
 
 OPEN_CODE_BLOCK   : '{' ;
 CLOSE_CODE_BLOCK  : '}' ;

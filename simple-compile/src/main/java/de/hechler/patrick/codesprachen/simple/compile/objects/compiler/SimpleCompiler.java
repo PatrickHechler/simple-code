@@ -26,6 +26,7 @@ import static de.hechler.patrick.codesprachen.primitive.core.utils.PrimAsmConsta
 
 import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.IOError;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -131,8 +132,9 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 	public static final int MAX_TMP_VAL_REG       = 0xFF;
 	
 	public static final SimpleFuncType MAIN_TYPE   = new SimpleFuncType(
-		List.of(new SimpleOffsetVariable(SimpleType.NUM, "argc"), new SimpleOffsetVariable(new SimpleTypePointer(new SimpleTypePointer(SimpleType.BYTE)), "argv")),
-		List.of(new SimpleOffsetVariable(SimpleType.NUM, "exitnum")));
+			List.of(new SimpleOffsetVariable(SimpleType.NUM, "argc"),
+					new SimpleOffsetVariable(new SimpleTypePointer(new SimpleTypePointer(SimpleType.BYTE)), "argv")),
+			List.of(new SimpleOffsetVariable(SimpleType.NUM, "exitnum")));
 	private static final long          MAIN_LENGTH = 16L;
 	private static final long          JMP_LENGTH  = 8L;
 	
@@ -277,7 +279,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		}
 		add(tu, new Command(Commands.CMD_RET, null, null));
 	}
-	
+
 	// only used to preassemble asm blocks
 	private static final PrimitiveAssembler PREASSEMBLER = new PrimitiveAssembler(null, null, null, false, true);
 	
@@ -511,7 +513,8 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 			throw new IllegalStateException("can not assign with array/structure values! (command: " + c + ")");
 		}
 		if (!c.target.type().equals(c.value.type())) {
-			throw new IllegalStateException("target and value type are different (command: " + c + ")");
+			SimpleValue casted = c.value.cast(c.target.type());
+			c = new SimpleCommandAssign(c.pool, c.target, casted);
 		}
 		boolean[] blockedRegs = new boolean[256];
 		switch (c.target) {
@@ -685,8 +688,8 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 					// @F
 					Param   target    = build2(A_XX | B_NUM, MIN_TMP_VAL_REG, sov.offset());
 					Command setLow    = new Command(Commands.CMD_MOV, target, build2(A_NUM, -1L));                                                 // use XOR when
-					Command setEq     =
-						(target.art & B_NUM) != 0 ? new Command(Commands.CMD_MOV, target, build2(A_NUM, 0L)) : new Command(Commands.CMD_XOR, target, target);
+					Command setEq     = (target.art & B_NUM) != 0 ? new Command(Commands.CMD_MOV, target, build2(A_NUM, 0L))
+							: new Command(Commands.CMD_XOR, target, target);
 					Command setHigh   = new Command(Commands.CMD_MOV, target, build2(A_NUM, 0L));
 					Command afterHigh = new Command(Commands.CMD_JMP, build2(A_NUM, JMP_LENGTH + setLow.length()), null);
 					Command afterEq   = new Command(Commands.CMD_JMP, build2(A_NUM, (JMP_LENGTH * 2) + setHigh.length() + setLow.length()), null);
@@ -740,7 +743,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 	private static void checkFuncType(SimpleCommandFuncCall c, SimpleFunctionSymbol func) {
 		if (!func.type.equals(((SimpleTypePointer) c.function.type()).target)) {
 			throw new IllegalArgumentException(
-				"the function call argument needs to have the same type as the functions type! (arg-type: " + c.function.type() + " func: " + func.type + ")");
+					"the function call argument needs to have the same type as the functions type! (arg-type: " + c.function.type() + " func: " + func.type + ")");
 		}
 	}
 	
@@ -821,6 +824,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 			addCmdBlock(tu, c.ifCmd);
 			allCommands.add(new Command(jofCmd, build2(A_NUM, tu.pos - jmpToEndPos), null));
 			allCommands.addAll(tu.commands);
+			tu.commands = allCommands;
 		}
 	}
 	
@@ -944,14 +948,14 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 	private static void addVariables(SimpleTU tu) {
 		for (SimpleOffsetVariable sv : tu.sf.vars()) {
 			ConstantPoolCommand cp = new ConstantPoolCommand();
-			align(tu, sv.type, null);
+			align(tu, sv.type, cp);
 			sv.init(tu.pos, tu.sf);
 			int len = (int) sv.type.byteCount();
 			if (len != sv.type.byteCount()) {
 				throw new IllegalArgumentException("the variable needs too much memory! (the compiler supports only variables with max (2^31)-1 bytes)");
 			}
 			cp.addBytes(new byte[len]);
-			tu.commands.add(cp);
+			add(tu, cp);
 		}
 	}
 	
@@ -961,8 +965,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 			align(tu, sv.t, cp);
 			sv.init(tu.pos);
 			cp.addBytes(sv.data);
-			tu.pos += sv.data.length;
-			tu.commands.add(cp);
+			add(tu, cp);
 		}
 	}
 	
@@ -978,11 +981,10 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 			if (cp == null) {
 				cp = new ConstantPoolCommand();
 				cp.addBytes(new byte[len]);
-				tu.commands.add(cp);
+				add(tu, cp);
 			} else {
 				cp.addBytes(new byte[len]);
 			}
-			tu.pos += len;
 		}
 	}
 	
@@ -1039,8 +1041,8 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		long dleMsg1Pos = dleMsg0Pos + oomMsgLen;
 		cp.addBytes("'\n".getBytes(StandardCharsets.UTF_8));
 		long dleMsg1Len = cp.length() - dleMsg1Pos;
-		add(tu, cp);
 		align(tu, 8, cp);
+		add(tu, cp);
 		oomHandler(tu, oomMsgPos, oomMsgLen);
 		dleHandler(tu, dleMsg0Pos, dleMsg0Len, dleMsg1Pos, dleMsg1Len);
 	}

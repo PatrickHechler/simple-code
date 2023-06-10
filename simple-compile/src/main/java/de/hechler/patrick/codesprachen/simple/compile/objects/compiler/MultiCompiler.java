@@ -21,26 +21,26 @@ import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.Set;
 
-import de.hechler.patrick.codesprachen.simple.compile.interfaces.Compiler;
+import de.hechler.patrick.codesprachen.simple.compile.interfaces.SCompiler;
 import de.hechler.patrick.zeugs.pfs.interfaces.File;
 
 @SuppressWarnings("javadoc")
-public abstract class MultiCompiler implements Compiler {
+public abstract class MultiCompiler implements SCompiler {
 
-	private final Set<Compiler> comps = new HashSet<>();
+	private final Set<SCompiler> comps = new HashSet<>();
 
 	public void addTranslationUnit(Path source, File target) throws IOException {
-		Compiler c = findCompiler(source);
+		SCompiler c = findCompiler(source);
 		c.addTranslationUnit(source, target);
 		comps.add(c);
 	}
 
 	public void compile() throws IOException {
-		for (Compiler c : comps) {
+		for (SCompiler c : comps) {
 			c.compile();
 		}
 	}
 
-	protected abstract Compiler findCompiler(Path source) throws IOException;
+	protected abstract SCompiler findCompiler(Path source) throws IOException;
 
 }

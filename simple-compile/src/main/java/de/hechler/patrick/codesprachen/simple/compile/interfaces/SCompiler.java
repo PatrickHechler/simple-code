@@ -31,7 +31,7 @@ import de.hechler.patrick.zeugs.pfs.interfaces.File;
  * 
  * @author pat
  */
-public interface Compiler {
+public interface SCompiler {
 	
 	/**
 	 * registers the given source file and target file.

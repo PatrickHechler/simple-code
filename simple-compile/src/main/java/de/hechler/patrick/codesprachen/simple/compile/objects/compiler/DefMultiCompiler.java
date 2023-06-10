@@ -21,7 +21,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
-import de.hechler.patrick.codesprachen.simple.compile.interfaces.Compiler;
+import de.hechler.patrick.codesprachen.simple.compile.interfaces.SCompiler;
 
 @SuppressWarnings("javadoc")
 public class DefMultiCompiler extends MultiCompiler {
@@ -42,14 +42,14 @@ public class DefMultiCompiler extends MultiCompiler {
 	
 	private static final Charset DEFAULT_CHARSET = StandardCharsets.UTF_8;
 	
-	private final Compiler other;
-	private final Compiler simpleSym;
-	private final Compiler simpleSrc;
-	private final Compiler primSym;
-	private final Compiler primSrc;
+	private final SCompiler other;
+	private final SCompiler simpleSym;
+	private final SCompiler simpleSrc;
+	private final SCompiler primSym;
+	private final SCompiler primSrc;
 	
-	public DefMultiCompiler(Compiler other, Compiler simpleSym, Compiler simpleSrc, Compiler primSym,
-			Compiler primSrc) {
+	public DefMultiCompiler(SCompiler other, SCompiler simpleSym, SCompiler simpleSrc, SCompiler primSym,
+			SCompiler primSrc) {
 		this.other = other;
 		this.simpleSym = simpleSym;
 		this.simpleSrc = simpleSrc;
@@ -57,15 +57,15 @@ public class DefMultiCompiler extends MultiCompiler {
 		this.primSrc = primSrc;
 	}
 	
-	public DefMultiCompiler(Compiler other, Compiler simple, Compiler prim, Compiler symbol) {
+	public DefMultiCompiler(SCompiler other, SCompiler simple, SCompiler prim, SCompiler symbol) {
 		this(other, symbol, simple, symbol, prim);
 	}
 	
-	public DefMultiCompiler(Compiler other, Compiler simple, Compiler prim) {
+	public DefMultiCompiler(SCompiler other, SCompiler simple, SCompiler prim) {
 		this(other, simple, prim, new IgnoreCompiler());
 	}
 	
-	public DefMultiCompiler(Charset cs, Compiler other, Path srcRoot, Path... lockups) {
+	public DefMultiCompiler(Charset cs, SCompiler other, Path srcRoot, Path... lockups) {
 		this(other, new SimpleCompiler(cs, srcRoot, lockups), new PrimitiveCompiler(cs, lockups));
 	}
 	
@@ -73,7 +73,7 @@ public class DefMultiCompiler extends MultiCompiler {
 		this(cs, new CopyCompiler(), srcRoot, lockups);
 	}
 	
-	public DefMultiCompiler(Charset cs, Compiler other) {
+	public DefMultiCompiler(Charset cs, SCompiler other) {
 		this(cs, other, Paths.get("."), Paths.get("/patr-symbols/"), Paths.get("~/patr-symbols/"));
 	}
 	
@@ -86,10 +86,10 @@ public class DefMultiCompiler extends MultiCompiler {
 	}
 	
 	@Override
-	protected Compiler findCompiler(Path source) {
+	protected SCompiler findCompiler(Path source) {
 		String name  = source.getFileName().toString();
 		int    start = name.lastIndexOf('.') + 1;
-		String end   = name.substring(start, name.length() - start);
+		String end   = name.substring(start, name.length());
 		switch (end) {
 		case PRIMITIVE_SOURCE_CODE_END:
 			return primSrc;

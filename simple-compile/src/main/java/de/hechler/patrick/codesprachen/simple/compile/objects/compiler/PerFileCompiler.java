@@ -21,11 +21,11 @@ import java.nio.file.Path;
 import java.util.LinkedList;
 import java.util.List;
 
-import de.hechler.patrick.codesprachen.simple.compile.interfaces.Compiler;
+import de.hechler.patrick.codesprachen.simple.compile.interfaces.SCompiler;
 import de.hechler.patrick.zeugs.pfs.interfaces.File;
 
 
-public abstract class PerFileCompiler implements Compiler {
+public abstract class PerFileCompiler implements SCompiler {
 	
 	private final List<TwoFiles> paths = new LinkedList<>();
 	

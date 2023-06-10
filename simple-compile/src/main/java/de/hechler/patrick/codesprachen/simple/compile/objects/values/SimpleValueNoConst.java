@@ -43,6 +43,7 @@ import de.hechler.patrick.codesprachen.simple.symbol.objects.SimpleVariable.Simp
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleFuncType;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleStructType;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleType;
+import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleTypeArray;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleTypePointer;
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleTypePrimitive;
 
@@ -217,7 +218,12 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 	private static class ArrayIndexValue extends CalculatingBIValue {
 		
 		public ArrayIndexValue(SimpleValue valA, SimpleValue valB) {
-			super(((SimpleTypePointer) valA).target, valA, valB);
+			super(((SimpleTypePointer) valA.type()).target, valA, valB);
+		}
+		
+		@Override
+		public SimpleValue mkPointer(SimplePool pool) {
+			return this.valA.addExpAdd(pool, true, this.valB);
 		}
 		
 		@Override
@@ -415,6 +421,13 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		public CastedNoConstValue(SimpleType type, SimpleValue val) {
 			super(type);
 			this.val = val;
+		}
+		
+		@Override
+		public SimpleValue mkPointer(SimplePool pool) {
+			SimpleValue pntrVal = val.mkPointer(pool);
+			SimpleTypePointer pntrType = new SimpleTypePointer(this.t);
+			return new CastedNoConstValue(pntrType, pntrVal);
 		}
 		
 		@Override
@@ -819,27 +832,27 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 			pos = valB.loadValue(sf, rd.reg, blockedRegisters, commands, pos, loader, sul);
 			Command cmp = new Command(compare, build2(A_XX, targetRegister), build2(A_XX, rd.reg));
 			pos += cmp.length();
-			pos = releaseRegister(commands, pos, rd, blockedRegisters, sul);
-			Command gotoTrue;
+			pos  = releaseRegister(commands, pos, rd, blockedRegisters, sul);
+			Command       gotoTrue;
 			List<Command> loadFalse = new ArrayList<>();
-			Command afterFalse;
-			List<Command> loadTrue = new ArrayList<>();
+			Command       afterFalse;
+			List<Command> loadTrue  = new ArrayList<>();
 			// jmpTrue @T
 			// move target, false
 			// JMP @F
 			// @T move target, true
 			// @F
 			long gotoTruePos = pos;
-			pos += JMP_LEN;
-			blockedRegisters[targetRegister] = false;
-			pos = falseValue.loadValue(sf, targetRegister, blockedRegisters, loadFalse, pos, loader, sul);
+			pos                              += JMP_LEN;
+			blockedRegisters[targetRegister]  = false;
+			pos                               = falseValue.loadValue(sf, targetRegister, blockedRegisters, loadFalse, pos, loader, sul);
 			long afterFalsePos = pos;
 			pos += JMP_LEN;
 			long trueLabel = pos;
 			blockedRegisters[targetRegister] = false;
-			pos = trueValue.loadValue(sf, targetRegister, blockedRegisters, loadTrue, pos, loader, sul);
-			gotoTrue = new Command(jmpOnTrue, build2(A_NUM, trueLabel - gotoTruePos), null);
-			afterFalse = new Command(Commands.CMD_JMP, build2(A_NUM, pos - afterFalsePos), null);
+			pos                              = trueValue.loadValue(sf, targetRegister, blockedRegisters, loadTrue, pos, loader, sul);
+			gotoTrue                         = new Command(jmpOnTrue, build2(A_NUM, trueLabel - gotoTruePos), null);
+			afterFalse                       = new Command(Commands.CMD_JMP, build2(A_NUM, pos - afterFalsePos), null);
 			commands.add(cmp);
 			commands.add(gotoTrue);
 			commands.addAll(loadFalse);
@@ -999,8 +1012,15 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 	}
 	
 	private SimpleValue add(boolean add, SimpleValue val) {
-		if (!this.t.isPrimitive() && !this.t.isPointer()) { throw new IllegalArgumentException("illegal add type: " + this.t); }
-		if (!val.type().isPrimitive() && !val.type().isPointer()) { throw new IllegalArgumentException("illegal add type: " + val.type()); }
+		if (!this.t.isPrimitive() && !this.t.isPointer()) {
+			if (this.t.isArray()) {
+				return cast(new SimpleTypePointer(((SimpleTypeArray) this.t).target)).add(add, val);
+			}
+			throw new IllegalArgumentException("illegal add type: " + this.t + " value: (" + this + ") " + (add ? '+' : '-') + " (" + val + ')');
+		}
+		if (!val.type().isPrimitive() && !val.type().isPointer()) {
+			throw new IllegalArgumentException("illegal add type: " + val.type() + " value: (" + this + ") " + (add ? '+' : '-') + " (" + val + ')');
+		}
 		if (this.t.isPointer()) {
 			return addPntr(add, this, val);
 		} else {
@@ -1219,7 +1239,7 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 	
 	@Override
 	public SimpleValue mkPointer(SimplePool pool) {
-		throw new IllegalStateException("can not make a pointer to this value (this: " + this + ")");
+		throw new IllegalStateException("can not make a pointer to this value (type: " + getClass() + " this: " + this + ")");
 	}
 	
 	@Override
@@ -1232,6 +1252,11 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		if (targetType.isStruct() || targetType.isArray()) { return new CastedNoConstValue(targetType, this); }
 		final SimpleValueNoConst me = this;
 		return new SimpleValueNoConst(targetType) {
+			
+			@Override
+			public SimpleValue mkPointer(SimplePool pool) {
+				return me;
+			}
 			
 			@Override
 			public long loadValue(SimpleFile sf, int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader,
@@ -1264,7 +1289,8 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 	@Override
 	public SimpleValue addExpNameRef(SimplePool pool, String text) {
 		if (!this.t.isStruct() && this.t != SimpleFile.DEPENDENCY_TYPE) {
-			throw new IllegalStateException("name referencing is only possible on (function) structures and dependencies!");
+			throw new IllegalStateException(
+					"name referencing is only possible on (function) structures and dependencies! (type: " + this.t + " value: (" + toString() + "):" + text + ')');
 		}
 		try {
 			SimpleOffsetVariable target = null;

@@ -19,14 +19,14 @@ package de.hechler.patrick.codesprachen.simple.compile.objects.compiler;
 import java.io.IOException;
 import java.nio.file.Path;
 
-import de.hechler.patrick.codesprachen.simple.compile.interfaces.Compiler;
+import de.hechler.patrick.codesprachen.simple.compile.interfaces.SCompiler;
 import de.hechler.patrick.zeugs.pfs.interfaces.File;
 
 
-public class IgnoreCompiler implements Compiler {
+public class IgnoreCompiler implements SCompiler {
 	
 	public void addTranslationUnit(Path source, File target) throws IOException {
-		target.close();
+		target.delete();
 	}
 	
 	public void compile() {/**/}
