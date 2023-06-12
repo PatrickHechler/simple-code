@@ -163,5 +163,9 @@ public interface SimpleValue {
 	SimpleValue cast(SimpleType t);
 
 	SimpleValue mkPointer(SimplePool pool);
+
+	default SimpleValue mkPointer() {
+		return mkPointer(null);
+	}
 	
 }

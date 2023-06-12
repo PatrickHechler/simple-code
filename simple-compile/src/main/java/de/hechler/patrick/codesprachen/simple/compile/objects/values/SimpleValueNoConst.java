@@ -228,7 +228,7 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		
 		@Override
 		public long loadValue(SimpleFile sf, int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader,
-				StackUseListener sul) {
+			StackUseListener sul) {
 			pos = valA.loadValue(sf, targetRegister, blockedRegisters, commands, pos, loader, sul);
 			long mul = this.t.byteCount();
 			if (mul < 1L) throw new AssertionError("target type is too small! valA: " + valA.type());
@@ -347,7 +347,7 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		
 		@Override
 		public long loadValue(SimpleFile sf, int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader,
-				StackUseListener sul) {
+			StackUseListener sul) {
 			pos = this.val.loadValue(sf, targetRegister, blockedRegisters, commands, pos, loader, sul);
 			Command cmd = new Command(this.op, build2(A_XX, targetRegister), null);
 			pos += cmd.length();
@@ -391,7 +391,7 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		
 		@Override
 		public long loadValue(SimpleFile sf, int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader,
-				StackUseListener sul) {
+			StackUseListener sul) {
 			RegisterData rd = new RegisterData(fallbackRegister(targetRegister));
 			blockedRegisters[targetRegister] = true;
 			pos                              = findRegister(blockedRegisters, commands, pos, rd, rd.reg, sul);
@@ -425,14 +425,14 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		
 		@Override
 		public SimpleValue mkPointer(SimplePool pool) {
-			SimpleValue pntrVal = val.mkPointer(pool);
+			SimpleValue       pntrVal  = val.mkPointer(pool);
 			SimpleTypePointer pntrType = new SimpleTypePointer(this.t);
 			return new CastedNoConstValue(pntrType, pntrVal);
 		}
 		
 		@Override
 		public long loadValue(SimpleFile sf, int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader,
-				StackUseListener sul) {
+			StackUseListener sul) {
 			return val.loadValue(sf, targetRegister, blockedRegisters, commands, pos, loader, sul);
 		}
 		
@@ -451,7 +451,7 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		
 		@Override
 		public long loadValue(SimpleFile sf, int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader,
-				StackUseListener sul) {
+			StackUseListener sul) {
 			int     oldByteCount;
 			boolean oldSigned;
 			boolean oldPntr;
@@ -523,7 +523,7 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		
 		@Override
 		public long loadValue(SimpleFile sf, int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader,
-				StackUseListener sul) {
+			StackUseListener sul) {
 			pos = super.val.loadValue(sf, targetRegister, blockedRegisters, commands, pos, loader, sul);
 			Commands c;
 			if (this.t == SimpleType.FPNUM) {
@@ -549,7 +549,7 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		
 		@Override
 		public long loadValue(SimpleFile sf, int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader,
-				StackUseListener sul) {
+			StackUseListener sul) {
 			pos = super.loadValue(sf, targetRegister, blockedRegisters, commands, pos, loader, sul);
 			Param   reg = build2(A_XX, targetRegister);
 			Command cmp = new Command(Commands.CMD_CMP, reg, build2(A_NUM, this.t.isPointerOrArray() ? 0L : -1L));
@@ -573,6 +573,13 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		} else if (t.equals(this.t)) {
 			return new CastedNoConstValue(t, this);
 		} else if (this.t.isPointerOrArray()) {
+			if (this.t.isArray() && t.isPointer()) {
+				SimpleValue res = mkPointer().cast(t);
+				if (res instanceof SimpleValueNoConst svnc) return svnc;
+				return new CastedNoConstValue(t, res);
+				// just add a useless cast, to get the functionality of this class
+				// well, there are no SimpleValue instances which are not from this class
+			}
 			if (t.isPointerOrArray()) {
 				return new CastedNoConstValue(t, this);
 			} else if (t.isPrimitive()) {
@@ -745,7 +752,7 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		
 		@Override
 		public long loadValue(SimpleFile sf, int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader,
-				StackUseListener sul) {
+			StackUseListener sul) {
 			Param reg     = build2(A_XX, targetRegister);
 			Param zero    = build2(A_NUM, 0L);
 			Param notZero = build2(A_NUM, 1L);
@@ -816,7 +823,7 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 		
 		@Override
 		public long loadValue(SimpleFile sf, int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader,
-				StackUseListener sul) {
+			StackUseListener sul) {
 			// move target, valA
 			// move other, valB
 			// compare target, other
@@ -1260,7 +1267,7 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 			
 			@Override
 			public long loadValue(SimpleFile sf, int targetRegister, boolean[] blockedRegisters, List<Command> commands, long pos, VarLoader loader,
-					StackUseListener sul) {
+				StackUseListener sul) {
 				pos = me.loadValue(sf, targetRegister, blockedRegisters, commands, pos, loader, sul);
 				pos = addMovCmd(this.t, commands, pos, build2(A_XX | B_REG, targetRegister), build2(A_XX, targetRegister));
 				return pos;
@@ -1290,7 +1297,7 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 	public SimpleValue addExpNameRef(SimplePool pool, String text) {
 		if (!this.t.isStruct() && this.t != SimpleFile.DEPENDENCY_TYPE) {
 			throw new IllegalStateException(
-					"name referencing is only possible on (function) structures and dependencies! (type: " + this.t + " value: (" + toString() + "):" + text + ')');
+				"name referencing is only possible on (function) structures and dependencies! (type: " + this.t + " value: (" + toString() + "):" + text + ')');
 		}
 		try {
 			SimpleOffsetVariable target = null;
@@ -1315,7 +1322,7 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 			}
 			if (target == null) {
 				throw new IllegalStateException(
-						"this structure does not has a member with the name '" + text + "' ((func-)struct: " + this.t + ") (me: " + this + ')');
+					"this structure does not has a member with the name '" + text + "' ((func-)struct: " + this.t + ") (me: " + this + ')');
 			}
 			return new SimpleNonDirectVariableValue(this, target);
 		} catch (RuntimeException re) {
