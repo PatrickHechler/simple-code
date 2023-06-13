@@ -949,7 +949,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		for (SimpleOffsetVariable sv : tu.sf.vars()) {
 			ConstantPoolCommand cp = new ConstantPoolCommand();
 			align(tu, sv.type, cp);
-			sv.init(tu.pos, tu.sf);
+			sv.init(tu.pos + cp.length(), tu.sf);
 			int len = (int) sv.type.byteCount();
 			if (len != sv.type.byteCount()) {
 				throw new IllegalArgumentException("the variable needs too much memory! (the compiler supports only variables with max (2^31)-1 bytes)");
@@ -974,10 +974,11 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 	}
 	
 	private static void align(SimpleTU tu, int bc, ConstantPoolCommand cp) {
-		long np = align(tu.pos, bc);
-		if (np != tu.pos) {
-			int len = (int) (np - tu.pos);
-			if (len != np - tu.pos) { throw new AssertionError(); }
+		long pos = cp != null ? tu.pos + cp.length() : tu.pos;
+		long np = align(pos, bc);
+		if (np != pos) {
+			int len = (int) (np - pos);
+			if (len != np - pos) { throw new AssertionError(); }
 			if (cp == null) {
 				cp = new ConstantPoolCommand();
 				cp.addBytes(new byte[len]);
