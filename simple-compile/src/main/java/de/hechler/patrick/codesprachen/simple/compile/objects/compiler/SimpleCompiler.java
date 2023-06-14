@@ -26,7 +26,6 @@ import static de.hechler.patrick.codesprachen.primitive.core.utils.PrimAsmConsta
 
 import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
-import java.io.ByteArrayOutputStream;
 import java.io.IOError;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -132,9 +131,8 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 	public static final int MAX_TMP_VAL_REG       = 0xFF;
 	
 	public static final SimpleFuncType MAIN_TYPE   = new SimpleFuncType(
-			List.of(new SimpleOffsetVariable(SimpleType.NUM, "argc"),
-					new SimpleOffsetVariable(new SimpleTypePointer(new SimpleTypePointer(SimpleType.BYTE)), "argv")),
-			List.of(new SimpleOffsetVariable(SimpleType.NUM, "exitnum")));
+		List.of(new SimpleOffsetVariable(SimpleType.NUM, "argc"), new SimpleOffsetVariable(new SimpleTypePointer(new SimpleTypePointer(SimpleType.BYTE)), "argv")),
+		List.of(new SimpleOffsetVariable(SimpleType.NUM, "exitnum")));
 	private static final long          MAIN_LENGTH = 16L;
 	private static final long          JMP_LENGTH  = 8L;
 	
@@ -279,7 +277,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 		}
 		add(tu, new Command(Commands.CMD_RET, null, null));
 	}
-
+	
 	// only used to preassemble asm blocks
 	private static final PrimitiveAssembler PREASSEMBLER = new PrimitiveAssembler(null, null, null, false, true);
 	
@@ -688,8 +686,8 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 					// @F
 					Param   target    = build2(A_XX | B_NUM, MIN_TMP_VAL_REG, sov.offset());
 					Command setLow    = new Command(Commands.CMD_MOV, target, build2(A_NUM, -1L));                                                 // use XOR when
-					Command setEq     = (target.art & B_NUM) != 0 ? new Command(Commands.CMD_MOV, target, build2(A_NUM, 0L))
-							: new Command(Commands.CMD_XOR, target, target);
+					Command setEq     =
+						(target.art & B_NUM) != 0 ? new Command(Commands.CMD_MOV, target, build2(A_NUM, 0L)) : new Command(Commands.CMD_XOR, target, target);
 					Command setHigh   = new Command(Commands.CMD_MOV, target, build2(A_NUM, 0L));
 					Command afterHigh = new Command(Commands.CMD_JMP, build2(A_NUM, JMP_LENGTH + setLow.length()), null);
 					Command afterEq   = new Command(Commands.CMD_JMP, build2(A_NUM, (JMP_LENGTH * 2) + setHigh.length() + setLow.length()), null);
@@ -743,7 +741,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 	private static void checkFuncType(SimpleCommandFuncCall c, SimpleFunctionSymbol func) {
 		if (!func.type.equals(((SimpleTypePointer) c.function.type()).target)) {
 			throw new IllegalArgumentException(
-					"the function call argument needs to have the same type as the functions type! (arg-type: " + c.function.type() + " func: " + func.type + ")");
+				"the function call argument needs to have the same type as the functions type! (arg-type: " + c.function.type() + " func: " + func.type + ")");
 		}
 	}
 	
@@ -975,7 +973,7 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 	
 	private static void align(SimpleTU tu, int bc, ConstantPoolCommand cp) {
 		long pos = cp != null ? tu.pos + cp.length() : tu.pos;
-		long np = align(pos, bc);
+		long np  = align(pos, bc);
 		if (np != pos) {
 			int len = (int) (np - pos);
 			if (len != np - pos) { throw new AssertionError(); }
@@ -1237,31 +1235,39 @@ public class SimpleCompiler extends StepCompiler<SimpleCompiler.SimpleTU> {
 	}
 	
 	private static int alignment(SimpleType t) throws AssertionError {
-		return switch (t) {
-		case @SuppressWarnings("preview") SimpleFuncType sft -> {
-			int max = 0;
-			for (SimpleOffsetVariable sov : sft.arguments) {
-				int val = alignment(sov.type);
-				if (val > max) max = val;
+		while (true) {
+			switch (t) {
+			case @SuppressWarnings("preview") SimpleFuncType sft: {
+				int max = 0;
+				for (SimpleOffsetVariable sov : sft.arguments) {
+					int val = alignment(sov.type);
+					if (val > max) max = val;
+				}
+				for (SimpleOffsetVariable sov : sft.results) {
+					int val = alignment(sov.type);
+					if (val > max) max = val;
+				}
+				return max;
 			}
-			for (SimpleOffsetVariable sov : sft.results) {
-				int val = alignment(sov.type);
-				if (val > max) max = val;
+			case @SuppressWarnings("preview") SimpleStructType sst: {
+				int max = 0;
+				for (SimpleOffsetVariable sov : sst.members) {
+					int val = alignment(sov.type);
+					if (val > max) max = val;
+				}
+				return max;
 			}
-			yield max;
+			case @SuppressWarnings("preview") SimpleTypeArray sta:
+				t = sta.target;
+				continue;
+			case @SuppressWarnings("preview") SimpleTypePointer stp:
+				return 8;
+			case @SuppressWarnings("preview") SimpleTypePrimitive stp:
+				return (int) stp.byteCount();
+			default:
+				throw new AssertionError("unknown type: " + t.getClass().getName());
+			}
 		}
-		case @SuppressWarnings("preview") SimpleStructType sst -> {
-			int max = 0;
-			for (SimpleOffsetVariable sov : sst.members) {
-				int val = alignment(sov.type);
-				if (val > max) max = val;
-			}
-			yield max;
-		}
-		case @SuppressWarnings("preview") SimpleTypePointer stp -> 8;
-		case @SuppressWarnings("preview") SimpleTypePrimitive stp -> (int) stp.byteCount();
-		default -> throw new AssertionError("unknown type: " + t.getClass().getName());
-		};
 	}
 	
 	private class SimpleSourceDependency extends SimpleDependency {

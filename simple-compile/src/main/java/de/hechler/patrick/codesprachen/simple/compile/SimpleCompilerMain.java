@@ -22,7 +22,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
+import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
@@ -59,7 +61,27 @@ public class SimpleCompilerMain {
 	private static Folder    bin;
 	private static boolean   force;
 	
-	public static void main(String[] args) {
+	static final byte[] VAL = "#!/bin/pvm\n".getBytes();
+
+	public static void main(String[] args) throws NoSuchAlgorithmException {
+		long val0 = 0xFFL & VAL[0];
+		val0 |= (0xFFL & VAL[1]) << 8;
+		val0 |= (0xFFL & VAL[2]) << 16;
+		val0 |= (0xFFL & VAL[3]) << 24;
+		val0 |= (0xFFL & VAL[4]) << 32;
+		val0 |= (0xFFL & VAL[5]) << 40;
+		val0 |= (0xFFL & VAL[6]) << 48;
+		val0 |= (0xFFL & VAL[7]) << 56;
+		System.out.println(VAL.length);
+		System.out.println(Long.toHexString(val0));
+		SecureRandom rnd = SecureRandom.getInstanceStrong();
+		long val1 = 0xFFL & VAL[8];
+		val1 |= (0xFFL & VAL[9]) << 8;
+		val1 |= (0xFFL & VAL[10]) << 16;
+		val1 |= (0xFFFFL & rnd.nextInt()) << 24;
+		val1 |= (0xFFFFL & rnd.nextInt()) << 40;
+		val1 |= (0xFFL & rnd.nextInt()) << 56;
+		System.out.println(Long.toHexString(val1));
 		setup(args);
 		try {
 			if (force) {

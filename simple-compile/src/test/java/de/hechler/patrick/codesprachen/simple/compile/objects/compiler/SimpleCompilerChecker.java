@@ -16,12 +16,12 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 package de.hechler.patrick.codesprachen.simple.compile.objects.compiler;
 
+import static de.hechler.patrick.zeugs.check.Assert.assertArrayEquals;
 import static de.hechler.patrick.zeugs.check.Assert.assertEquals;
-import static de.hechler.patrick.zeugs.check.Assert.assertTrue;
 
 import java.io.IOError;
 import java.io.IOException;
-import java.io.InputStream;
+import java.lang.ProcessBuilder.Redirect;
 import java.lang.reflect.Method;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -30,9 +30,10 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermission;
 import java.security.NoSuchProviderException;
 import java.util.Arrays;
-import java.util.function.BooleanSupplier;
+import java.util.Set;
 
 import de.hechler.patrick.zeugs.check.anotations.Check;
 import de.hechler.patrick.zeugs.check.anotations.CheckClass;
@@ -44,6 +45,7 @@ import de.hechler.patrick.zeugs.pfs.FSProvider;
 import de.hechler.patrick.zeugs.pfs.interfaces.FS;
 import de.hechler.patrick.zeugs.pfs.interfaces.FSElement;
 import de.hechler.patrick.zeugs.pfs.interfaces.File;
+import de.hechler.patrick.zeugs.pfs.interfaces.Folder;
 import de.hechler.patrick.zeugs.pfs.misc.ElementType;
 import de.hechler.patrick.zeugs.pfs.opts.PatrFSOptions;
 import de.hechler.patrick.zeugs.pfs.opts.StreamOpenOptions;
@@ -51,6 +53,8 @@ import de.hechler.patrick.zeugs.pfs.opts.StreamOpenOptions;
 @CheckClass(disableSuper = true)
 @SuppressWarnings("javadoc")
 public class SimpleCompilerChecker {
+	
+	private static final boolean DELETE_STD_FILES = true;
 	
 	private FSProvider patrFsProv;
 	
@@ -89,11 +93,12 @@ public class SimpleCompilerChecker {
 	private static final String ADD2_PFS = "./testout/add2.pfs";
 	private static final String ADD2_RES = "/de/hechler/patrick/codesprachen/simple/compile/programs/add2.ssc";
 	
-	private static final String HW_PMF = "/hello-world";
-	private static final String HW_PFS = "./testout/hello-world.pfs";
-	private static final String HW_RES = "/de/hechler/patrick/codesprachen/simple/compile/programs/hello-world.ssc";
+	private static final String HW_PMF_PARENT_NAME = "bin";
+	private static final String HW_PMF             = "/bin/bin";
+	private static final String HW_PFS             = "./testout/hello-world.pfs";
+	private static final String HW_RES             = "/de/hechler/patrick/codesprachen/simple/compile/programs/hello-world.ssc";
 	
-	private static final String ECHO_PMF = "/echo";
+	private static final String ECHO_PMF = "/bin";
 	private static final String ECHO_PFS = "./testout/echo.pfs";
 	private static final String ECHO_RES = "/de/hechler/patrick/codesprachen/simple/compile/programs/echo.ssc";
 	
@@ -143,6 +148,9 @@ public class SimpleCompilerChecker {
 		try (FS fs = this.patrFsProv.loadFS(new PatrFSOptions(HW_PFS, true, 4096L, 1024))) {
 			System.err.println("opened fs, compile now");
 			SimpleCompiler compiler = new SimpleCompiler(StandardCharsets.UTF_8, Path.of(getClass().getResource(SRC_RES).toURI()), new Path[0]);
+			try (Folder root = fs.folder("/")) {
+				root.createFolder(HW_PMF_PARENT_NAME).close();
+			}
 			fs.stream(HW_PMF, new StreamOpenOptions(false, true, false, ElementType.FILE, true, true)).close();
 			File file = fs.file(HW_PMF);
 			file.flag(FSElement.FLAG_EXECUTABLE, 0);
@@ -152,8 +160,13 @@ public class SimpleCompilerChecker {
 				System.err.println("finished compile, close now fs file length: " + f.length());
 			}
 		}
+		Files.setPosixFilePermissions(Path.of(HW_PFS), Set.of(                                                        //
+			PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE, PosixFilePermission.OWNER_EXECUTE,       //
+			PosixFilePermission.GROUP_READ, PosixFilePermission.GROUP_WRITE, PosixFilePermission.GROUP_EXECUTE,       //
+			PosixFilePermission.OTHERS_READ, PosixFilePermission.OTHERS_WRITE, PosixFilePermission.OTHERS_EXECUTE     //
+		));
 		System.err.println("execute now the program");
-		execute(HW_PFS, HW_PMF, 0, EMPTY_BARR, "hello world\n".getBytes(StandardCharsets.UTF_8), EMPTY_BARR);
+		exec("hello-world-", 0, EMPTY_BARR, "hello world\n".getBytes(StandardCharsets.UTF_8), EMPTY_BARR, HW_PFS);
 	}
 	
 	@Check
@@ -170,134 +183,60 @@ public class SimpleCompilerChecker {
 				System.err.println("finished compile, close now fs file length: " + f.length());
 			}
 		}
+		Files.setPosixFilePermissions(Path.of(ECHO_PFS), Set.of(                                                      //
+			PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE, PosixFilePermission.OWNER_EXECUTE,       //
+			PosixFilePermission.GROUP_READ, PosixFilePermission.GROUP_WRITE, PosixFilePermission.GROUP_EXECUTE,       //
+			PosixFilePermission.OTHERS_READ, PosixFilePermission.OTHERS_WRITE, PosixFilePermission.OTHERS_EXECUTE     //
+		));
 		System.err.println("execute now the program");
-		execute(ECHO_PFS, ECHO_PMF, 0, EMPTY_BARR, "echo text\n".getBytes(StandardCharsets.UTF_8), EMPTY_BARR, "echo", "text");
-		execute(ECHO_PFS, ECHO_PMF, 0, EMPTY_BARR, "echo text\n".getBytes(StandardCharsets.UTF_8), EMPTY_BARR, "echo text");
-		execute(ECHO_PFS, ECHO_PMF, 0, EMPTY_BARR,
-				"this is a large echo text, containing many characters and arguments, which will/should be printed to stdout by the echo program\n"
-						.getBytes(StandardCharsets.UTF_8),
-				EMPTY_BARR, "this", "is", "a", "large", "echo", "text,", "containing", "many", "characters", "and", "arguments,", "which", "will/should", "be",
-				"printed", "to", "stdout", "by", "the", "echo", "program");
+		exec("echo-text-", 0, EMPTY_BARR, "echo text\n".getBytes(), EMPTY_BARR, ECHO_PFS, "echo", "text");
+		exec("echo-text-1arg-", 0, EMPTY_BARR, "echo text\n".getBytes(), EMPTY_BARR, "pvm", ECHO_PFS, "echo text");
+		exec("echo-long-text-", 0, EMPTY_BARR,
+			"this is a large echo text, containing many characters and arguments, which will/should be printed to stdout by the echo program\n"
+				.getBytes(StandardCharsets.UTF_8),
+			EMPTY_BARR, ECHO_PFS, ECHO_PFS, "this", "is", "a", "large", "echo", "text,", "containing", "many", "characters", "and", "arguments,", "which",
+			"will/should", "be", "printed", "to", "stdout", "by", "the", "echo", "program");
 	}
 	
 	protected void execute(String pfsFile, String pmfFile, int exitCode, byte[] stdin, byte[] stdout, byte[] stderr, String... programArgs)
-			throws IOException, InterruptedException {
-		Runtime  r    = Runtime.getRuntime();
+		throws IOException, InterruptedException {
 		String[] args = new String[] { "pvm", "--pfs=" + pfsFile, "--pmf=" + pmfFile };
 		if (programArgs.length != 0) {
 			int olen = args.length;
 			args = Arrays.copyOf(args, olen + programArgs.length);
 			System.arraycopy(programArgs, 0, args, olen, programArgs.length);
 		}
+		exec(pmfFile.substring(1) + '-', exitCode, stdin, stdout, stderr, args);
+	}
+	
+	private static void exec(String name, int exitCode, byte[] stdin, byte[] stdout, byte[] stderr, String... args)
+		throws IOException, CheckerException, InterruptedException {
 		System.err.println("args: " + Arrays.toString(args));
-		Process process = r.exec(args);
-		System.err.println("started process pid: " + process.pid() + "   " + process);
-		if (stdin.length > 0) { process.getOutputStream().write(stdin); }
-		TwoBools b1 = new TwoBools(), b2 = new TwoBools();
-		Thread   t  = Thread.ofVirtual().unstarted(() -> check(() -> process.isAlive(), process.getErrorStream(), stderr, b1));
-		t.setName("check stderr of " + pmfFile);
-		t.start();
-		t = Thread.ofVirtual().unstarted(() -> check(() -> process.isAlive(), process.getInputStream(), stdout, b2));
-		t.setName("check stdout of " + pmfFile);
-		t.start();
-		assertEquals(exitCode, process.waitFor());
-		checkResult(b1);
-		checkResult(b2);
-	}
-	
-	@SuppressWarnings("static-method")
-	protected void checkResult(TwoBools res) throws InterruptedException, CheckerException {
-		while (!res.finish) {
-			synchronized (res) {
-				if (res.finish) { break; }
-				res.wait();
-			}
-		}
-		assertTrue(res.result);
-	}
-	
-	@SuppressWarnings("static-method")
-	protected void check(BooleanSupplier cond, InputStream stream, byte[] value, TwoBools b) {
-		System.err.println(logStart() + "start");
+		Path sin  = Files.createTempFile(name, ".in");
+		Path sout = Files.createTempFile(name, ".out");
+		Path serr = Files.createTempFile(name, ".err");
 		try {
-			b.result = false;
-			byte[]  other = new byte[value.length];
-			for (int i = 0; i < value.length;) {
-				try {
-					int reat = stream.read(other, i, other.length - i);
-					if (reat == -1) {
-						if (!cond.getAsBoolean()) {
-							reat = stream.read(other, i, other.length - i);
-							if (reat != -1) {
-								i += reat;
-								continue;
-							}
-							throw new IOException("reached EOF too early (only reat '" + new String(other, 0, i) + "' but expected '" + new String(value)
-									+ "' (stream: '" + stream + "')");
-						}
-						sleep();
-						continue;
-					}
-					synchronized (System.err) {
-						System.err.print(logStart() + "little read: ");
-						System.err.write(other, i, reat);
-						System.err.println("\n" + logStart() + "    length: " + reat);
-					}
-					i += reat;
-				} catch (IOException e) {
-					throw new IOError(e);
-				}
-			}
-			if (other.length != 0) {
-				synchronized (System.err) {
-					System.err.print(logStart() + "read: ");
-					try {
-						System.err.write(other);
-					} catch (IOException e) {}
-					System.err.println();
-				}
-			}
-			b.result = Arrays.equals(value, other);
-			try {
-				while (stream.available() > 0 || cond.getAsBoolean()) {
-					if (stream.available() == 0) {
-						sleep();
-						continue;
-					}
-					b.result = false;
-					other    = new byte[stream.available()];
-					int r = stream.read(other, 0, other.length);
-					System.err.println(logStart() + "additioannly read: " + new String(other, 0, r));
-				}
-			} catch (IOException e) {
-				throw new IOError(e);
-			}
+			Files.write(sin, stdin);
+			ProcessBuilder builder = new ProcessBuilder(args);
+			builder.redirectInput(Redirect.from(sin.toFile()));
+			builder.redirectOutput(Redirect.to(sout.toFile()));
+			builder.redirectError(Redirect.to(serr.toFile()));
+			Process process = builder.start();
+			System.err.println("started process pid: " + process.pid() + "   " + process);
+			assertEquals(exitCode, process.waitFor());
+			assertArrayEquals(stdout, Files.readAllBytes(sout));
+			assertArrayEquals(stderr, Files.readAllBytes(serr));
 		} finally {
-			b.finish = true;
-			synchronized (b) {
-				b.notifyAll();
+			if (DELETE_STD_FILES) {
+				Files.delete(sin);
+				Files.delete(sout);
+				Files.delete(serr);
+			} else {
+				System.out.println(sin);
+				System.out.println(sout);
+				System.out.println(serr);
 			}
-			System.err.println(logStart() + "finish");
 		}
-	}
-	
-	private static void sleep() {
-		try {
-			Thread.sleep(0L);
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-		}
-	}
-	
-	private static String logStart() {
-		return "[" + Thread.currentThread().getName() + "]: ";
-	}
-	
-	private static final class TwoBools {
-		
-		volatile boolean finish;
-		volatile boolean result;
-		
 	}
 	
 }

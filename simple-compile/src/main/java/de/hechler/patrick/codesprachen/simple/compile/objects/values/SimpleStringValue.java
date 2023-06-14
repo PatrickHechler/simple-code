@@ -18,6 +18,7 @@ package de.hechler.patrick.codesprachen.simple.compile.objects.values;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.List;
 
 import de.hechler.patrick.codesprachen.simple.symbol.objects.types.SimpleType;
@@ -37,7 +38,7 @@ public class SimpleStringValue extends SimpleValueDataPointer {
 	}
 	
 	public SimpleStringValue(byte[] data) {
-		super(new SimpleTypeArray(SimpleType.UBYTE, data.length), data);
+		super(new SimpleTypeArray(SimpleType.UBYTE, data.length + 1L), Arrays.copyOf(data, data.length + 1));
 	}
 	
 	private static final byte[] data(List<String> strs) {
@@ -54,8 +55,8 @@ public class SimpleStringValue extends SimpleValueDataPointer {
 		for (String str : strs) {
 			byte[] cpy = str.getBytes(CHARSET);
 			if (cpy.length != str.length()) {
-				int grow = cpy.length - str.length();
-				byte[] nb = new byte[bytes.length + grow];
+				int    grow = cpy.length - str.length();
+				byte[] nb   = new byte[bytes.length + grow];
 				System.arraycopy(bytes, 0, nb, 0, off);
 				bytes = nb;
 			}
@@ -69,8 +70,8 @@ public class SimpleStringValue extends SimpleValueDataPointer {
 	
 	@Override
 	public String toString() {
-		return "\"" + new String(this.data, CHARSET).replace("\\", "\\\\").replace("\r", "\\r").replace("\n", "\\n")
-				.replace("\t", "\\t").replace("\0", "\\0") + "\"";
+		return "\"" + new String(this.data, CHARSET).replace("\\", "\\\\").replace("\r", "\\r").replace("\n", "\\n").replace("\t", "\\t").replace("\0", "\\0")
+			+ "\"";
 	}
 	
 }
