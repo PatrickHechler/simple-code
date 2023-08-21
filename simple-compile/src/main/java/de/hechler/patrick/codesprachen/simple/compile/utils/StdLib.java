@@ -258,7 +258,7 @@ public class StdLib {
 		res.put("strFromU32str", slf(63, "strFromU32str", of(sv(UWORD, 1, "u32str"), sv(CHAR, 1, "u8str"), sv(NUM, 0, "bufLen")), of(sv(UWORD, 1, "u32strUnconcStart"), sv(CHAR, 1, "u8strUnconvStart"), sv(NUM, 0, "remBufLen"), sv(NUM, 0, "remU8Len"))));
 		res.put("strFormat", slf(64, "strFormat", of(sv(CHAR, 1, "frmtStr"), sv(CHAR, 1, "outStr"), sv(NUM, 0, "bufLen"), sv(NUM, 1, "args")), of(sv(NUM, 0, "outLen"))));
 		res.put("loadFile", slf(65, "loadFile", of(sv(CHAR, 1, "file")), of(sv(UBYTE, 1, "data"), sv(NUM, 0, "len"))));
-		res.put("loadLib", slf(66, "loadLib", of(sv(CHAR, 1, "file")), of(sv(UBYTE, 1, "data"), sv(NUM, 0, "len"), sv(NUM, 0, "loaded"))));
+		res.put("loadLib", slf(66, "loadLib", of(sv(CHAR, 1, "file"), sv(NUM, 0, "initOff"), sv(NUM, 0, "initIsPntr")), of(sv(UBYTE, 1, "data"), sv(NUM, 0, "len"), sv(NUM, 0, "loaded"))));
 		res.put("unloadLib", slf(67, "unloadLib", of(sv(UBYTE, 1, "data")), of()));
 		return res;
 }
