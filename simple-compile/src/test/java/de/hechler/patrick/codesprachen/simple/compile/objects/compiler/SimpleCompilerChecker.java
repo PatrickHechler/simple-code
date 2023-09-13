@@ -113,7 +113,7 @@ public class SimpleCompilerChecker {
 			Path           p        = Path.of(uri);
 			Path[]         ps       = new Path[0];
 			SimpleCompiler compiler = new SimpleCompiler(cs, p, ps);
-			fs.stream(ADD_PMF, new StreamOpenOptions(false, true, false, ElementType.FILE, true, true)).close();
+			fs.stream(ADD_PMF, new StreamOpenOptions(false, true, false, ElementType.FILE, true, true, false)).close();
 			try (File file = fs.file(ADD_PMF)) {
 				file.flag(FSElement.FLAG_EXECUTABLE, 0);
 				compiler.addTranslationUnit(Path.of(cls.getResource(ADD_RES).toURI()), file);
@@ -132,7 +132,7 @@ public class SimpleCompilerChecker {
 		try (FS fs = this.patrFsProv.loadFS(new PatrFSOptions(ADD2_PFS, true, 4096L, 1024))) {
 			System.err.println("opened fs, compile now");
 			SimpleCompiler compiler = new SimpleCompiler(StandardCharsets.UTF_8, Path.of(getClass().getResource(SRC_RES).toURI()), new Path[0]);
-			fs.stream(ADD2_PMF, new StreamOpenOptions(false, true, false, ElementType.FILE, true, true)).close();
+			fs.stream(ADD2_PMF, new StreamOpenOptions(false, true, false, ElementType.FILE, true, true, false)).close();
 			File file = fs.file(ADD2_PMF);
 			file.flag(FSElement.FLAG_EXECUTABLE, 0);
 			compiler.addTranslationUnit(Path.of(getClass().getResource(ADD2_RES).toURI()), file);
@@ -151,7 +151,7 @@ public class SimpleCompilerChecker {
 			try (Folder root = fs.folder("/")) {
 				root.createFolder(HW_PMF_PARENT_NAME).close();
 			}
-			fs.stream(HW_PMF, new StreamOpenOptions(false, true, false, ElementType.FILE, true, true)).close();
+			fs.stream(HW_PMF, new StreamOpenOptions(false, true, false, ElementType.FILE, true, true, false)).close();
 			File file = fs.file(HW_PMF);
 			file.flag(FSElement.FLAG_EXECUTABLE, 0);
 			compiler.addTranslationUnit(Path.of(getClass().getResource(HW_RES).toURI()), file);
@@ -174,7 +174,7 @@ public class SimpleCompilerChecker {
 		try (FS fs = this.patrFsProv.loadFS(new PatrFSOptions(ECHO_PFS, true, 4096L, 1024))) {
 			System.err.println("opened fs, compile now");
 			SimpleCompiler compiler = new SimpleCompiler(StandardCharsets.UTF_8, Path.of(getClass().getResource(SRC_RES).toURI()), new Path[0]);
-			fs.stream(ECHO_PMF, new StreamOpenOptions(false, true, false, ElementType.FILE, true, true)).close();
+			fs.stream(ECHO_PMF, new StreamOpenOptions(false, true, false, ElementType.FILE, true, true, false)).close();
 			File file = fs.file(ECHO_PMF);
 			file.flag(FSElement.FLAG_EXECUTABLE, 0);
 			compiler.addTranslationUnit(Path.of(getClass().getResource(ECHO_RES).toURI()), file);
@@ -198,7 +198,7 @@ public class SimpleCompilerChecker {
 			"will/should", "be", "printed", "to", "stdout", "by", "the", "echo", "program");
 	}
 	
-	protected void execute(String pfsFile, String pmfFile, int exitCode, byte[] stdin, byte[] stdout, byte[] stderr, String... programArgs)
+	protected static void execute(String pfsFile, String pmfFile, int exitCode, byte[] stdin, byte[] stdout, byte[] stderr, String... programArgs)
 		throws IOException, InterruptedException {
 		String[] args = new String[] { "pvm", "--pfs=" + pfsFile, "--pmf=" + pmfFile };
 		if (programArgs.length != 0) {

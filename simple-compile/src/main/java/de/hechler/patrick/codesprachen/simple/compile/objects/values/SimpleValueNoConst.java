@@ -145,7 +145,7 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 				default -> throw new AssertionError(type.byteCount() + " : " + type);
 				};
 				if (((SimpleTypePrimitive) type).signed()) {
-					Command cmplCmd = new Command(Commands.CMD_CMPL, get(pos, to), build2(A_NUM, and));
+					Command cmplCmd = new Command(Commands.CMD_BCP, get(pos, to), build2(A_NUM, and));
 					Command jmpNBCmd;
 					Command orCmd   = new Command(Commands.CMD_OR, get(pos, to), build2(A_NUM, ~and));
 					Command jmpCmd;
@@ -293,7 +293,7 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 									case 4 -> 0x0000000080000000L;
 									default -> throw new AssertionError(mul);
 									};
-					Command cmp  = new Command(Commands.CMD_CMPL, target, build2(A_NUM, test));
+					Command cmp  = new Command(Commands.CMD_BCP, target, build2(A_NUM, test));
 					Command jmpNB;
 					Command or   = new Command(Commands.CMD_OR, target, build2(A_NUM, ~andVal));
 					Command jmp;
@@ -489,7 +489,7 @@ public abstract class SimpleValueNoConst implements SimpleValue {
 			Param myReg        = build2(A_XX, targetRegister);
 			if (newSigned) {
 				long    newTest = 1L << ((minByteCount << 3) - 1);
-				Command test    = new Command(Commands.CMD_CMPL, myReg, build2(A_NUM, newTest));
+				Command test    = new Command(Commands.CMD_BCP, myReg, build2(A_NUM, newTest));
 				pos += test.length();
 				commands.add(test);
 				Command jmpnb;
