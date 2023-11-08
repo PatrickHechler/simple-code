@@ -4,7 +4,7 @@ simple-code is a simple programming language.
 
 ## file
 
-`( dependency | variable | structure | function | constant )* EOF`
+`( [dependency] | [variable] | [typedef] | [function] )* EOF`
 * a simple-code file is a collection of dependencies, functions, variables and structures.
 
 ### dependency
@@ -28,7 +28,7 @@ simple-code is a simple programming language.
 
 ### function
 
-`func [FUNC_MARKS_AND_NAME] \( [NAMED_TYPE_LIST] \) ( --&gt; &lt; [NAMED_TYPE_LIST] &gt; )? [BLOCK]`
+`func [FUNC_MARKS_AND_NAME] [FUNC_TYPE] [BLOCK]`
 
 a function is a block of commands used to do something for example convert the argument parameters to result parameters
 * marks:
@@ -45,31 +45,24 @@ a function is a block of commands used to do something for example convert the a
 
 ### variable
 
-`var (exp)? [NAMED_TYPE] ( &lt;-- [VALUE] )? ;`
+`(const)? (exp)? [NAMED_TYPE] ( &lt;-- [VALUE] )? ;`
 
 a variable can be used by all functions if declared in a file    
-if declared in a code block it can be used by the commands in the block after the declaration
-if a non constant initial value is assigned and not declared in a code block the initilizing will be done at the start of the `init` function
-if a constant initial value is assigned and not declared in a code block the initilizing will be done at compile time
+if declared in a code block it can be used by the commands in the block after the declaration    
+if a non constant initial value is assigned and not declared in a code block the initilizing will be done at the start of the `init` function    
+if a constant initial value is assigned and not declared in a code block the initilizing will be done at compile time    
+if marked with `const` there must be a constant initial value    
 * marks:
+    * `const`: the variable can not be modified after initialisation
     * `exp`: the variable will be exported to the symbol file
 
-### constant
+### typedef
 
-`const (exp)? [NAME] &lt;-- [VALUE] ;`
-
-a constant is always of the type: signed 64-bit number (`num`)    
-a constant can be used like a value of type `num`
-* marks:
-    * `exp`: the constant will be exported to the symbol file
-
-### structure
-
-`struct [NAME] { [NAMED_TYPE_LIST] }`
+`typedef [TYPE] [NAME] ;`
 
 ### FUNC_MARKS_AND_NAME
 
-`exp ( main | init )? [NAME] | ( main | init ) [NAME]?`
+`(exp)? (main | init)? [NAME] | (main | init) [NAME]?`
 
 ### NAME
 
@@ -96,36 +89,51 @@ a constant can be used like a value of type `num`
     * `byte` : a 8-bit number
     * `ubyte` : an unsigned 8-bit number/character
     * `char` : same as `ubyte`
-    * `struct [NAME]` : a memory structure
+    * `struct { [NAMED_TYPE_LIST] }` : a memory structure
     * `[TYPE] #` : a pointer to a value of type
     * `[TYPE] \[ [VALUE]? \]` : an array of values of a type
     * `addr? [FUNC_TYPE]` : a function address
-    * `cstruct [FUNC_TYPE]` : a function call structure
+    * `fstuct ( [NAME] | [FUNC_TYPE0] )` : a function call structure
+
+
 
 ### FUNC_TYPE
 
-`( &lt; ( [NAMED_TYPE_LIST] | ... ) &gt; &lt;-- )? ( ( [NAMED_TYPE_LIST] | ... ) \)`
+`fstruct [NAME] | [FUNC_TYPE0]`
+
+### FUNC_TYPE0
+
+`[FUNC_TYPE_RESULTS] \( ( [NAMED_TYPE_LIST] ) \)`
+
+#### FUNC_TYPE_RESULTS
+
+`( ( [NAMED_TYPE] | &lt; ( [NAMED_TYPE_LIST] ) &gt; ) &lt;-- )?`
 
 ### COMMAND
 
 * BLOCK
     * `{ ( [COMMAND] )* }`
 * VAR_DECL
-    * `var [TYPE] [NAME] ( &lt;-- [VALUE] )? ;`
+    * `[variable]`
 * ASSIGN
     * `[POSTFIX_EXP] &lt;-- [VALUE] ;`
 * FUNC_CALL
-    * `call [NAME] ( : [NAME] )? [POSTFIX_EXP] ;`
+    * `call [VALUE] [VALUE] ;`
+    * `[POSTFIX_EXP] [FUNC_CALL_RESULT] [FUNC_CALL_ARGS] ;`
+        * FUNC_CALL_RESULT
+            * `( ( [POSTFIX_EXP] | &lt; ( [POSTFIX_EXP] ( , [POSTFIX_EXP] )* )? &gt; ) &lt;-- )?`
+        * FUNC_CALL_ARGS
+            * `\( ([VALUE] ( , [VALUE] )* )? \)`
 * WHILE
     * `while \( [VALUE] \) [COMMAND]`
 * IF
     * `if \( [VALUE] \) [COMMAND] ( else [COMMAND] )?`
 * ASSEMBLER
     * `asm ( [XNN] &lt;-- [VALUE] )* [PRIM_CODE_BLOCK] ( [VALUE] &lt;-- [XNN] )* ;`
-    * XNN
-        * `X[0-9A-E][0-9A-F] | XF[0-9]`
-    * PRIM_CODE_BLOCK
-        * `:: ( [^&gt;"'\|] | &gt; [^&gt;] | " ( [^"\\] | \\ . )* " | ' ( [^'\\] | \\ . )* ' | \| ( [^&gt;:] | &gt; [^\r\n]* [\r\n] | : ( [^|] | \| [^&gt;] )* \|&gt; ) )* &gt;&gt;`
+        * XNN
+            * `X[0-9A-E][0-9A-F] | XF[0-9]`
+        * PRIM_CODE_BLOCK
+            * `:: ( [^&gt;"'\|] | &gt; [^&gt;] | " ( [^"\\] | \\ . )* " | ' ( [^'\\] | \\ . )* ' | \| ( [^&gt;:] | &gt; [^\r\n]* [\r\n] | : ( [^|] | \| [^&gt;] )* \|&gt; ) )* &gt;&gt;`
 
 ### VALUE
 
