@@ -2,7 +2,6 @@ package de.hechler.patrick.codesprachen.simple.compile.error;
 
 import java.util.List;
 
-@SuppressWarnings("javadoc")
 public class CompileError extends Exception {
 	
 	private static final long serialVersionUID = 624098131567818737L;
@@ -11,13 +10,14 @@ public class CompileError extends Exception {
 	public final int          charInLine;
 	public final int          totalChar;
 	public final String       offendingToken;
-	public final List<String> expectedTokens;
+	public final List<String> expectedTokens;// NOSONAR the list is serializable
 	
 	public CompileError(int line, int charInLine, int totalChar, String offendingToken, List<String> expectedTokens) {
 		this(line, charInLine, totalChar, offendingToken, expectedTokens, null);
 	}
 	
-	public CompileError(int line, int charInLine, int totalChar, String offendingToken, List<String> expectedTokens, String additionalMessage) {
+	public CompileError(int line, int charInLine, int totalChar, String offendingToken, List<String> expectedTokens,
+		String additionalMessage) {
 		super(generateMessage(line, charInLine, totalChar, offendingToken, expectedTokens, additionalMessage));
 		this.line           = line;
 		this.charInLine     = charInLine;
@@ -38,7 +38,7 @@ public class CompileError extends Exception {
 		if ( totalChar != -1 ) {
 			b.append(" at total char ").append(totalChar);
 		}
-		if (additionalMessage != null) {
+		if ( additionalMessage != null ) {
 			b.append(": ").append(additionalMessage);
 		}
 		if ( offendingToken != null ) {

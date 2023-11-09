@@ -1,14 +1,12 @@
 package de.hechler.patrick.codesprachen.simple.compile.objects.types;
 
 import java.util.List;
-import java.util.Objects;
 
 import de.hechler.patrick.codesprachen.simple.compile.objects.simplefile.SimpleVariable;
 
-public record StructType(String name, List<SimpleVariable> members) implements SimpleType {
+public record StructType(List<SimpleVariable> members) implements SimpleType {
 	
-	public StructType(String name, List<SimpleVariable> members) {
-		this.name    = Objects.requireNonNull(name, "name");
+	public StructType(List<SimpleVariable> members) {
 		this.members = List.copyOf(members);
 	}
 	
@@ -41,7 +39,7 @@ public record StructType(String name, List<SimpleVariable> members) implements S
 	
 	@Override
 	public String toString() {
-		return this.members.stream().reduce(new StringBuilder().append("struct ").append(this.name).append(" {\n"),
+		return this.members.stream().reduce(new StringBuilder().append("struct ").append(" {\n"),
 			(a, b) -> a.append("  ").append(b).append(";\n"), (a, b) -> a.append(b)).append("}").toString();
 	}
 	

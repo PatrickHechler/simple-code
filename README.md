@@ -13,18 +13,19 @@ simple-code is a simple programming language.
 * the first STRING is the path relative from a included source directory
 * the second optional STRING is the path of the binary used at runtime
     * if not set it will be the extracted from the first STRING
-        * if the first STRING ends with `.sf`, `.sexp` the end will be discarded
+        * if the first STRING ends with `.ssf`, `.sexp` the end will be discarded
         * otherwise it will be the first STRING
 * file type:
-    * the DEPENDENCY is treated as simple-source-code-file when it ends with `.sf`
+    * the DEPENDENCY is treated as simple-source-code-file when it ends with `.ssf`
         * note that if the dependnecy is a source file it is not allowed to be under a lockup directory
         * a source dependency needs to be currently compiled
         * note that a source code dependency is not allowed to have a runtime path set
     * the DEPENDENCY is treated as simple-export-file when it ends with `.sexp`
-    * if the DEPENDENCY ends with `.*` the compiler will use the simple-source-code-file with a `.sf` ending if it compiles currently the targeted source file
+    * if the DEPENDENCY ends with `.*` the compiler will use the simple-source-code-file with a `.ssf` ending if it compiles currently the targeted source file
+        * note that if no `.ssf` could be fond the compiler can not compile it and thus the `.sexp` file is used
     * if the DEPENDENCY ends with `.*` the compiler will use the simple-export-file with a `.sexp` ending if it currently does not compile the targeted source file
     * otherwise the DEPENDENCY is treated as simple-export-file
-* to use a import from a dependency use `dependency_name` `:` `import_name`
+* to use a exprted symbol from a dependency use `dependency_name` `:` `import_name`
 
 ### function
 
@@ -33,15 +34,22 @@ simple-code is a simple programming language.
 a function is a block of commands used to do something for example convert the argument parameters to result parameters
 * marks:
     * `exp`: the function will be exported to the symbol file
+    * `init`: this function will be the initialisation function called when the file is loaded
+        * note that the `init` function will be executed even before the `main` function (if the `main` gets executed)
+        * note that if a global variable has an initilizer the compiler may generate an implicit `init` function
+        * the `init` function has to have specific structure:
+            * `( ) --&gt; &lt; &gt;`
     * `main`: the file will be made executable and this function will be the main function.
         * the `main` function has to have specific structure:
             * `( num , char## ) --&gt; &lt; ubyte &gt;`
-            * argument params:
+            * argument values:
                 1. `num` argc: this will be set to the number of arguments passed to the program
                 2. `char##` argv: this will point the arguments passed to the program
                     * the first argument will be the program itself
-            * return param:
+            * return value:
                 1. `ubyte` exitnum: the return number of the main function will be the exit number of the process
+* note that only one function can be marked with `init`/`main`
+* note that if a function is marked with `main` or `init` and has no name the function can not be called by any user generated program code
 
 ### variable
 
@@ -55,10 +63,11 @@ if marked with `const` there must be a constant initial value
 * marks:
     * `const`: the variable can not be modified after initialisation
     * `exp`: the variable will be exported to the symbol file
+        * only variables declared in a file and **not** in a code block can be marked with `exp`
 
 ### typedef
 
-`typedef [TYPE] [NAME] ;`
+`(exp)? typedef [TYPE] [NAME] ;`
 
 ### FUNC_MARKS_AND_NAME
 
@@ -95,8 +104,6 @@ if marked with `const` there must be a constant initial value
     * `addr? [FUNC_TYPE]` : a function address
     * `fstuct ( [NAME] | [FUNC_TYPE0] )` : a function call structure
 
-
-
 ### FUNC_TYPE
 
 `fstruct [NAME] | [FUNC_TYPE0]`
@@ -129,11 +136,9 @@ if marked with `const` there must be a constant initial value
 * IF
     * `if \( [VALUE] \) [COMMAND] ( else [COMMAND] )?`
 * ASSEMBLER
-    * `asm ( [XNN] &lt;-- [VALUE] )* [PRIM_CODE_BLOCK] ( [VALUE] &lt;-- [XNN] )* ;`
-        * XNN
-            * `X[0-9A-E][0-9A-F] | XF[0-9]`
-        * PRIM_CODE_BLOCK
-            * `:: ( [^&gt;"'\|] | &gt; [^&gt;] | " ( [^"\\] | \\ . )* " | ' ( [^'\\] | \\ . )* ' | \| ( [^&gt;:] | &gt; [^\r\n]* [\r\n] | : ( [^|] | \| [^&gt;] )* \|&gt; ) )* &gt;&gt;`
+    * `asm ( [STRING] &lt;-- [VALUE] )* [ASM_BLOCK] ( [VALUE] &lt;-- [STRING] )* ;`
+        * ASM_BLOCK
+            * `::: ( [^&gt;] | &gt; [^&gt;] | &gt;&gt; [^&gt;] )* &gt;&gt;&gt;`
 
 ### VALUE
 
