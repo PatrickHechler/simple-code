@@ -11,7 +11,7 @@ public class UnaryOpVal {
 	private static final SimpleValue MINUS_ONE = NumericVal.create(NativeType.BYTE, -1L, ErrorContext.NO_CONTEXT);
 	private static final SimpleValue ONE       = NumericVal.create(NativeType.UBYTE, 1L, ErrorContext.NO_CONTEXT);
 	private static final SimpleValue ZERO      = NumericVal.create(NativeType.UBYTE, 0L, ErrorContext.NO_CONTEXT);
-	private static final SimpleValue ZERO_8B   = NumericVal.create(NativeType.UNUM, 0L , ErrorContext.NO_CONTEXT);
+	private static final SimpleValue ZERO_8B   = NumericVal.create(NativeType.UNUM, 0L, ErrorContext.NO_CONTEXT);
 	
 	public SimpleValue create(UnaryOp op, SimpleValue a, ErrorContext ctx) {
 		switch ( op ) {
@@ -19,8 +19,8 @@ public class UnaryOpVal {
 			return BinaryOpVal.create(a, BinaryOp.MATH_MUL, MINUS_ONE, ctx);
 		case PLUS:
 			return BinaryOpVal.create(a, BinaryOp.MATH_MUL, ONE, ctx);
-		case ADDRESSOF:
-			break;
+		case ADDRESS_OF:
+			return AddressOfVal.create(a, ctx);
 		case BIT_NOT:
 			return BinaryOpVal.create(a, BinaryOp.BIT_XOR, MINUS_ONE, ctx);
 		case BOOL_NOT:
@@ -28,13 +28,15 @@ public class UnaryOpVal {
 				return BinaryOpVal.create(a, BinaryOp.CMP_NEQ, ZERO_8B, ctx);
 			}
 			return BinaryOpVal.create(a, BinaryOp.CMP_NEQ, ZERO, ctx);
+		case DEREF_PNTR:
+			return BinaryOpVal.create(a, BinaryOp.ARR_PNTR_INDEX, ZERO, ctx);
 		default:
 			throw new AssertionError("unknown Unary Operator: " + op.name());
 		}
 	}
 	
 	public enum UnaryOp {
-		PLUS, MINUS, ADDRESSOF, BIT_NOT, BOOL_NOT
+		PLUS, MINUS, ADDRESS_OF, BIT_NOT, BOOL_NOT, DEREF_PNTR,
 	}
 	
 }

@@ -11,10 +11,14 @@ public record PointerType(SimpleType target) implements SimpleType {
 	/**
 	 * a {@link PointerType} which points to a {@link StructType#FLAG_NOUSE non usable} structure
 	 */
-	public static final PointerType POINTER = new PointerType(new StructType(List.of(), StructType.FLAG_NOUSE));
+	public static final PointerType POINTER = create(StructType.create(List.of(), StructType.FLAG_NOUSE, ErrorContext.NO_CONTEXT), ErrorContext.NO_CONTEXT);
 	
 	public PointerType {
 		Objects.requireNonNull(target, "target");
+	}
+	
+	public static PointerType create(SimpleType target, @SuppressWarnings("unused") ErrorContext ctx) {
+		return new PointerType(target);
 	}
 	
 	@Override

@@ -1,6 +1,8 @@
 package de.hechler.patrick.codesprachen.simple.compile.objects.simplefile;
 
-public abstract class SimpleDependency {
+import de.hechler.patrick.codesprachen.simple.compile.objects.simplefile.scope.SimpleScope;
+
+public abstract class SimpleDependency implements SimpleScope {
 	
 	public final String binaryTarget;
 	

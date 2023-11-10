@@ -112,7 +112,10 @@ if marked with `const` there must be a constant initial value
 
 ### FUNC_TYPE0
 
-`[FUNC_TYPE_RESULTS] \( ( [NAMED_TYPE_LIST] ) \)`
+`(nopad)? [FUNC_TYPE_RESULTS] \( ( [NAMED_TYPE_LIST] ) \)`
+
+* marks:
+    * `nopad`: do not use padding
 
 #### FUNC_TYPE_RESULTS
 
@@ -173,13 +176,12 @@ if marked with `const` there must be a constant initial value
 * UNARY_EXP
     * `( \+ | - | & | ~ | ! )? [POSTFIX_EXP]`
 * POSTFIX_EXP
-    * `[DIRECT_EXP] ( # | \[ [VALUE] \] )*`
+    * `[DIRECT_EXP] ( # | \[ [VALUE] \] | : [NAME] )*`
 * DIRECT_EXP
     * `[STRING]+`
     * `[CHARACTER]`
     * `[NUM]`
     * `[FPNUM]`
-    * `[NAME] ( : [NAME] )*`
     * `\( [VALUE] \)`
 * STRING
     * `"([^"\\\r\n\0]|\\(["rnt0\\]|u[0-9A-Fa-f]{4}))*"`

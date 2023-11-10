@@ -20,11 +20,11 @@ public record DataVal(byte[] value, SimpleType type, ErrorContext ctx) implement
 		}
 		sb.append('\0');
 		byte[] val = sb.toString().getBytes(StandardCharsets.UTF_8);
-		return new DataVal(val, stringType(val), ctx);
+		return new DataVal(val, stringType(val, ctx), ctx);
 	}
 	
 	public static SimpleValue create(List<SimpleValue> value, ErrorContext ctx) {
-		if (value.isEmpty()) return new DataVal(new byte[0], new ArrayType(new StructType(List.of(), StructType.FLAG_NOUSE), 0), ctx);
+		if (value.isEmpty()) return new DataVal(new byte[0], ArrayType.create(StructType.create(List.of(), StructType.FLAG_NOUSE, ctx), 0, ctx), ctx);
 		SimpleValue val = value.get(0);
 		SimpleType t = val.type();
 		long len = t.size() * value.size();
@@ -33,8 +33,8 @@ public record DataVal(byte[] value, SimpleType type, ErrorContext ctx) implement
 		return new DataVal(data, new ArrayType(t, value.size()), ctx);
 	}
 	
-	private static SimpleType stringType(byte[] data) {
-		return new ArrayType(NativeType.UBYTE, data.length);
+	private static SimpleType stringType(byte[] data, ErrorContext ctx) {
+		return ArrayType.create(NativeType.UBYTE, data.length, ctx);
 	}
 	
 	@Override

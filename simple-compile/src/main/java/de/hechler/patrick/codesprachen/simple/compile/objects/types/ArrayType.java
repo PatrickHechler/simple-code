@@ -14,6 +14,10 @@ public record ArrayType(SimpleType target, long length) implements SimpleType {
 		}
 	}
 	
+	public static ArrayType create(SimpleType target, long length, @SuppressWarnings("unused") ErrorContext ctx) {
+		return new ArrayType(target, length);
+	}
+	
 	@Override
 	public long size() {
 		if ( this.length <= 0L ) {

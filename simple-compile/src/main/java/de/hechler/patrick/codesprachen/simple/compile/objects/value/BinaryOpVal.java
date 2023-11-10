@@ -1,9 +1,12 @@
 package de.hechler.patrick.codesprachen.simple.compile.objects.value;
 
 import de.hechler.patrick.codesprachen.simple.compile.error.ErrorContext;
+import de.hechler.patrick.codesprachen.simple.compile.objects.types.ArrayType;
+import de.hechler.patrick.codesprachen.simple.compile.objects.types.FuncType;
 import de.hechler.patrick.codesprachen.simple.compile.objects.types.NativeType;
 import de.hechler.patrick.codesprachen.simple.compile.objects.types.PointerType;
 import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleType;
+import de.hechler.patrick.codesprachen.simple.compile.objects.types.StructType;
 
 public record BinaryOpVal(SimpleValue a, BinaryOp op, SimpleValue b, ErrorContext ctx) implements SimpleValue {
 	
@@ -23,7 +26,7 @@ public record BinaryOpVal(SimpleValue a, BinaryOp op, SimpleValue b, ErrorContex
 		}
 		case CMP -> {
 			SimpleType t = a.type().commonType(b.type(), ctx);
-				checkNumeric(t, ctx);
+			checkNumeric(t, ctx);
 			a = CastVal.create(a, t, ctx);
 			b = CastVal.create(b, t, ctx);
 		}
@@ -47,9 +50,35 @@ public record BinaryOpVal(SimpleValue a, BinaryOp op, SimpleValue b, ErrorContex
 			checkNoPntrScalarNumeric(a.type(), ctx);
 			checkNoPntrScalarNumeric(b.type(), ctx);
 		}
+		case ARR_PNTR_INDEX -> {
+			checkArrPntr(a.type(), ctx);
+			checkNoPntrScalarNumeric(b.type(), ctx);
+		}
+		case DEREF_BY_NAME -> {
+			String name = ( (NameVal) b ).name();
+			if ( a instanceof DependencyVal dv ) {
+				return dv.dep().nameValue(name, ctx);
+			} else if ( a.type() instanceof StructType st ) {
+				st.checkHasMember(name, ctx);
+			} else if ( a.type() instanceof FuncType ft ) {
+				ft.checkHasMember(name, ctx);
+			} else {
+				SimpleType.castErrImplicit(a.type(), "something where I can dereference with a name", ctx);
+			}
+		}
 		default -> throw new AssertionError("illegal BinaryOperator type: " + op.type.name());
 		}
 		return new BinaryOpVal(a, op, b, ctx);
+	}
+	
+	private static void checkArrPntr(SimpleType t, ErrorContext ctx) {
+		if ( t instanceof PointerType ) {
+			return;
+		}
+		if ( t instanceof ArrayType ) {
+			return;
+		}
+		SimpleType.castErrImplicit(t, "a pointer type", ctx);
 	}
 	
 	private static void checkNumeric(SimpleType t, ErrorContext ctx) {
@@ -87,12 +116,22 @@ public record BinaryOpVal(SimpleValue a, BinaryOp op, SimpleValue b, ErrorContex
 	
 	@Override
 	public SimpleType type() {
-		if (this.op.type == BinaryOpType.CMP) return NativeType.UBYTE;
+		if ( this.op.type == BinaryOpType.CMP ) return NativeType.UBYTE;
+		if ( this.op.type == BinaryOpType.ARR_PNTR_INDEX ) {
+			if ( this.a.type() instanceof PointerType pt ) {
+				return pt.target();
+			}
+			if ( this.a.type() instanceof ArrayType at ) {
+				return at.target();
+			}
+			throw new AssertionError(
+				"binary operator array/pointer index, but the first operants type is no array/pointer: " + this);
+		}
 		return this.a.type();
 	}
 	
 	public enum BinaryOpType {
-		BOOL, BIT, CMP, MATH_ADDSUB, MATH, SHIFT,
+		BOOL, BIT, CMP, MATH_ADDSUB, MATH, SHIFT, ARR_PNTR_INDEX, DEREF_BY_NAME,
 	}
 	
 	public enum BinaryOp {//@formatter:off
@@ -115,6 +154,8 @@ public record BinaryOpVal(SimpleValue a, BinaryOp op, SimpleValue b, ErrorContex
 		MATH_MUL(BinaryOpType.MATH),
 		MATH_DIV(BinaryOpType.MATH),
 		MATH_MOD(BinaryOpType.MATH),
+		ARR_PNTR_INDEX(BinaryOpType.ARR_PNTR_INDEX),
+		DEREF_BY_NAME(BinaryOpType.DEREF_BY_NAME),
 		;//@formatter:on
 		
 		public final BinaryOpType type;

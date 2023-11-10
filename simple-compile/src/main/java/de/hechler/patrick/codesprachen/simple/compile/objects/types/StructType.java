@@ -15,23 +15,39 @@ public record StructType(List<SimpleVariable> members, int flags) implements Sim
 	public static final int FLAG_NOUSE = 0x0020;
 	public static final int ALL_FLAGS = FLAG_NOPAD | FLAG_NOUSE;
 	
-	public StructType(List<SimpleVariable> members, int flags) {
-		this.members = List.copyOf(members);
-		this.flags   = flags & ALL_FLAGS;
-		if ( this.flags != flags ) {
+	public static StructType create(List<SimpleVariable> members, int flags, ErrorContext ctx) {
+		members = List.copyOf(members);
+		if ( ( flags & ALL_FLAGS ) != flags ) {
 			throw new IllegalArgumentException("illegal flags value: " + Integer.toHexString(flags));
+		}
+		for (int i = 0, s = members.size(); i < s; i++) {
+			String name = members.get(i).name();
+			checkDupName(members, i + 1, name, ctx);
+		}
+		return new StructType(members, flags);
+	}
+	
+	static void checkDupName(List<SimpleVariable> members, int i, String name, ErrorContext ctx) {
+		for (int ci = i, s = members.size(); ci < s; ci++) {
+			if ( name.equals(members.get(ci).name()) ) {
+				throw new CompileError(ctx, "duplicate name: " + name);
+			}
 		}
 	}
 	
 	@Override
 	public long size() {
-		if ( this.members.isEmpty() ) return 0L;
-		long mySize     = this.members.get(0).type().size();
-		int  totalAlign = this.members.get(0).type().align();
-		for (int i = 1, s = this.members.size(); i < s; i++) {
-			SimpleType t     = this.members.get(i).type();
+		return size(this.members, this.flags);
+	}
+	
+	static long size(List<SimpleVariable> members, int flags) {
+		if ( members.isEmpty() ) return 0L;
+		long mySize     = members.get(0).type().size();
+		int  totalAlign = members.get(0).type().align();
+		for (int i = 1, s = members.size(); i < s; i++) {
+			SimpleType t     = members.get(i).type();
 			long       tsize = t.size();
-			if ( ( this.flags & FLAG_NOPAD ) == 0 ) {
+			if ( ( flags & FLAG_NOPAD ) == 0 ) {
 				int talign = t.align();
 				if ( talign > totalAlign ) {
 					totalAlign = talign;
@@ -48,8 +64,19 @@ public record StructType(List<SimpleVariable> members, int flags) implements Sim
 	
 	@Override
 	public int align() {
-		if ( this.members.isEmpty() || ( this.flags & FLAG_NOPAD ) != 0 ) return 1;
-		return this.members.stream().mapToInt(a -> a.type().align()).max().orElse(0);
+		return align(this.members, this.flags);
+	}
+	
+	static int align(List<SimpleVariable> members, int flags) {
+		if ( members.isEmpty() || ( flags & FLAG_NOPAD ) != 0 ) return 1;
+		int align = 0;
+		for (SimpleVariable sv : members) {
+			int sva = sv.type().align();
+			if ( sva > align ) {
+				align = sva;
+			}
+		}
+		return align;
 	}
 	
 	@Override
@@ -102,14 +129,17 @@ public record StructType(List<SimpleVariable> members, int flags) implements Sim
 	
 	@Override
 	public int hashCode() {
-		final int            prime  = 31;
-		int                  result = 1;
-		List<SimpleVariable> m      = this.members;
+		final int prime  = 31;
+		int       result = 1;
 		result = prime * result + this.flags;
+		return hashCode(result, this.members);
+	}
+	
+	static int hashCode(int result, List<SimpleVariable> m) {
+		final int prime = 31;
 		for (int i = 0, s = m.size(); i < s; i++) {
 			result = prime * result + m.get(i).type().hashCode();
 		}
-		result = prime * result + m.hashCode();
 		return result;
 	}
 	
@@ -120,9 +150,11 @@ public record StructType(List<SimpleVariable> members, int flags) implements Sim
 		if ( getClass() != obj.getClass() ) return false;
 		StructType other = (StructType) obj;
 		if ( this.flags != other.flags ) return false;
-		List<SimpleVariable> mm = this.members;
-		List<SimpleVariable> om = other.members;
-		int                  s  = mm.size();
+		return equals(this.members, other.members);
+	}
+	
+	static boolean equals(List<SimpleVariable> mm, List<SimpleVariable> om) {
+		int s = mm.size();
 		if ( s != om.size() ) return false;
 		for (int i = s; --i >= 0;) {
 			if ( mm.get(i).type().equals(om.get(i).type()) ) {
@@ -130,6 +162,16 @@ public record StructType(List<SimpleVariable> members, int flags) implements Sim
 			}
 		}
 		return true;
+	}
+	
+	public void checkHasMember(String name, ErrorContext ctx) {
+		for (SimpleVariable sv : this.members) {
+			if ( name.equals(sv.name()) ) {
+				return;
+			}
+		}
+		throw new CompileError(ctx,
+			"the structure has no member with the given name! name: " + name + " " + toStringSingleLine());
 	}
 	
 }
