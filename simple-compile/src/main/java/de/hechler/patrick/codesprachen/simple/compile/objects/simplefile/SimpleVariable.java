@@ -19,8 +19,16 @@ public record SimpleVariable(SimpleType type, String name, int flags) {
 		}
 	}
 	
-	public SimpleVariable(SimpleType type, String name) {
-		this(type, name, 0);
+	@Override
+	public String toString() {
+		StringBuilder sb = new StringBuilder();
+		if ( ( this.flags & FLAG_CONSTANT ) != 0 ) {
+			sb.append("const ");
+		}
+		if ( ( this.flags & FLAG_EXPORT ) != 0 ) {
+			sb.append("exp ");
+		}
+		return sb.append(this.type).append(' ').append(this.name).append(';').toString();
 	}
 	
 }

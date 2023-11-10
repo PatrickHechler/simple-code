@@ -98,7 +98,9 @@ if marked with `const` there must be a constant initial value
     * `byte` : a 8-bit number
     * `ubyte` : an unsigned 8-bit number/character
     * `char` : same as `ubyte`
-    * `struct { [NAMED_TYPE_LIST] }` : a memory structure
+    * `struct (nopad)? { [NAMED_TYPE_LIST] }` : a memory structure
+        * marks:
+            * `nopad`: do not use padding
     * `[TYPE] #` : a pointer to a value of type
     * `[TYPE] \[ [VALUE]? \]` : an array of values of a type
     * `addr? [FUNC_TYPE]` : a function address

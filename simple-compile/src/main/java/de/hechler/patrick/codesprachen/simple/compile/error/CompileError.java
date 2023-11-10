@@ -2,7 +2,7 @@ package de.hechler.patrick.codesprachen.simple.compile.error;
 
 import java.util.List;
 
-public class CompileError extends Exception {
+public class CompileError extends RuntimeException {
 	
 	private static final long serialVersionUID = 624098131567818737L;
 	
@@ -12,8 +12,16 @@ public class CompileError extends Exception {
 	public final String       offendingToken;
 	public final List<String> expectedTokens;// NOSONAR the list is serializable
 	
-	public CompileError(int line, int charInLine, int totalChar, String offendingToken, List<String> expectedTokens) {
-		this(line, charInLine, totalChar, offendingToken, expectedTokens, null);
+	public CompileError(ErrorContext ctx, List<String> expectedTokens) {
+		this(ctx.line, ctx.charInLine, ctx.totalChar, ctx.offendingToken(), expectedTokens, null);
+	}
+	
+	public CompileError(ErrorContext ctx, String additionalMsg) {
+		this(ctx.line, ctx.charInLine, ctx.totalChar, ctx.offendingToken(), null, additionalMsg);
+	}
+	
+	public CompileError(ErrorContext ctx, List<String> expectedTokens, String additionalMsg) {
+		this(ctx.line, ctx.charInLine, ctx.totalChar, ctx.offendingToken(), expectedTokens, additionalMsg);
 	}
 	
 	public CompileError(int line, int charInLine, int totalChar, String offendingToken, List<String> expectedTokens,
