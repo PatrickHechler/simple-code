@@ -5,7 +5,6 @@ import java.util.Map;
 
 import de.hechler.patrick.codesprachen.simple.compile.error.CompileError;
 import de.hechler.patrick.codesprachen.simple.compile.error.ErrorContext;
-import de.hechler.patrick.codesprachen.simple.compile.objects.simplefile.scope.SimpleScope;
 import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleType;
 import de.hechler.patrick.codesprachen.simple.compile.objects.value.DependencyVal;
 import de.hechler.patrick.codesprachen.simple.compile.objects.value.FunctionVal;
