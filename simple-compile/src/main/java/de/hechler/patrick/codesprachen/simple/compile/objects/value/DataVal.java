@@ -80,7 +80,9 @@ public record DataVal(byte[] value, SimpleType type, ErrorContext ctx) implement
 			} else {
 				first = false;
 			}
-			b.append(Integer.toHexString(0xFF & valb));
+			String str = Integer.toHexString(0xFF & valb);
+			if (str.length() == 1) b.append('0');
+			b.append(str);
 		}
 		b.append(", type=");
 		b.append(this.type);
