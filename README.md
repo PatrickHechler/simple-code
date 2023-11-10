@@ -87,22 +87,23 @@ if marked with `const` there must be a constant initial value
 ### TYPE
 
 * types:
-    * `num` : a 64-bit number
+    * `num` : a signed 64-bit number
     * `unum` : an unsigned 64-bit number
     * `fpnum` : a 64-bit floating point number
     * `fpdword` : a 32-bit floating point number
-    * `dword` : a 32-bit number
+    * `dword` : a signed 32-bit number
     * `udword` : an unsigned 32-bit number
-    * `word` : a 16-bit number
+    * `word` : a signed 16-bit number
     * `uword` : an unsigned 16-bit number
-    * `byte` : a 8-bit number
+    * `byte` : a signed 8-bit number
     * `ubyte` : an unsigned 8-bit number/character
-    * `char` : same as `ubyte`
+    * `char` : implicit `typedef ubyte char;`
     * `struct (nopad)? { [NAMED_TYPE_LIST] }` : a memory structure
         * marks:
             * `nopad`: do not use padding
-    * `[TYPE] #` : a pointer to a value of type
-    * `[TYPE] \[ [VALUE]? \]` : an array of values of a type
+                * when using this some entries may not be aligned
+    * `[TYPE] #` : a pointer to a value of TYPE
+    * `[TYPE] \[ [VALUE]? \]` : an array of values of TYPE
     * `addr? [FUNC_TYPE]` : a function address
     * `fstuct ( [NAME] | [FUNC_TYPE0] )` : a function call structure
 
