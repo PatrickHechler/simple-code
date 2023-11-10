@@ -41,7 +41,7 @@ public record DataVal(byte[] value, SimpleType type, ErrorContext ctx) implement
 	public int hashCode() {
 		final int prime  = 31;
 		int       result = 1;
-		result = prime * result + ( ( this.type == null ) ? 0 : this.type.hashCode() );
+		result = prime * result + this.type.hashCode();
 		result = prime * result + Arrays.hashCode(this.value);
 		return result;
 	}
@@ -52,9 +52,7 @@ public record DataVal(byte[] value, SimpleType type, ErrorContext ctx) implement
 		if ( obj == null ) return false;
 		if ( getClass() != obj.getClass() ) return false;
 		DataVal other = (DataVal) obj;
-		if ( this.type == null ) {
-			if ( other.type != null ) return false;
-		} else if ( !this.type.equals(other.type) ) return false;
+		if ( !this.type.equals(other.type) ) return false;
 		return Arrays.equals(this.value, other.value);
 	}
 	
