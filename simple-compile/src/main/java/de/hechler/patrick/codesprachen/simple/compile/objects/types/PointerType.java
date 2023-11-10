@@ -44,18 +44,20 @@ public record PointerType(SimpleType target) implements SimpleType {
 		if ( type == NativeType.UNUM || type == NativeType.NUM ) {
 			return type;
 		}
-		return SimpleType.castErr(this, type, ctx);
+		return SimpleType.castErrImplicit(this, type, ctx);
+		
 	}
 	
 	@Override
-	public void checkCastable(SimpleType type, ErrorContext ctx) throws CompileError {
+	public void checkCastable(SimpleType type, ErrorContext ctx, boolean explicit) throws CompileError {
 		if ( type instanceof PointerType ) {
 			return;
 		}
 		if ( type == NativeType.UNUM || type == NativeType.NUM ) {
 			return;
 		}
-		SimpleType.castErr(this, type, ctx);
+		if ( explicit ) SimpleType.castErrExplicit(this, type, ctx);
+		SimpleType.castErrImplicit(this, type, ctx);
 	}
 	
 	@Override

@@ -9,7 +9,7 @@ public record CastVal(SimpleValue value, SimpleType type, ErrorContext ctx) impl
 		if ( value.type() == type ) {
 			return value;
 		}
-		value.type().checkCastable(type, ctx);
+		value.type().checkCastable(type, ctx, false);
 		return new CastVal(value, type, ctx);
 	}
 	

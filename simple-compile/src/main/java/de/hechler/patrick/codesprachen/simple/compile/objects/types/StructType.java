@@ -55,15 +55,16 @@ public record StructType(List<SimpleVariable> members, int flags) implements Sim
 	@Override
 	public SimpleType commonType(SimpleType type, ErrorContext ctx) throws CompileError {
 		if ( !equals(type) ) {
-			SimpleType.castErr(this, type, ctx);
+			SimpleType.castErrImplicit(this, type, ctx);
 		}
 		return this;
 	}
 	
 	@Override
-	public void checkCastable(SimpleType type, ErrorContext ctx) throws CompileError {
+	public void checkCastable(SimpleType type, ErrorContext ctx, boolean explicit) throws CompileError {
 		if ( !equals(type) ) {
-			SimpleType.castErr(this, type, ctx);
+			if ( explicit ) SimpleType.castErrExplicit(this, type, ctx);
+			SimpleType.castErrImplicit(this, type, ctx);
 		}
 	}
 	
@@ -77,7 +78,7 @@ public record StructType(List<SimpleVariable> members, int flags) implements Sim
 		for (SimpleVariable sv : this.members) {
 			sb.append("\n  ").append(sv).append(';');
 		}
-		if (!this.members.isEmpty()) {
+		if ( !this.members.isEmpty() ) {
 			sb.append('\n');
 		}
 		return sb.append('}').toString();
@@ -117,11 +118,11 @@ public record StructType(List<SimpleVariable> members, int flags) implements Sim
 		if ( this == obj ) return true;
 		if ( obj == null ) return false;
 		if ( getClass() != obj.getClass() ) return false;
-		StructType           other = (StructType) obj;
+		StructType other = (StructType) obj;
 		if ( this.flags != other.flags ) return false;
-		List<SimpleVariable> mm    = this.members;
-		List<SimpleVariable> om    = other.members;
-		int                  s     = mm.size();
+		List<SimpleVariable> mm = this.members;
+		List<SimpleVariable> om = other.members;
+		int                  s  = mm.size();
 		if ( s != om.size() ) return false;
 		for (int i = s; --i >= 0;) {
 			if ( mm.get(i).type().equals(om.get(i).type()) ) {

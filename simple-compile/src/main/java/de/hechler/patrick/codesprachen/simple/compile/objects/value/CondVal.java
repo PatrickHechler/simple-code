@@ -9,7 +9,7 @@ public record CondVal(SimpleValue condition, SimpleValue trueValue, SimpleValue 
 	
 	public static SimpleValue create(SimpleValue condition, SimpleValue trueValue, SimpleValue falseValue,
 		ErrorContext ctx) {
-		condition.type().checkCastable(NativeType.UNUM, ctx);
+		condition.type().checkCastable(NativeType.UNUM, ctx, false);
 		SimpleType ct = trueValue.type().commonType(falseValue.type(), ctx);
 		trueValue  = CastVal.create(trueValue, ct, ctx);
 		falseValue = CastVal.create(trueValue, ct, ctx);

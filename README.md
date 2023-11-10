@@ -182,11 +182,16 @@ if marked with `const` there must be a constant initial value
     * `[NAME] ( : [NAME] )*`
     * `\( [VALUE] \)`
 * STRING
-    * `"([^"\\]|\\["rnt0\\])*"`
+    * `"([^"\\\r\n\0]|\\(["rnt0\\]|u[0-9A-Fa-f]{4}))*"`
 * CHARACTER
-    * `'([^'\\]|\\['rnt0\\])'`
+    * `'([^'\\\r\n\0]|\\(['rnt0\\]|u[0-9A-Fa-f]{4}))'`
 * NUM
-    * `-?[0-9]+`
+    * `[0-9]+`
+        * same as `DEC-[0-9]+`
+    * `-[0-9]+`
+        * same as `NDEC-[0-9]+`
+    * `DEC-[0-9]+`
+    * `NDEC-[0-9]+`
     * `HEX-[0-9A-F]+`
     * `UHEX-[0-9A-F]+`
     * `NHEX-[0-9A-F]+`

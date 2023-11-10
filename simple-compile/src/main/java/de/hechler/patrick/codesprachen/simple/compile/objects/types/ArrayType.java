@@ -5,7 +5,7 @@ import java.util.Objects;
 import de.hechler.patrick.codesprachen.simple.compile.error.CompileError;
 import de.hechler.patrick.codesprachen.simple.compile.error.ErrorContext;
 
-public record ArrayType(SimpleType target, int length) implements SimpleType {
+public record ArrayType(SimpleType target, long length) implements SimpleType {
 	
 	public ArrayType {
 		Objects.requireNonNull(target, "array target");
@@ -16,7 +16,7 @@ public record ArrayType(SimpleType target, int length) implements SimpleType {
 	
 	@Override
 	public long size() {
-		if ( this.length <= 0 ) {
+		if ( this.length <= 0L ) {
 			return 0L;
 		}
 		return this.target.size() * this.length;
@@ -44,11 +44,11 @@ public record ArrayType(SimpleType target, int length) implements SimpleType {
 		if ( type == NativeType.UNUM || type == NativeType.NUM ) {
 			return type;
 		}
-		return SimpleType.castErr(this, type, ctx);
+	return	SimpleType.castErrImplicit(this, type, ctx);
 	}
 	
 	@Override
-	public void checkCastable(SimpleType type, ErrorContext ctx) throws CompileError {
+	public void checkCastable(SimpleType type, ErrorContext ctx, boolean explicit) throws CompileError {
 		if ( type instanceof PointerType ) {
 			return;
 		}
@@ -58,7 +58,8 @@ public record ArrayType(SimpleType target, int length) implements SimpleType {
 		if ( type == NativeType.UNUM || type == NativeType.NUM ) {
 			return;
 		}
-		SimpleType.castErr(this, type, ctx);
+		if ( explicit ) SimpleType.castErrExplicit(this, type, ctx);
+		SimpleType.castErrImplicit(this, type, ctx);
 	}
 	
 	@Override

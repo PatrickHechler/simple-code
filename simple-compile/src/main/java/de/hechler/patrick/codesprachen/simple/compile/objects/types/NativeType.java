@@ -58,15 +58,15 @@ public enum NativeType implements SimpleType {
 				return FPDWORD;
 			}
 			if ( this.size() > nt.size() ) {
-				return extracted(nt);
+				return scalarCommonType(nt);
 			}
-			return nt.extracted(this);
+			return nt.scalarCommonType(this);
 		}
-		return SimpleType.castErr(this, type, ctx);
+		return SimpleType.castErrImplicit(this, type, ctx);
 	}
 	
 	@SuppressWarnings("incomplete-switch")
-	private NativeType extracted(NativeType type) {
+	private NativeType scalarCommonType(NativeType type) {
 		switch ( this ) {// NOSONAR
 		case NUM, DWORD, WORD, BYTE:
 			return this;
@@ -99,14 +99,15 @@ public enum NativeType implements SimpleType {
 	}
 	
 	@Override
-	public void checkCastable(SimpleType type, ErrorContext ctx) throws CompileError {
+	public void checkCastable(SimpleType type, ErrorContext ctx, boolean explicit) throws CompileError {
 		if ( type instanceof NativeType ) {
 			return;
 		}
 		if ( ( this == UNUM || this == NUM ) && type instanceof PointerType ) {
 			return;
 		}
-		SimpleType.castErr(this, type, ctx);
+		if ( explicit ) SimpleType.castErrExplicit(this, type, ctx);
+		SimpleType.castErrImplicit(this, type, ctx);
 	}
 	
 	@Override
