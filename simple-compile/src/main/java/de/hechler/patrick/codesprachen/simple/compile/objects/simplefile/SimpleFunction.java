@@ -1,10 +1,10 @@
 package de.hechler.patrick.codesprachen.simple.compile.objects.simplefile;
 
-import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleType;
+import de.hechler.patrick.codesprachen.simple.compile.objects.types.FuncType;
 
 public class SimpleFunction {
 	
-	public SimpleType type() {
+	public FuncType type() {
 		// TODO Auto-generated method stub
 		return null;
 	}

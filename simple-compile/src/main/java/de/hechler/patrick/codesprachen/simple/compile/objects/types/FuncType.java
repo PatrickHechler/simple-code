@@ -1,5 +1,7 @@
 package de.hechler.patrick.codesprachen.simple.compile.objects.types;
 
+import static de.hechler.patrick.codesprachen.simple.compile.error.ErrorContext.NO_CONTEXT;
+
 import java.util.List;
 
 import de.hechler.patrick.codesprachen.simple.compile.error.CompileError;
@@ -14,6 +16,15 @@ public record FuncType(List<SimpleVariable> resMembers, List<SimpleVariable> arg
 	public static final int FLAG_INIT = 0x0400;
 	public static final int FLAG_NOPAD = StructType.FLAG_NOPAD;
 	public static final int ALL_FLAGS = FLAG_EXPORT | FLAG_MAIN | FLAG_INIT | FLAG_NOPAD;
+	
+	public static final FuncType MAIN_TYPE = create(List.of(//
+		new SimpleVariable(NativeType.UNUM, "argc", 0),//
+		new SimpleVariable(
+			PointerType.create(PointerType.create(NativeType.UBYTE, NO_CONTEXT), NO_CONTEXT),
+			"argv", 0)//
+	), List.of(new SimpleVariable(NativeType.UBYTE, "exitnum", 0)), FLAG_MAIN, NO_CONTEXT);
+	
+	public static final FuncType INIT_TYPE = create(List.of(), List.of(), FLAG_INIT, NO_CONTEXT);
 	
 	static {
 		if ( Integer.bitCount(ALL_FLAGS) != 4 ) {
@@ -83,7 +94,7 @@ public record FuncType(List<SimpleVariable> resMembers, List<SimpleVariable> arg
 		}
 		sb.append('<');
 		append(sb, this.resMembers);
-		sb.append("> <-- ()");
+		sb.append("> <-- (");
 		append(sb, this.resMembers);
 		return sb.append(')').toString();
 	}
@@ -112,17 +123,6 @@ public record FuncType(List<SimpleVariable> resMembers, List<SimpleVariable> arg
 		return result;
 	}
 	
-	@Override
-	public boolean equals(Object obj) {
-		if ( this == obj ) return true;
-		if ( obj == null ) return false;
-		if ( getClass() != obj.getClass() ) return false;
-		FuncType other = (FuncType) obj;
-		if ( this.flags != other.flags ) return false;
-		if ( !StructType.equals(this.argMembers, other.argMembers) ) return false;
-		return StructType.equals(this.resMembers, other.resMembers);
-	}
-	
 	public void checkHasMember(String name, ErrorContext ctx) {
 		for (SimpleVariable sv : this.resMembers) {
 			if ( name.equals(sv.name()) ) {
@@ -136,6 +136,26 @@ public record FuncType(List<SimpleVariable> resMembers, List<SimpleVariable> arg
 		}
 		throw new CompileError(ctx,
 			"the structure has no member with the given name! name: " + name + " " + toStringSingleLine());
+	}
+	
+	@Override
+	public boolean equals(Object obj) {
+		if ( this == obj ) return true;
+		if ( obj == null ) return false;
+		if ( getClass() != obj.getClass() ) return false;
+		FuncType other = (FuncType) obj;
+		if ( this.flags != other.flags ) return false;
+		if ( !StructType.equals(this.argMembers, other.argMembers) ) return false;
+		return StructType.equals(this.resMembers, other.resMembers);
+	}
+	
+	public boolean equalsIgnoreFlags(Object obj) {
+		if ( this == obj ) return true;
+		if ( obj == null ) return false;
+		if ( getClass() != obj.getClass() ) return false;
+		FuncType other = (FuncType) obj;
+		if ( !StructType.equals(this.argMembers, other.argMembers) ) return false;
+		return StructType.equals(this.resMembers, other.resMembers);
 	}
 	
 }

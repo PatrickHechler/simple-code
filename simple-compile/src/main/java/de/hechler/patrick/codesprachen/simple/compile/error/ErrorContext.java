@@ -4,15 +4,17 @@ import java.util.function.Supplier;
 
 public class ErrorContext {
 	
-	public static final ErrorContext NO_CONTEXT = new ErrorContext(-1, -1, -1, (String) null);
+	public static final ErrorContext NO_CONTEXT = new ErrorContext(null, -1, -1, -1, (String) null);
 	
+	public final String            file;
 	public final int               line;
 	public final int               charInLine;
 	public final int               totalChar;
 	private final Supplier<String> offendingTokenSub;
 	private String                 offendingToken;
 	
-	public ErrorContext(int line, int charInLine, int totalChar, Supplier<String> offendingTokenSub) {
+	public ErrorContext(String file, int line, int charInLine, int totalChar, Supplier<String> offendingTokenSub) {
+		this.file              = file;
 		this.line              = line;
 		this.charInLine        = charInLine;
 		this.totalChar         = totalChar;
@@ -20,7 +22,8 @@ public class ErrorContext {
 		this.offendingToken    = null;
 	}
 	
-	public ErrorContext(int line, int charInLine, int totalChar, String offendingToken) {
+	public ErrorContext(String file, int line, int charInLine, int totalChar, String offendingToken) {
+		this.file              = file;
 		this.line              = line;
 		this.charInLine        = charInLine;
 		this.totalChar         = totalChar;

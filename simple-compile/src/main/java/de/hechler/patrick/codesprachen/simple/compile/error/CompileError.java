@@ -6,6 +6,7 @@ public class CompileError extends RuntimeException {
 	
 	private static final long serialVersionUID = 624098131567818737L;
 	
+	public final String       file;
 	public final int          line;
 	public final int          charInLine;
 	public final int          totalChar;
@@ -13,20 +14,21 @@ public class CompileError extends RuntimeException {
 	public final List<String> expectedTokens;// NOSONAR the list is serializable
 	
 	public CompileError(ErrorContext ctx, List<String> expectedTokens) {
-		this(ctx.line, ctx.charInLine, ctx.totalChar, ctx.offendingToken(), expectedTokens, null);
+		this(ctx.file, ctx.line, ctx.charInLine, ctx.totalChar, ctx.offendingToken(), expectedTokens, null);
 	}
 	
 	public CompileError(ErrorContext ctx, String additionalMsg) {
-		this(ctx.line, ctx.charInLine, ctx.totalChar, ctx.offendingToken(), null, additionalMsg);
+		this(ctx.file, ctx.line, ctx.charInLine, ctx.totalChar, ctx.offendingToken(), null, additionalMsg);
 	}
 	
 	public CompileError(ErrorContext ctx, List<String> expectedTokens, String additionalMsg) {
-		this(ctx.line, ctx.charInLine, ctx.totalChar, ctx.offendingToken(), expectedTokens, additionalMsg);
+		this(ctx.file, ctx.line, ctx.charInLine, ctx.totalChar, ctx.offendingToken(), expectedTokens, additionalMsg);
 	}
 	
-	public CompileError(int line, int charInLine, int totalChar, String offendingToken, List<String> expectedTokens,
-		String additionalMessage) {
-		super(generateMessage(line, charInLine, totalChar, offendingToken, expectedTokens, additionalMessage));
+	public CompileError(String file, int line, int charInLine, int totalChar, String offendingToken,
+		List<String> expectedTokens, String additionalMessage) {
+		super(generateMessage(file, line, charInLine, totalChar, offendingToken, expectedTokens, additionalMessage));
+		this.file           = file;
 		this.line           = line;
 		this.charInLine     = charInLine;
 		this.totalChar      = totalChar;
@@ -34,19 +36,22 @@ public class CompileError extends RuntimeException {
 		this.expectedTokens = expectedTokens == null ? List.of() : List.copyOf(expectedTokens);
 	}
 	
-	private static String generateMessage(int line, int charInLine, int totalChar, String offendingToken,
+	private static String generateMessage(String file, int line, int charInLine, int totalChar, String offendingToken,
 		List<String> expectedTokens, String additionalMessage) {
 		StringBuilder b = new StringBuilder().append("illegal input");
+		if ( file != null && !file.isEmpty() ) {
+			b.append(" in file ").append(file);
+		}
 		if ( line != -1 ) {
 			b.append(" at line ").append(line);
 			if ( charInLine != -1 ) {
-				b.append(":").append(charInLine);
+				b.append(':').append(charInLine);
 			}
 		}
 		if ( totalChar != -1 ) {
 			b.append(" at total char ").append(totalChar);
 		}
-		if ( additionalMessage != null ) {
+		if ( additionalMessage != null && !additionalMessage.isEmpty() ) {
 			b.append(": ").append(additionalMessage);
 		}
 		if ( offendingToken != null ) {

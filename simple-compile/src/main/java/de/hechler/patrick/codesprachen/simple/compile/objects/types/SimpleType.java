@@ -20,7 +20,8 @@ public interface SimpleType {
 	}
 	
 	static <T> T castErrImplicit(SimpleType from, SimpleType to, ErrorContext ctx) {
-		throw new CompileError(ctx, "can't implicitly cast from " + from.toStringSingleLine() + " to " + to.toStringSingleLine());
+		throw new CompileError(ctx,
+			"can't implicitly cast from " + from.toStringSingleLine() + " to " + to.toStringSingleLine());
 	}
 	
 	static <T> T castErrExplicit(SimpleType from, String to, ErrorContext ctx) {

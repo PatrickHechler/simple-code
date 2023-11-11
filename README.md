@@ -4,12 +4,21 @@ simple-code is a simple programming language.
 
 ## file
 
-`( [dependency] | [variable] | [typedef] | [function] )* EOF`
-* a simple-code file is a collection of dependencies, functions, variables and structures.
+`( [`[dependency](#dependency)`] | [variable] | [typedef] | [function] )* EOF`
+
+### simple-export-file
+
+`( [variable] | [typedef] | [dep-function] )* EOF`
+
+* note that simple-export-files are parsed with some special rulse:
+    * `exp` markings are ignored
+        * this is a export file, everything here is here because it was exported!
+    * only `const` variables are allowed to have an initilizer
+        * having a `const` variable without initilizer is still an error
 
 ### dependency
 
-`dep [NAME] [STRING] ( [STRING] )? ;`
+`dep ( [NAME] | &lt;ME&gt; ) [STRING] ( [STRING] )? ;`
 * the first STRING is the path relative from a included source directory
 * the second optional STRING is the path of the binary used at runtime
     * if not set it will be the extracted from the first STRING
@@ -26,6 +35,11 @@ simple-code is a simple programming language.
     * if the DEPENDENCY ends with `.*` the compiler will use the simple-export-file with a `.sexp` ending if it currently does not compile the targeted source file
     * otherwise the DEPENDENCY is treated as simple-export-file
 * to use a exprted symbol from a dependency use `dependency_name` `:` `import_name`
+* if instead of a dependency name `&lt;ME&gt;` is used:
+    * no runtime path is allowed to be specified
+    * the STRING is always interpreted as a simple-export-file
+    * the exported symbols can directly be used
+    * if at the end of the parsing process there are symbols in the simple-export-file which are not declared in the translation unit the compilation fails
 
 ### function
 
@@ -41,7 +55,7 @@ a function is a block of commands used to do something for example convert the a
             * `( ) --&gt; &lt; &gt;`
     * `main`: the file will be made executable and this function will be the main function.
         * the `main` function has to have specific structure:
-            * `( num , char## ) --&gt; &lt; ubyte &gt;`
+            * `( unum , char## ) --&gt; &lt; ubyte &gt;`
             * argument values:
                 1. `num` argc: this will be set to the number of arguments passed to the program
                 2. `char##` argv: this will point the arguments passed to the program
@@ -50,6 +64,10 @@ a function is a block of commands used to do something for example convert the a
                 1. `ubyte` exitnum: the return number of the main function will be the exit number of the process
 * note that only one function can be marked with `init`/`main`
 * note that if a function is marked with `main` or `init` and has no name the function can not be called by any user generated program code
+
+### dep-function
+
+`func [NAME] [FUNC_TYPE] ;`
 
 ### variable
 
