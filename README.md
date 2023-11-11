@@ -4,7 +4,7 @@ simple-code is a simple programming language.
 
 ## file
 
-`( [dependency](#dependency) | [variable] | [typedef] | [function] )* EOF`
+`( [dependency] | [variable] | [typedef] | [function] )* EOF`
 
 ### simple-export-file
 
@@ -26,9 +26,9 @@ simple-code is a simple programming language.
         * otherwise it will be the first STRING
 * file type:
     * the DEPENDENCY is treated as simple-source-code-file when it ends with `.ssf`
-        * note that if the dependnecy is a source file it is not allowed to be under a lockup directory
+        * if the dependency is a source file it is not allowed to be under a lockup directory
         * a source dependency needs to be currently compiled
-        * note that a source code dependency is not allowed to have a runtime path set
+        * a source code dependency is not allowed to have a runtime path specified
     * the DEPENDENCY is treated as simple-export-file when it ends with `.sexp`
     * if the DEPENDENCY ends with `.*` the compiler will use the simple-source-code-file with a `.ssf` ending if it compiles currently the targeted source file
         * note that if no `.ssf` could be fond the compiler can not compile it and thus the `.sexp` file is used
@@ -40,6 +40,10 @@ simple-code is a simple programming language.
     * the STRING is always interpreted as a simple-export-file
     * the exported symbols can directly be used
     * if at the end of the parsing process there are symbols in the simple-export-file which are not declared in the translation unit the compilation fails
+    * if a symbol is declared and a incompatible symbol with the same name can be found in the simple-export-file the compilation fails
+        * only the (existence and) compatibility of the symbols is checked, they are not forced to be exported by these rules
+        * incompatible means (here): different, but the names and the markings are ignored
+            * for example `add <num result> <-- (num numberA, num numberB)` is compatible to `exp add <num res> <-- (num a, num b)`, but incompatible to `add <unum result> <-- (unum numberA, unum numberB)`
 
 ### function
 
