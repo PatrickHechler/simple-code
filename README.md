@@ -4,7 +4,7 @@ simple-code is a simple programming language.
 
 ## file
 
-`( [`[dependency](#dependency)`] | [variable] | [typedef] | [function] )* EOF`
+`( [dependency](#dependency) | [variable] | [typedef] | [function] )* EOF`
 
 ### simple-export-file
 
