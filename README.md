@@ -157,9 +157,15 @@ if marked with `const` there must be a constant initial value
 * IF
     * `if \( [VALUE] \) [COMMAND] ( else [COMMAND] )?`
 * ASSEMBLER
-    * `asm ( [STRING] <-- [VALUE] )* [ASM_BLOCK] ( [VALUE] <-- [STRING] )* ;`
+    * `asm ( [STRING] <-- [VALUE] ,? )* [ASM_BLOCK] ( [POSTFIX_EXP] <-- [STRING] ,? | [STRING] <-- \? ,? )* ;`
         * ASM_BLOCK
             * `::: ( [^>] | > [^>] | >> [^>] )* >>>`
+        * each STRING represents a native register or address supported by the assembler
+        * the `[STRING] <-- [VALUE]` pairs represent the arguments to be passed to the assembly code block
+        * the `[POSTFIX_EXP] <-- [STRING]` pairs represent the results of the assembler code
+        * the `[STRING] <-- \?` pairs represent the registers modified by the assembler block
+            * note that registers used as argument are **not** implicitly marked as modified
+            * registers used as result are implicitly marked as modified
 
 ### VALUE
 
