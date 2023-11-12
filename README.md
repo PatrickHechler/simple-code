@@ -72,7 +72,7 @@ a function is a block of commands used to do something for example convert the a
 
 a variable can be used by all functions if declared in a file    
 if declared in a code block it can be used by the commands in the block after the declaration    
-if a non constant initial value is assigned and not declared in a code block the initilizing will be done at the start of the `init` function    
+if a non constant initial value is assigned and not declared in a code block the initilizing will be done at the start of the `init` function in the order of declaration    
 if a constant initial value is assigned and not declared in a code block the initilizing will be done at compile time    
 if marked with `const` there must be a constant initial value    
 * marks:
@@ -161,9 +161,9 @@ if marked with `const` there must be a constant initial value
         * ASM_BLOCK
             * `::: ( [^>] | > [^>] | >> [^>] )* >>>`
         * each STRING represents a native register or address supported by the assembler
-        * the `[STRING] <-- [VALUE]` pairs represent the arguments to be passed to the assembly code block
-        * the `[POSTFIX_EXP] <-- [STRING]` pairs represent the results of the assembler code
-        * the `[STRING] <-- \?` pairs represent the registers modified by the assembler block
+        * the `[STRING] <-- [VALUE]` pairs represent the arguments to be passed to the asm code
+        * the `[POSTFIX_EXP] <-- [STRING]` pairs represent the results of the asm code
+        * the `[STRING] <-- \?` pairs represent the registers modified by the asm code
             * note that registers used as argument are **not** implicitly marked as modified
             * registers used as result are implicitly marked as modified
 
