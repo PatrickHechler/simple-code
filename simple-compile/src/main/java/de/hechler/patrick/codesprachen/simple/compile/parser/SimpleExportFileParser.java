@@ -3,7 +3,6 @@ package de.hechler.patrick.codesprachen.simple.compile.parser;
 import java.io.InputStream;
 
 import de.hechler.patrick.codesprachen.simple.compile.objects.simplefile.SimpleDependency;
-import de.hechler.patrick.codesprachen.simple.compile.objects.simplefile.SimpleFile;
 
 public class SimpleExportFileParser {
 	
@@ -19,7 +18,6 @@ public class SimpleExportFileParser {
 	
 	
 	public SimpleDependency parse() {
-		SimpleFile file;
 		
 	}
 	

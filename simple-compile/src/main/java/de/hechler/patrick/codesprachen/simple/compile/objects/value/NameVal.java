@@ -19,4 +19,9 @@ public record NameVal(String name) implements SimpleValue {
 		return ErrorContext.NO_CONTEXT;
 	}
 	
+	@Override
+	public String toString() {
+		return this.name;
+	}
+	
 }

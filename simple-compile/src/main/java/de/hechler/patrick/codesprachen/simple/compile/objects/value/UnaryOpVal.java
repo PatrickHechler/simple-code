@@ -8,12 +8,12 @@ import de.hechler.patrick.codesprachen.simple.compile.objects.value.BinaryOpVal.
 public class UnaryOpVal {
 	
 	// no need to give them an error context
-	private static final SimpleValue MINUS_ONE = NumericVal.create(NativeType.BYTE, -1L, ErrorContext.NO_CONTEXT);
-	private static final SimpleValue ONE       = NumericVal.create(NativeType.UBYTE, 1L, ErrorContext.NO_CONTEXT);
-	private static final SimpleValue ZERO      = NumericVal.create(NativeType.UBYTE, 0L, ErrorContext.NO_CONTEXT);
-	private static final SimpleValue ZERO_8B   = NumericVal.create(NativeType.UNUM, 0L, ErrorContext.NO_CONTEXT);
+	private static final SimpleValue MINUS_ONE = ScalarNumericVal.create(NativeType.BYTE, -1L, ErrorContext.NO_CONTEXT);
+	private static final SimpleValue ONE       = ScalarNumericVal.create(NativeType.UBYTE, 1L, ErrorContext.NO_CONTEXT);
+	private static final SimpleValue ZERO      = ScalarNumericVal.create(NativeType.UBYTE, 0L, ErrorContext.NO_CONTEXT);
+	private static final SimpleValue ZERO_8B   = ScalarNumericVal.create(NativeType.UNUM, 0L, ErrorContext.NO_CONTEXT);
 	
-	public SimpleValue create(UnaryOp op, SimpleValue a, ErrorContext ctx) {
+	public static SimpleValue create(UnaryOp op, SimpleValue a, ErrorContext ctx) {
 		switch ( op ) {
 		case MINUS:
 			return BinaryOpVal.create(a, BinaryOp.MATH_MUL, MINUS_ONE, ctx);

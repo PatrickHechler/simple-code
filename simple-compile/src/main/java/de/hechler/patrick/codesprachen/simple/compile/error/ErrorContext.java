@@ -1,42 +1,36 @@
 package de.hechler.patrick.codesprachen.simple.compile.error;
 
-import java.util.function.Supplier;
-
 public class ErrorContext {
 	
-	public static final ErrorContext NO_CONTEXT = new ErrorContext(null, -1, -1, -1, (String) null);
+	public static final ErrorContext NO_CONTEXT = new ErrorContext();
 	
-	public final String            file;
-	public final int               line;
-	public final int               charInLine;
-	public final int               totalChar;
-	private final Supplier<String> offendingTokenSub;
-	private String                 offendingToken;
+	public String            file;
+	public int               line;
+	public int               charInLine;
+	public int               totalChar;
+	public String           offendingToken;
 	
-	public ErrorContext(String file, int line, int charInLine, int totalChar, Supplier<String> offendingTokenSub) {
-		this.file              = file;
-		this.line              = line;
-		this.charInLine        = charInLine;
-		this.totalChar         = totalChar;
-		this.offendingTokenSub = offendingTokenSub;
-		this.offendingToken    = null;
+	public ErrorContext() {
+		this.line = -1;
+		this.charInLine = -1;
+		this.totalChar = -1;
 	}
 	
-	public ErrorContext(String file, int line, int charInLine, int totalChar, String offendingToken) {
-		this.file              = file;
-		this.line              = line;
-		this.charInLine        = charInLine;
-		this.totalChar         = totalChar;
-		this.offendingTokenSub = null;
-		this.offendingToken    = offendingToken;
-	}
-	
-	public String offendingToken() {
-		String ot = this.offendingToken;
-		if ( ot != null ) return ot;
-		ot                  = this.offendingTokenSub.get();
-		this.offendingToken = ot;
-		return ot;
+	@Override
+	public String toString() {
+		StringBuilder builder = new StringBuilder();
+		builder.append("ErrorContext [file=");
+		builder.append(file);
+		builder.append(", line=");
+		builder.append(line);
+		builder.append(", charInLine=");
+		builder.append(charInLine);
+		builder.append(", totalChar=");
+		builder.append(totalChar);
+		builder.append(", offendingToken=");
+		builder.append(offendingToken);
+		builder.append("]");
+		return builder.toString();
 	}
 	
 }

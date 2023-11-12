@@ -11,7 +11,7 @@ public record CondVal(SimpleValue condition, SimpleValue trueValue, SimpleValue 
 		ErrorContext ctx) {
 		condition.type().checkCastable(NativeType.UNUM, ctx, false);
 		SimpleType ct = trueValue.type().commonType(falseValue.type(), ctx);
-		trueValue  = CastVal.create(trueValue, ct, ctx);
+		trueValue = CastVal.create(trueValue, ct, ctx);
 		falseValue = CastVal.create(trueValue, ct, ctx);
 		return new CondVal(condition, trueValue, falseValue, ctx);
 	}
@@ -19,6 +19,17 @@ public record CondVal(SimpleValue condition, SimpleValue trueValue, SimpleValue 
 	@Override
 	public SimpleType type() {
 		return this.trueValue.type();
+	}
+	
+	@Override
+	public void checkAssignable(SimpleType type, ErrorContext ctx) {
+		this.trueValue.checkAssignable(type, ctx);
+		this.falseValue.checkAssignable(type, ctx);
+	}
+	
+	@Override
+	public String toString() {
+		return "(" + this.condition + " ? " + this.trueValue + " : " + this.falseValue + ")";
 	}
 	
 }

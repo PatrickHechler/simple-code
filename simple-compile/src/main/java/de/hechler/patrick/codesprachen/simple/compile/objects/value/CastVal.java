@@ -13,4 +13,9 @@ public record CastVal(SimpleValue value, SimpleType type, ErrorContext ctx) impl
 		return new CastVal(value, type, ctx);
 	}
 	
+	@Override
+	public String toString() {
+		return "((" + this.type + ") " + this.value + " )";
+	}
+	
 }

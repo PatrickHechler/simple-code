@@ -8,10 +8,15 @@ import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleType;
 public record AddressOfVal(SimpleValue a, SimpleType type, ErrorContext ctx) implements SimpleValue {
 	
 	public static SimpleValue create(SimpleValue a, ErrorContext ctx) {
-		if (a instanceof NumericVal) {
+		if ( a instanceof ScalarNumericVal ) {
 			throw new CompileError(ctx, "can not calculate the runtime address of a numeric constant: " + a);
 		}
 		return new AddressOfVal(a, PointerType.create(a.type(), ctx), ctx);
+	}
+	
+	@Override
+	public String toString() {
+		return "( &" + this.a + " )";
 	}
 	
 }

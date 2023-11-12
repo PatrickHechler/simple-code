@@ -11,4 +11,9 @@ public record FunctionVal(SimpleFunction func, SimpleType type, ErrorContext ctx
 		return new FunctionVal(func, PointerType.create(func.type, ctx), ctx);
 	}
 
+	@Override
+	public String toString() {
+		return func.name;
+	}
+	
 }

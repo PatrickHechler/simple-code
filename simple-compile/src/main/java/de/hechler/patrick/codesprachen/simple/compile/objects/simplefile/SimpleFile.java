@@ -30,7 +30,7 @@ public class SimpleFile extends SimpleDependency {
 	}
 	
 	@Override
-	public SimpleValue nameValue(String name, ErrorContext ctx) {
+	public SimpleValue nameValueOrNull(String name, ErrorContext ctx) {
 		SimpleVariable sv = this.variables.get(name);
 		if ( sv != null ) {
 			return VariableVal.create(sv, ctx);
@@ -43,7 +43,7 @@ public class SimpleFile extends SimpleDependency {
 		if ( dep != null ) {
 			return DependencyVal.create(dep, ctx);
 		}
-		throw new CompileError(ctx, "nothing with the name '" + name + "' could be found");
+		return null;
 	}
 	
 	public void dependency(SimpleDependency dep, String name, ErrorContext ctx) {

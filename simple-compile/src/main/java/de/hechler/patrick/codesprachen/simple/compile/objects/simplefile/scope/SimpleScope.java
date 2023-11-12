@@ -6,6 +6,10 @@ import de.hechler.patrick.codesprachen.simple.compile.objects.value.SimpleValue;
 
 public interface SimpleScope {
 	
-	SimpleValue nameValue(String name, ErrorContext ctx) throws CompileError;
+	SimpleValue nameValueOrNull(String name, ErrorContext ctx);
+	
+	default SimpleValue nameValueOrErr(String name, ErrorContext ctx) throws CompileError {
+		throw new CompileError(ctx, "nothing with the name '" + name + "' could be found");
+	}
 	
 }

@@ -19,4 +19,9 @@ public record DependencyVal(SimpleDependency dep, ErrorContext ctx) implements S
 		return StructType.create(List.of(), StructType.FLAG_NOUSE, ErrorContext.NO_CONTEXT);
 	}
 	
+	@Override
+	public String toString() {
+		return "(dependency: " + dep.binaryTarget + ")";
+	}
+	
 }

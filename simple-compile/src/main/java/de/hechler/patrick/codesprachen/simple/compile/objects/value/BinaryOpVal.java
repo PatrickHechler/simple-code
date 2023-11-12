@@ -57,7 +57,7 @@ public record BinaryOpVal(SimpleValue a, BinaryOp op, SimpleValue b, ErrorContex
 		case DEREF_BY_NAME -> {
 			String name = ( (NameVal) b ).name();
 			if ( a instanceof DependencyVal dv ) {
-				return dv.dep().nameValue(name, ctx);
+				return dv.dep().nameValueOrErr(name, ctx);
 			} else if ( a.type() instanceof StructType st ) {
 				st.checkHasMember(name, ctx);
 			} else if ( a.type() instanceof FuncType ft ) {
@@ -164,6 +164,33 @@ public record BinaryOpVal(SimpleValue a, BinaryOp op, SimpleValue b, ErrorContex
 			this.type = type;
 		}
 		
+	}
+	
+	@Override
+	public String toString() {
+		return switch ( this.op ) {
+		case ARR_PNTR_INDEX -> this.a + "[" + this.b + "]";
+		case DEREF_BY_NAME -> this.a + ":" + this.b;
+		case BIT_AND -> "(" + this.a + " & " + this.b + ")";
+		case BIT_OR -> "(" + this.a + " | " + this.b + ")";
+		case BIT_XOR -> "(" + this.a + " ^ " + this.b + ")";
+		case BOOL_AND -> "(" + this.a + " && " + this.b + ")";
+		case BOOL_OR -> "(" + this.a + " || " + this.b + ")";
+		case CMP_EQ -> "(" + this.a + " == " + this.b + ")";
+		case CMP_GE -> "(" + this.a + " >= " + this.b + ")";
+		case CMP_GT -> "(" + this.a + " > " + this.b + ")";
+		case CMP_LE -> "(" + this.a + " <= " + this.b + ")";
+		case CMP_LT -> "(" + this.a + " < " + this.b + ")";
+		case CMP_NEQ -> "(" + this.a + " != " + this.b + ")";
+		case MATH_ADD -> "(" + this.a + " + " + this.b + ")";
+		case MATH_SUB -> "(" + this.a + " - " + this.b + ")";
+		case MATH_MUL -> "(" + this.a + " * " + this.b + ")";
+		case MATH_DIV -> "(" + this.a + " / " + this.b + ")";
+		case MATH_MOD -> "(" + this.a + " % " + this.b + ")";
+		case SHIFT_LEFT -> "(" + this.a + " << " + this.b + ")";
+		case SHIFT_ARITMETIC_RIGTH -> "(" + this.a + " >> " + this.b + ")";
+		case SHIFT_LOGIC_RIGTH -> "(" + this.a + " >>> " + this.b + ")";
+		};
 	}
 	
 }

@@ -15,4 +15,14 @@ public record VariableVal(SimpleVariable sv, ErrorContext ctx) implements Simple
 		return this.sv.type();
 	}
 	
+	@Override
+	public void checkAssignable(SimpleType type, ErrorContext ctx) {
+		type.checkCastable(sv.type(), ctx, false);
+	}
+	
+	@Override
+	public String toString() {
+		return sv.name();
+	}
+	
 }
