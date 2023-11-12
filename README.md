@@ -22,10 +22,10 @@ simple-code is a simple programming language.
 `dep ( [NAME] | <ME> ) [STRING] ( [STRING] )? ;`
 * the first STRING is the path relative from a included source directory
 * the second optional STRING is the path of the binary used at runtime
-    * if not set it will be the extracted from the first STRING
+    * specifing the same export file with different runtime paths may be a compilation error
+    * if not set it will be the calculated from the first STRING
         * if the first STRING ends with `.sexp` the end will be discarded
         * otherwise it will be the first STRING
-        * specifing the same export file with different runtime paths may be a compilation error
 * to use a exprted symbol from a dependency use `dependency_name` `:` `import_name`
 * if instead of a dependency name `<ME>` is used:
     * no runtime path is allowed to be specified
