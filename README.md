@@ -10,13 +10,12 @@ simple-code is a simple programming language.
 
 `( [dependency] | [variable] | [typedef] | [dep-function] )* EOF`
 
-* note that simple-export-files are parsed with some special rulse:
+* note that simple-export-files are parsed with some special rules:
     * `exp` markings are ignored
         * this is a export file, everything here is here because it was exported!
     * only `const` variables are allowed to have an initilizer
         * having a `const` variable without initilizer is still an error
-    * dependencies must be of type `simple-export-file`
-    * dependencies must not use `&lt;ME&gt;` instead of a `NAME`
+    * dependencies **must not** use `&lt;ME&gt;` instead of a `NAME`
 
 ### dependency
 
@@ -24,18 +23,9 @@ simple-code is a simple programming language.
 * the first STRING is the path relative from a included source directory
 * the second optional STRING is the path of the binary used at runtime
     * if not set it will be the extracted from the first STRING
-        * if the first STRING ends with `.ssf`, `.sexp` the end will be discarded
+        * if the first STRING ends with `.sexp` the end will be discarded
         * otherwise it will be the first STRING
-* file type:
-    * the DEPENDENCY is treated as simple-source-code-file when it ends with `.ssf`
-        * if the dependency is a source file it is not allowed to be under a lockup directory
-        * a source dependency needs to be currently compiled
-        * a source code dependency is not allowed to have a runtime path specified
-    * the DEPENDENCY is treated as simple-export-file when it ends with `.sexp`
-    * if the DEPENDENCY ends with `.*` the compiler will use the simple-source-code-file with a `.ssf` ending if it compiles currently the targeted source file
-        * note that if no `.ssf` could be fond the compiler can not compile it and thus the `.sexp` file is used
-    * if the DEPENDENCY ends with `.*` the compiler will use the simple-export-file with a `.sexp` ending if it currently does not compile the targeted source file
-    * otherwise the DEPENDENCY is treated as simple-export-file
+        * specifing the same export file with different runtime paths may be a compilation error
 * to use a exprted symbol from a dependency use `dependency_name` `:` `import_name`
 * if instead of a dependency name `&lt;ME&gt;` is used:
     * no runtime path is allowed to be specified
@@ -43,9 +33,10 @@ simple-code is a simple programming language.
     * the exported symbols can directly be used
     * if at the end of the parsing process there are symbols in the simple-export-file which are not declared in the translation unit the compilation fails
     * if a symbol is declared and a incompatible symbol with the same name can be found in the simple-export-file the compilation fails
-        * only the (existence and) compatibility of the symbols is checked, they are not forced to be exported by these rules
-        * incompatible means (here): different, but the names and the markings are ignored
-            * for example `add <num result> <-- (num numberA, num numberB)` is compatible to `exp add <num res> <-- (num a, num b)`, but incompatible to `add <unum result> <-- (unum numberA, unum numberB)`
+        * only the compatibility (and existence) of the symbols is checked, they are not forced to be exported by these rules
+        * incompatible means (here): different, but the names and the markings, except for `nopad` are ignored
+            * for example `add <num result> <-- (num number_a, num number_b)` is compatible to `exp add <num res> <-- (num a, num b)`, but incompatible to `add <unum result> <-- (unum numberA, unum numberB)`
+            * for example `typedef struct { num a; } num_wrapper;` is incompatible to `typedef struct nopad { num a; } num_wrapper;`
 
 ### function
 
