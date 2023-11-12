@@ -15,11 +15,11 @@ simple-code is a simple programming language.
         * this is a export file, everything here is here because it was exported!
     * only `const` variables are allowed to have an initilizer
         * having a `const` variable without initilizer is still an error
-    * dependencies **must not** use `&lt;ME&gt;` instead of a `NAME`
+    * dependencies **must not** use `<ME>` instead of a `NAME`
 
 ### dependency
 
-`dep ( [NAME] | &lt;ME&gt; ) [STRING] ( [STRING] )? ;`
+`dep ( [NAME] | <ME> ) [STRING] ( [STRING] )? ;`
 * the first STRING is the path relative from a included source directory
 * the second optional STRING is the path of the binary used at runtime
     * if not set it will be the extracted from the first STRING
@@ -27,7 +27,7 @@ simple-code is a simple programming language.
         * otherwise it will be the first STRING
         * specifing the same export file with different runtime paths may be a compilation error
 * to use a exprted symbol from a dependency use `dependency_name` `:` `import_name`
-* if instead of a dependency name `&lt;ME&gt;` is used:
+* if instead of a dependency name `<ME>` is used:
     * no runtime path is allowed to be specified
     * the STRING is always interpreted as a simple-export-file
     * the exported symbols can directly be used
@@ -49,10 +49,10 @@ a function is a block of commands used to do something for example convert the a
         * note that the `init` function will be executed even before the `main` function (if the `main` gets executed)
         * note that if a global variable has an initilizer the compiler may generate an implicit `init` function
         * the `init` function has to have specific structure:
-            * `( ) --&gt; &lt; &gt;`
+            * `( ) --> < >`
     * `main`: the file will be made executable and this function will be the main function.
         * the `main` function has to have specific structure:
-            * `( unum , char## ) --&gt; &lt; ubyte &gt;`
+            * `( unum , char## ) --> < ubyte >`
             * argument values:
                 1. `num` argc: this will be set to the number of arguments passed to the program
                 2. `char##` argv: this will point the arguments passed to the program
@@ -68,7 +68,7 @@ a function is a block of commands used to do something for example convert the a
 
 ### variable
 
-`(const)? (exp)? [NAMED_TYPE] ( &lt;-- [VALUE] )? ;`
+`(const)? (exp)? [NAMED_TYPE] ( <-- [VALUE] )? ;`
 
 a variable can be used by all functions if declared in a file    
 if declared in a code block it can be used by the commands in the block after the declaration    
@@ -135,7 +135,7 @@ if marked with `const` there must be a constant initial value
 
 #### FUNC_TYPE_RESULTS
 
-`( ( [NAMED_TYPE] | &lt; ( [NAMED_TYPE_LIST] ) &gt; ) &lt;-- )?`
+`( ( [NAMED_TYPE] | < ( [NAMED_TYPE_LIST] ) > ) <-- )?`
 
 ### COMMAND
 
@@ -144,12 +144,12 @@ if marked with `const` there must be a constant initial value
 * VAR_DECL
     * `[variable]`
 * ASSIGN
-    * `[POSTFIX_EXP] &lt;-- [VALUE] ;`
+    * `[POSTFIX_EXP] <-- [VALUE] ;`
 * FUNC_CALL
     * `call [VALUE] [VALUE] ;`
     * `[POSTFIX_EXP] [FUNC_CALL_RESULT] [FUNC_CALL_ARGS] ;`
         * FUNC_CALL_RESULT
-            * `( ( [POSTFIX_EXP] | &lt; ( [POSTFIX_EXP] ( , [POSTFIX_EXP] )* )? &gt; ) &lt;-- )?`
+            * `( ( [POSTFIX_EXP] | < ( [POSTFIX_EXP] ( , [POSTFIX_EXP] )* )? > ) <-- )?`
         * FUNC_CALL_ARGS
             * `\( ([VALUE] ( , [VALUE] )* )? \)`
 * WHILE
@@ -157,9 +157,9 @@ if marked with `const` there must be a constant initial value
 * IF
     * `if \( [VALUE] \) [COMMAND] ( else [COMMAND] )?`
 * ASSEMBLER
-    * `asm ( [STRING] &lt;-- [VALUE] )* [ASM_BLOCK] ( [VALUE] &lt;-- [STRING] )* ;`
+    * `asm ( [STRING] <-- [VALUE] )* [ASM_BLOCK] ( [VALUE] <-- [STRING] )* ;`
         * ASM_BLOCK
-            * `::: ( [^&gt;] | &gt; [^&gt;] | &gt;&gt; [^&gt;] )* &gt;&gt;&gt;`
+            * `::: ( [^>] | > [^>] | >> [^>] )* >>>`
 
 ### VALUE
 
@@ -180,9 +180,9 @@ if marked with `const` there must be a constant initial value
 * EQ_EXP
     * `[REL_EXP] ( ( != | == ) [REL_EXP] )*`
 * REL_EXP
-    * `[REL_EXP] ( ( &gt; | &gt;= | &lt;= | &lt; ) [REL_EXP] )*`
+    * `[REL_EXP] ( ( > | >= | <= | < ) [REL_EXP] )*`
 * SHIFT_EXP
-    * `[SHIFT_EXP] ( ( &lt;&lt; | &gt;&gt; | &gt;&gt;&gt; ) [SHIFT_EXP] )*`
+    * `[SHIFT_EXP] ( ( << | >> | >>> ) [SHIFT_EXP] )*`
 * ADD_EXP
     * `[MUL_EXP] ( ( \+ | - ) [MUL_EXP] )*`
 * MUL_EXP
