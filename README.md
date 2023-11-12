@@ -8,13 +8,15 @@ simple-code is a simple programming language.
 
 ### simple-export-file
 
-`( [variable] | [typedef] | [dep-function] )* EOF`
+`( [dependency] | [variable] | [typedef] | [dep-function] )* EOF`
 
 * note that simple-export-files are parsed with some special rulse:
     * `exp` markings are ignored
         * this is a export file, everything here is here because it was exported!
     * only `const` variables are allowed to have an initilizer
         * having a `const` variable without initilizer is still an error
+    * dependencies must be of type `simple-export-file`
+    * dependencies must not use `&lt;ME&gt;` instead of a `NAME`
 
 ### dependency
 
