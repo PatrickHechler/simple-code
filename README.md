@@ -119,7 +119,7 @@ if marked with `const` there must be a constant initial value
                 * when using this some entries may not be aligned
     * `[TYPE] #` : a pointer to a value of TYPE
     * `[TYPE] \[ [VALUE]? \]` : an array of values of TYPE
-    * `addr? [FUNC_TYPE]` : a function address
+    * `[FUNC_TYPE]` : a function address
     * `fstuct ( [NAME] | [FUNC_TYPE0] )` : a function call structure
 
 ### FUNC_TYPE
@@ -202,29 +202,40 @@ if marked with `const` there must be a constant initial value
 * DIRECT_EXP
     * `[STRING]+`
     * `[CHARACTER]`
-    * `[NUM]`
-    * `[FPNUM]`
+    * `[NUMBER]`
     * `\( [VALUE] \)`
 * STRING
     * `"([^"\\\r\n\0]|\\(["rnt0\\]|u[0-9A-Fa-f]{4}))*"`
 * CHARACTER
     * `'([^'\\\r\n\0]|\\(['rnt0\\]|u[0-9A-Fa-f]{4}))'`
-* NUM
-    * `[0-9]+`
-        * same as `DEC-[0-9]+`
-    * `-[0-9]+`
-        * same as `NDEC-[0-9]+`
-    * `DEC-[0-9]+`
-    * `NDEC-[0-9]+`
-    * `HEX-[0-9A-F]+`
-    * `UHEX-[0-9A-F]+`
-    * `NHEX-[0-9A-F]+`
-    * `BIN-[01]+`
-    * `NBIN-[01]+`
-    * `OCT-[0-7]+`
-    * `NOCT-[0-7]+`
-* FPNUM
-    * `-?([0-9]*.[0-9]+|[0-9]+.[0-9]*)`
+* NUMBER
+    * `[SCALAR_NUM]([Ss]|[Uu])?([QqNn]|[Dd]|[Ww]|[Bb])?`
+        * the sign (first) postfix:
+            * `U|u` is only allowed for positive numbers (zero is positive)
+            * if emited:
+                * positive numbers are unsigned
+                * negative numbers are signed
+        * if present, the size (second) postfix must not truncate the number (`256b` is disallowed)
+            * `Q|q|N|n`: `num`/`unum`
+            * `D|d`: `dword`/`udword`
+            * `W|w`: `word`/`uword`
+            * `B|b`: `byte`/`ubyte`
+    * SCALAR_NUM:
+        * `[0-9]+`
+            * same as `DEC-[0-9]+`
+        * `-[0-9]+`
+            * same as `NDEC-[0-9]+`
+        * `DEC-[0-9]+`
+        * `NDEC-[0-9]+`
+        * `HEX-[0-9A-F]+`
+        * `UHEX-[0-9A-F]+`
+        * `NHEX-[0-9A-F]+`
+        * `BIN-[01]+`
+        * `NBIN-[01]+`
+        * `OCT-[0-7]+`
+        * `NOCT-[0-7]+`
+    * FPNUM:
+        * `-?([0-9]*.[0-9]+|[0-9]+.[0-9]*)`
 
 ## comments
 

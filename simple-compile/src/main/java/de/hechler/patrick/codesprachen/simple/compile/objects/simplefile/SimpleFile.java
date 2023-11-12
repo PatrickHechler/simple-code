@@ -64,7 +64,7 @@ public class SimpleFile extends SimpleDependency {
 	public void function(SimpleFunction func, String name, ErrorContext ctx) {
 		checkDuplicateName(name, ctx);
 		this.functions.put(name, func);
-		int flags = func.type().flags();
+		int flags = func.type.flags();
 		if ( ( flags & FuncType.FLAG_INIT ) != 0 ) {
 			if ( this.init != null ) {
 				throw new CompileError(ctx, "there is already a function marked with init: "

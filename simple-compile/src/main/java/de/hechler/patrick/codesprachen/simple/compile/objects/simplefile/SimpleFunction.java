@@ -4,9 +4,12 @@ import de.hechler.patrick.codesprachen.simple.compile.objects.types.FuncType;
 
 public class SimpleFunction {
 	
-	public FuncType type() {
-		// TODO Auto-generated method stub
-		return null;
+	public final String   name;
+	public final FuncType type;
+	
+	public SimpleFunction(String name, FuncType type) {
+		this.name = name;
+		this.type = type;
 	}
 	
 }

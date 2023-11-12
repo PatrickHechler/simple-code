@@ -16,12 +16,11 @@ public record FuncType(List<SimpleVariable> resMembers, List<SimpleVariable> arg
 	public static final int FLAG_INIT = 0x0400;
 	public static final int FLAG_NOPAD = StructType.FLAG_NOPAD;
 	public static final int ALL_FLAGS = FLAG_EXPORT | FLAG_MAIN | FLAG_INIT | FLAG_NOPAD;
+	public static final int STRUCTURAL_FLAGS = FLAG_NOPAD;
 	
 	public static final FuncType MAIN_TYPE = create(List.of(//
-		new SimpleVariable(NativeType.UNUM, "argc", 0),//
-		new SimpleVariable(
-			PointerType.create(PointerType.create(NativeType.UBYTE, NO_CONTEXT), NO_CONTEXT),
-			"argv", 0)//
+		new SimpleVariable(NativeType.UNUM, "argc", 0), //
+		new SimpleVariable(PointerType.create(PointerType.create(NativeType.UBYTE, NO_CONTEXT), NO_CONTEXT), "argv", 0)//
 	), List.of(new SimpleVariable(NativeType.UBYTE, "exitnum", 0)), FLAG_MAIN, NO_CONTEXT);
 	
 	public static final FuncType INIT_TYPE = create(List.of(), List.of(), FLAG_INIT, NO_CONTEXT);
@@ -115,8 +114,8 @@ public record FuncType(List<SimpleVariable> resMembers, List<SimpleVariable> arg
 	
 	@Override
 	public int hashCode() {
-		final int prime  = 31;
-		int       result = 1;
+		final int prime = 31;
+		int result = 1;
 		result = prime * result + this.flags;
 		result = StructType.hashCode(result, this.argMembers);
 		result = StructType.hashCode(result, this.resMembers);
@@ -149,11 +148,12 @@ public record FuncType(List<SimpleVariable> resMembers, List<SimpleVariable> arg
 		return StructType.equals(this.resMembers, other.resMembers);
 	}
 	
-	public boolean equalsIgnoreFlags(Object obj) {
+	public boolean equalsIgnoreNonStructuralFlags(Object obj) {
 		if ( this == obj ) return true;
 		if ( obj == null ) return false;
 		if ( getClass() != obj.getClass() ) return false;
 		FuncType other = (FuncType) obj;
+		if ( ( this.flags & STRUCTURAL_FLAGS ) != ( other.flags & STRUCTURAL_FLAGS ) ) return false;
 		if ( !StructType.equals(this.argMembers, other.argMembers) ) return false;
 		return StructType.equals(this.resMembers, other.resMembers);
 	}
