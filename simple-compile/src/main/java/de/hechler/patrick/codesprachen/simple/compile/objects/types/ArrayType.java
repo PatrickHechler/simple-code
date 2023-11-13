@@ -22,7 +22,7 @@ public record ArrayType(SimpleType target, long length) implements SimpleType {
 	
 	public static ArrayType create(SimpleType target, SimpleValue length, ErrorContext ctx) {
 		if ( length == null ) create(target, -1L, ctx);
-		length = length.simplify();
+		length = length.superSimplify();
 		if ( length instanceof ScalarNumericVal snv && snv.value() >= 0L ) {
 			return create(target, snv.value(), ctx);
 		}

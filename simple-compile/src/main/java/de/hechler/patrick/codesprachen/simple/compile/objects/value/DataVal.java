@@ -8,10 +8,20 @@ import de.hechler.patrick.codesprachen.simple.compile.error.CompileError;
 import de.hechler.patrick.codesprachen.simple.compile.error.ErrorContext;
 import de.hechler.patrick.codesprachen.simple.compile.objects.types.ArrayType;
 import de.hechler.patrick.codesprachen.simple.compile.objects.types.NativeType;
+import de.hechler.patrick.codesprachen.simple.compile.objects.types.PointerType;
 import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleType;
 import de.hechler.patrick.codesprachen.simple.compile.objects.types.StructType;
 
-public record DataVal(byte[] value, SimpleType type, ErrorContext ctx) implements SimpleValue {
+public record DataVal(byte[] value, SimpleType type, ErrorContext ctx, DataVal orig, long off, boolean deref)
+	implements SimpleValue {
+	
+	public DataVal(byte[] value, SimpleType type, ErrorContext ctx) {
+		this(value, type, ctx, null, 0L, false);
+	}
+	
+	public DataVal(DataVal orig, long off, boolean deref, SimpleType type, ErrorContext ctx) {
+		this(null, type, ctx, orig.orig == null ? orig : orig.orig, orig.orig == null ? off : off + orig.off, deref);
+	}
 	
 	public static SimpleValue createString(List<String> value, ErrorContext ctx) {
 		StringBuilder sb = new StringBuilder(value.stream().mapToInt(String::length).sum() + 1);
@@ -66,14 +76,12 @@ public record DataVal(byte[] value, SimpleType type, ErrorContext ctx) implement
 	
 	@Override
 	public String toString() {
-		if ( this.type instanceof ArrayType at ) {
-			if ( at.target() == NativeType.UBYTE ) {
-				return "\"" + new String(Arrays.copyOf(this.value, this.value.length - 1), StandardCharsets.UTF_8)
-					.replace("\0", "\\0").replace("\r", "\\r").replace("\n", "\\n").replace("\t", "\\t")
-					.replace("\"", "\\\"") + "\""; // note that \u0000 escape sequences are not supported in the
-													// backwards translation
+		if ( this.orig != null ) {
+			if ( this.deref ) {
+				PointerType ptype = PointerType.create(this.type, ErrorContext.NO_CONTEXT);
+				return "( (" + ptype + ") ((ubyte#) " + this.orig + " + " + this.off + ") )#";
 			}
-			return fallbackToString();
+			return "( (" + this.type + ") ((ubyte#) " + this.orig + " + " + this.off + ") )";
 		}
 		return fallbackToString();
 	}

@@ -2,13 +2,89 @@ package de.hechler.patrick.codesprachen.simple.compile.objects.value;
 
 import de.hechler.patrick.codesprachen.simple.compile.error.CompileError;
 import de.hechler.patrick.codesprachen.simple.compile.error.ErrorContext;
+import de.hechler.patrick.codesprachen.simple.compile.objects.types.ArrayType;
+import de.hechler.patrick.codesprachen.simple.compile.objects.types.NativeType;
+import de.hechler.patrick.codesprachen.simple.compile.objects.types.PointerType;
 import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleType;
 
 public interface SimpleValue {
 	
 	SimpleType type();
 	
+	@Deprecated
 	SimpleValue simplify();
+	
+	default SimpleValue superSimplify() {
+		SimpleValue res = simplify();
+		if ( res instanceof DataVal dv && dv.deref() ) {
+			return switch ( type() ) {// no need to extend the 64-bit unum to a 64-bit value
+			case NativeType.NUM, NativeType.UNUM -> _SSH.toScalar(this, dv, 8, false);
+			case NativeType.FPNUM -> _SSH.toFP(this, dv, 8);
+			case NativeType.FPDWORD -> _SSH.toFP(this, dv, 4);
+			case NativeType.DWORD -> _SSH.toScalar(this, dv, 4, false);
+			case NativeType.UDWORD -> _SSH.toScalar(this, dv, 4, true);
+			case NativeType.WORD -> _SSH.toScalar(this, dv, 2, false);
+			case NativeType.UWORD -> _SSH.toScalar(this, dv, 2, true);
+			case NativeType.BYTE -> _SSH.toScalar(this, dv, 2, false);
+			case NativeType.UBYTE -> _SSH.toScalar(this, dv, 2, true);
+			case PointerType _a -> _SSH.toScalar(this, dv, 8, false);
+			case ArrayType _a -> _SSH.toScalar(this, dv, 8, false);
+			case SimpleType _a -> res;
+			};
+		}
+		return res;
+	}
+	
+	static class _SSH {
+		
+		private static SimpleValue toScalar(SimpleValue orig, DataVal dv, int len, boolean signExtend) {
+			if ( invalid(orig, dv, len) ) {
+				return dv;
+			}
+			long value = toLong(dv, len, signExtend);
+			return ScalarNumericVal.create(orig.type(), value, ErrorContext.NO_CONTEXT);
+		}
+		
+		private static SimpleValue toFP(SimpleValue orig, DataVal dv, int len) {
+			if ( invalid(orig, dv, len) ) {
+				return dv;
+			}
+			long value = toLong(dv, len, false);
+			double fpVal = len == 4 ? Float.intBitsToFloat((int) value) : Double.longBitsToDouble(value);
+			return FPNumericVal.create((NativeType) orig.type(), fpVal, ErrorContext.NO_CONTEXT);
+		}
+		
+		private static long toLong(DataVal dv, int len, boolean signExtend) {
+			long value = 0;
+			byte[] data = dv.orig().value();
+			int off = (int) dv.off();
+			for (int i = 0; i < len; i++) {
+				value |= ( 0xFFL & data[off + i] ) << ( i << 3 );
+			}
+			if ( signExtend ) {// value & bit(( len * 8 ) - 1)
+				int highestBit = 1 << ( ( len << 3 ) - 1 );
+				if ( ( value & highestBit ) != 0 ) {
+					value |= ~( highestBit - 1 );
+				}
+			}
+			return value;
+		}
+		
+		private static boolean invalid(SimpleValue orig, DataVal dv, int len) {
+			if ( dv.off() < 0 || dv.orig().value().length - len <= dv.off() ) {
+				System.err.println("[WARNING]: attempt to dereference an array outside of its bounds: " + orig.ctx());
+				System.err.println("           value: " + orig);
+				System.err.println("           simplified-value: " + dv);
+				System.err.println("           offset: " + dv.off());
+				System.err.println("           array-length (in bytes): " + dv.orig().value().length);
+				System.err.println("           deref-block-length (in bytes): " + len);
+				System.err.println("           deref-block (in bytes): " + dv.off() + " .. " + ( dv.off() + len ));
+				return true;
+			}
+			return false;
+		}
+		
+	}
 	
 	ErrorContext ctx();
 	
@@ -16,6 +92,13 @@ public interface SimpleValue {
 		throw new CompileError(ctx, "this value (" + this + ") is not assignable");
 	}
 	
+	// false positives are better than false negatives
+	// false negatives lead to non optimized values
+	// false positives can lead to some wasted calculation power (but the same result)
+	// if it is hard to calculate if this is a constant and it would be again needed when the value should be optimized,
+	// just return true
+	// also some values are in only some ways constant, then also return true (for example a string has no known runtime
+	// address but known content)
 	default boolean isConstant() {
 		return false;
 	}

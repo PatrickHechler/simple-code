@@ -223,18 +223,47 @@ public record BinaryOpVal(SimpleValue a, BinaryOp op, SimpleValue b, ErrorContex
 	@Override
 	public boolean isConstant() {
 		return switch ( this.op ) {
-		case ARR_PNTR_INDEX -> this.a instanceof DataVal && this.b.isConstant();
 		case DEREF_BY_NAME -> this.a.isConstant();
 		case BOOL_AND -> this.a.isConstant() && this.b.isConstant()
-			|| ( this.a.simplify() instanceof ScalarNumericVal snv && snv.value() == 0L );
+			|| ( this.a.superSimplify() instanceof ScalarNumericVal snv && snv.value() == 0L );
 		case BOOL_OR -> this.a.isConstant() && this.b.isConstant()
-			|| ( this.a.simplify() instanceof ScalarNumericVal snv && snv.value() != 0L );
+			|| ( this.a.superSimplify() instanceof ScalarNumericVal snv && snv.value() != 0L );
 		default -> this.a.isConstant() && this.b.isConstant();
 		};
 	}
-
+	
 	@Override
-	public SimpleValue simplify() { // TODO Auto-generated method stub
-	return null; }
+	public SimpleValue simplify() {
+		if ( !isConstant() ) {
+			return create(this.a.simplify(), this.op, this.b.simplify(), ctx);
+		}
+		SimpleValue sa = this.a.simplify();
+		SimpleValue sb = this.b.simplify();
+		return switch ( this.op ) {
+		case ARR_PNTR_INDEX -> {
+			
+		}
+		case BIT_AND -> null;
+		case BIT_OR -> null;
+		case BIT_XOR -> null;
+		case BOOL_AND -> null;
+		case BOOL_OR -> null;
+		case CMP_EQ -> null;
+		case CMP_GE -> null;
+		case CMP_GT -> null;
+		case CMP_LE -> null;
+		case CMP_LT -> null;
+		case CMP_NEQ -> null;
+		case DEREF_BY_NAME -> null;
+		case MATH_ADD -> null;
+		case MATH_DIV -> null;
+		case MATH_MOD -> null;
+		case MATH_MUL -> null;
+		case MATH_SUB -> null;
+		case SHIFT_ARITMETIC_RIGTH -> null;
+		case SHIFT_LEFT -> null;
+		case SHIFT_LOGIC_RIGTH -> null;
+		};
+	}
 	
 }

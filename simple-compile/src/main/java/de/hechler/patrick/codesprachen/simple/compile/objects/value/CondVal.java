@@ -28,6 +28,18 @@ public record CondVal(SimpleValue condition, SimpleValue trueValue, SimpleValue 
 	}
 	
 	@Override
+	public SimpleValue simplify() {
+		SimpleValue c = this.condition.simplify();
+		if ( c instanceof ScalarNumericVal snv && snv.value() != 0L || c instanceof AddressOfVal
+			|| c instanceof DataVal ) {
+			return this.trueValue.simplify();
+		} else if ( c instanceof ScalarNumericVal snv ) {
+			return this.falseValue.simplify();
+		}
+		return create(c, this.trueValue.simplify(), this.falseValue.simplify(), ctx);
+	}
+	
+	@Override
 	public String toString() {
 		return "(" + this.condition + " ? " + this.trueValue + " : " + this.falseValue + ")";
 	}

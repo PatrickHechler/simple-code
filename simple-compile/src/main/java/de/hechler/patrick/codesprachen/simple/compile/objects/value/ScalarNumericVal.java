@@ -8,6 +8,22 @@ import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleType;
 
 public record ScalarNumericVal(SimpleType type, long value, ErrorContext ctx) implements SimpleValue {
 	
+	public static SimpleValue createAllowTruncate(SimpleType type, long value, ErrorContext ctx) throws CompileError {
+		switch ( type ) {
+		case NativeType.UNUM, NativeType.NUM -> {}
+		case NativeType.UDWORD -> value = Integer.toUnsignedLong((int) value);
+		case NativeType.UWORD -> value = Short.toUnsignedLong((short) value);
+		case NativeType.UBYTE -> value = Byte.toUnsignedLong((byte) value);
+		case NativeType.DWORD -> value = (int) value;
+		case NativeType.WORD -> value = (short) value;
+		case NativeType.BYTE -> value = (byte) value;
+		case NativeType.FPDWORD, NativeType.FPNUM -> throw new AssertionError();
+		case PointerType pt -> {}
+		case SimpleType st -> System.err.println("[WARN]: there is some crazy number type: " + st);
+		}
+		return new ScalarNumericVal(type, value, ctx);
+	}
+	
 	public static SimpleValue create(SimpleType type, long value, ErrorContext ctx) throws CompileError {
 		switch ( type ) {
 		case NativeType.UNUM, NativeType.NUM -> {}
