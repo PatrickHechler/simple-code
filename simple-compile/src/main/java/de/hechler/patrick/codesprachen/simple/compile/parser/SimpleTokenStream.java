@@ -15,6 +15,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
 import de.hechler.patrick.codesprachen.simple.compile.error.CompileError;
+import de.hechler.patrick.codesprachen.simple.compile.error.ErrorContext;
 
 public class SimpleTokenStream {
 	
@@ -173,9 +174,33 @@ public class SimpleTokenStream {
 	private final InputStream in;
 	public final String       file;
 	
+	private final ErrorContext ctx;
+	
 	public SimpleTokenStream(InputStream in, String file) {
 		this.in = in.markSupported() ? in : new BufferedInputStream(in);
 		this.file = file;
+		this.ctx = new ErrorContext(file, this::offendingToken);
+	}
+	
+	
+	public int line() {
+		return line;
+	}
+	
+	public int charInLine() {
+		return charInLine;
+	}
+	
+	public int totalChar() {
+		return totalChar;
+	}
+	
+	public ErrorContext ctx() {
+		this.ctx.charInLine = this.charInLine;
+		this.ctx.line = this.line;
+		this.ctx.totalChar = this.totalChar;
+		this.ctx.setOffendingTokenCach(null);
+		return this.ctx;
 	}
 	
 	public void consume() {
@@ -215,13 +240,31 @@ public class SimpleTokenStream {
 		return name(this.tok);
 	}
 	
-	public String dynamicTokenSpecialText() {
+	public String consumeDynTokSpecialText() {
+		String dt = this.dynTok;
+		assert dt != null : "dynamicTokenSpecialText called, but there is no dynamic token";
+		this.tok = -1;
+		this.dynTok = null;
+		return dt;
+	}
+	
+	public String dynTokSpecialText() {
 		String dt = this.dynTok;
 		assert dt != null : "dynamicTokenSpecialText called, but there is no dynamic token";
 		return dt;
 	}
 	
-	public int token() {
+	/**
+	 * note that this method only returns and consumes the token, if the {@link #dynTokSpecialText()} is needed it is
+	 * cached until {@link #consume()} or {@link #consumeDynTokSpecialText()} is called
+	 */
+	public int consumeTok() {
+		int t = tok();
+		this.tok = -1;
+		return t;
+	}
+	
+	public int tok() {
 		if ( tok >= 0 ) {
 			return tok;
 		}
@@ -386,12 +429,16 @@ public class SimpleTokenStream {
 					switch ( val ) {
 					case 'S', 's', 'U', 'u':
 						sb.append(val);
-						if ( ++i >= r ) val = in.read();
-						else val = bytes[i];
+						if ( ++i >= r ) {
+							i = 0;
+							in.mark(1);
+							val = in.read();
+						} else val = bytes[i];
 					}
 					switch ( val ) {
 					case 'Q', 'q', 'N', 'n', 'D', 'd', 'W', 'w', 'B', 'b':
 						sb.append(val);
+						i++;
 					}
 					in.reset();
 					in.skipNBytes(i);
@@ -440,9 +487,6 @@ public class SimpleTokenStream {
 					if ( bytes[i] == '.' && !alreadyDot ) {
 						alreadyDot = true;
 					} else {
-						switch (bytes[i]) {
-						case 'Q', 'q', 'N', 'n', 'D', 'd';
-						}
 						this.dynTok = sb.toString();
 						if ( this.dynTok.length() == 1 && ".".equals(this.dynTok) ) {
 							this.dynTok = null; // needs to be changed when there is a . token
@@ -455,7 +499,14 @@ public class SimpleTokenStream {
 							return MINUS;
 						}
 						in.reset();
-						in.skipNBytes(i);
+						switch ( bytes[i] ) {
+						case 'Q', 'q', 'N', 'n', 'D', 'd':
+							sb.append((char) bytes[i]);
+							in.skipNBytes(i + 1);
+							break;
+						default:
+							in.skipNBytes(i);
+						}
 						this.charInLine += this.dynTok.length();
 						this.totalChar += this.dynTok.length();
 						this.tok = NUMBER;
@@ -791,13 +842,13 @@ public class SimpleTokenStream {
 	public static void main(String[] args) throws IllegalArgumentException, IllegalAccessException {
 		ByteArrayInputStream bais = new ByteArrayInputStream("dep hello world".getBytes(StandardCharsets.UTF_8));
 		SimpleTokenStream sts = new SimpleTokenStream(bais, null);
-		System.out.println(sts.token() + " : " + name(sts.tok) + " : " + sts.dynamicTokenSpecialText());
+		System.out.println(sts.tok() + " : " + name(sts.tok) + " : " + sts.dynTokSpecialText());
 		System.out.println("  at line " + sts.line + ':' + sts.charInLine + " (total char: " + sts.totalChar + ')');
 		sts.consume();
-		System.out.println(sts.token() + " : " + name(sts.tok) + " : " + sts.dynamicTokenSpecialText());
+		System.out.println(sts.tok() + " : " + name(sts.tok) + " : " + sts.dynTokSpecialText());
 		System.out.println("  at line " + sts.line + ':' + sts.charInLine + " (total char: " + sts.totalChar + ')');
 		sts.consume();
-		System.out.println(sts.token() + " : " + name(sts.tok) + " : " + sts.dynamicTokenSpecialText());
+		System.out.println(sts.tok() + " : " + name(sts.tok) + " : " + sts.dynTokSpecialText());
 		System.out.println("  at line " + sts.line + ':' + sts.charInLine + " (total char: " + sts.totalChar + ')');
 		for (Field f : SimpleTokenStream.class.getDeclaredFields()) {
 			int fmods = f.getModifiers();

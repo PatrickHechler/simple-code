@@ -1,8 +1,16 @@
 package de.hechler.patrick.codesprachen.simple.compile.parser;
 
-import static de.hechler.patrick.codesprachen.simple.compile.parser.SimpleTokenStream.*;
+import static de.hechler.patrick.codesprachen.simple.compile.parser.SimpleTokenStream.DEP;
+import static de.hechler.patrick.codesprachen.simple.compile.parser.SimpleTokenStream.EOF;
+import static de.hechler.patrick.codesprachen.simple.compile.parser.SimpleTokenStream.FUNC;
+import static de.hechler.patrick.codesprachen.simple.compile.parser.SimpleTokenStream.NAME;
+import static de.hechler.patrick.codesprachen.simple.compile.parser.SimpleTokenStream.SEMI;
+import static de.hechler.patrick.codesprachen.simple.compile.parser.SimpleTokenStream.STRING;
+import static de.hechler.patrick.codesprachen.simple.compile.parser.SimpleTokenStream.TYPEDEF;
 
 import java.io.InputStream;
+import java.util.List;
+import java.util.function.BiFunction;
 
 import de.hechler.patrick.codesprachen.simple.compile.error.CompileError;
 import de.hechler.patrick.codesprachen.simple.compile.objects.simplefile.SimpleDependency;
@@ -10,21 +18,23 @@ import de.hechler.patrick.codesprachen.simple.compile.objects.simplefile.SimpleF
 
 public class SimpleExportFileParser {
 	
-	private final SimpleTokenStream in;
+	private final SimpleTokenStream                          in;
+	private final BiFunction<String,String,SimpleDependency> dep;
 	
-	public SimpleExportFileParser(InputStream in, String file) {
-		this(new SimpleTokenStream(in, file));
+	public SimpleExportFileParser(InputStream in, String file, BiFunction<String,String,SimpleDependency> dep) {
+		this(new SimpleTokenStream(in, file), dep);
 	}
 	
-	public SimpleExportFileParser(SimpleTokenStream in) {
+	public SimpleExportFileParser(SimpleTokenStream in, BiFunction<String,String,SimpleDependency> dep) {
 		this.in = in;
+		this.dep = dep;
 	}
 	
 	
 	public SimpleDependency parse(String runtimePath) {
 		SimpleFile sf = new SimpleFile(runtimePath);
 		while ( true ) {
-			switch ( in.token() ) {
+			switch ( in.tok() ) {
 			case DEP:
 				parseDependency(sf);
 				break;
@@ -44,8 +54,23 @@ public class SimpleExportFileParser {
 	
 	protected void parseDependency(SimpleFile sf) {
 		in.consume();
-		if (in.token() != NAME) {
-			throw new CompileError(in.file, in.line, in.file, CHAR, null, null, null)
+		expectToken(NAME, "expected to get `[NAME] [STRING] ;´ after `dep´");
+		String name = in.consumeDynTokSpecialText();
+		expectToken(STRING, "expected to get `[STRING] ;´ after `dep [NAME]´");
+		String path = in.consumeDynTokSpecialText();
+		consumeToken(SEMI, "expected to get `;´ after `dep [NAME] [STRING]´");
+		sf.dependency(dep.apply(name, path), name, in.ctx());
+	}
+	
+	private void expectToken(int tok, String msg) {
+		if ( in.tok() != tok ) {
+			throw new CompileError(in.ctx(), List.of(SimpleTokenStream.name(tok)), msg);
+		}
+	}
+	
+	private void consumeToken(int tok, String msg) {
+		if ( in.consumeTok() != tok ) {
+			throw new CompileError(in.ctx(), List.of(SimpleTokenStream.name(tok)), msg);
 		}
 	}
 	
