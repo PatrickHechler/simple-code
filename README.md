@@ -68,6 +68,7 @@ a function is a block of commands used to do something for example convert the a
 `func (exp)? [NAME] [TYPE] ;`
 
 * like `[function]`, but there are no `main`/`init` marks allowed and the `[BLOCK]` is replaced by a `;`
+    * `(exp)?` replaces `[FUNC_MARKS_AND_NAME]`, because it allows anonymus functions when marked with `main`/`init`
 
 ### variable
 
