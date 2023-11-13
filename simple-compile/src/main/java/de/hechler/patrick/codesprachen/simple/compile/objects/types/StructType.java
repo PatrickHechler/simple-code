@@ -42,11 +42,11 @@ public record StructType(List<SimpleVariable> members, int flags) implements Sim
 	
 	static long size(List<SimpleVariable> members, int flags) {
 		if ( members.isEmpty() ) return 0L;
-		long mySize     = members.get(0).type().size();
-		int  totalAlign = members.get(0).type().align();
+		long mySize = members.get(0).type().size();
+		int totalAlign = members.get(0).type().align();
 		for (int i = 1, s = members.size(); i < s; i++) {
-			SimpleType t     = members.get(i).type();
-			long       tsize = t.size();
+			SimpleType t = members.get(i).type();
+			long tsize = t.size();
 			if ( ( flags & FLAG_NOPAD ) == 0 ) {
 				int talign = t.align();
 				if ( talign > totalAlign ) {
@@ -129,8 +129,8 @@ public record StructType(List<SimpleVariable> members, int flags) implements Sim
 	
 	@Override
 	public int hashCode() {
-		final int prime  = 31;
-		int       result = 1;
+		final int prime = 31;
+		int result = 1;
 		result = prime * result + this.flags;
 		return hashCode(result, this.members);
 	}
@@ -165,9 +165,13 @@ public record StructType(List<SimpleVariable> members, int flags) implements Sim
 	}
 	
 	public void checkHasMember(String name, ErrorContext ctx) {
+		member(name, ctx);
+	}
+	
+	public SimpleVariable member(String name, ErrorContext ctx) {
 		for (SimpleVariable sv : this.members) {
 			if ( name.equals(sv.name()) ) {
-				return;
+				return sv;
 			}
 		}
 		throw new CompileError(ctx,

@@ -6,12 +6,12 @@ public class CompileError extends RuntimeException {
 	
 	private static final long serialVersionUID = 624098131567818737L;
 	
-	public final String       file;
-	public final int          line;
-	public final int          charInLine;
-	public final int          totalChar;
-	public final String       offendingToken;
-	public final List<String> expectedTokens;// NOSONAR the list is serializable
+	public String        file;
+	public final int     line;
+	public final int     charInLine;
+	public final int     totalChar;
+	public final String  offendingToken;
+	private List<String> expectedTokens;// NOSONAR the list is serializable
 	
 	public CompileError(ErrorContext ctx, List<String> expectedTokens) {
 		this(ctx.file, ctx.line, ctx.charInLine, ctx.totalChar, ctx.offendingToken, expectedTokens, null);
@@ -28,10 +28,10 @@ public class CompileError extends RuntimeException {
 	public CompileError(String file, int line, int charInLine, int totalChar, String offendingToken,
 		List<String> expectedTokens, String additionalMessage) {
 		super(generateMessage(file, line, charInLine, totalChar, offendingToken, expectedTokens, additionalMessage));
-		this.file           = file;
-		this.line           = line;
-		this.charInLine     = charInLine;
-		this.totalChar      = totalChar;
+		this.file = file;
+		this.line = line;
+		this.charInLine = charInLine;
+		this.totalChar = totalChar;
 		this.offendingToken = offendingToken;
 		this.expectedTokens = expectedTokens == null ? List.of() : List.copyOf(expectedTokens);
 	}
@@ -70,6 +70,16 @@ public class CompileError extends RuntimeException {
 			b.append(']');
 		}
 		return b.toString();
+	}
+	
+	
+	public List<String> expectedTokens() {
+		return expectedTokens;
+	}
+	
+	
+	public void expectedTokens(List<String> expectedTokens) {
+		this.expectedTokens = expectedTokens == null ? null : List.copyOf(expectedTokens);
 	}
 	
 }

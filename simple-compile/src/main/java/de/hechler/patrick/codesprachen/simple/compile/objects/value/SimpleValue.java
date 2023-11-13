@@ -10,7 +10,7 @@ public interface SimpleValue {
 	
 	ErrorContext ctx();
 	
-	default void checkAssignable(SimpleType type, ErrorContext ctx) throws CompileError {
+	default void checkAssignable(@SuppressWarnings( "unused" ) SimpleType type, ErrorContext ctx) throws CompileError {
 		throw new CompileError(ctx, "this value (" + this + ") is not assignable");
 	}
 	

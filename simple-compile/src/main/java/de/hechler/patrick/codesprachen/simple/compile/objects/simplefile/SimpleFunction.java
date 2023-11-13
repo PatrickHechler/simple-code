@@ -10,6 +10,9 @@ public class SimpleFunction {
 	public SimpleFunction(String name, FuncType type) {
 		this.name = name;
 		this.type = type;
+		if ((type.flags() & FuncType.FLAG_FUNC_ADDRESS) == 0) {
+			throw new AssertionError();
+		}
 	}
 	
 }

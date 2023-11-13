@@ -15,20 +15,21 @@ public interface SimpleType {
 	
 	String toStringSingleLine();
 	
-	static <T> T castErrExplicit(SimpleType from, SimpleType to, ErrorContext ctx) {
-		throw new CompileError(ctx, "can't cast from " + from.toStringSingleLine() + " to " + to.toStringSingleLine());
+	static < T > T castErrExplicit(SimpleType from, SimpleType to, ErrorContext ctx) {
+		throw new CompileError(ctx, "can't cast from " + from.toStringSingleLine() + " to " + toToSLS(to));
 	}
 	
-	static <T> T castErrImplicit(SimpleType from, SimpleType to, ErrorContext ctx) {
-		throw new CompileError(ctx,
-			"can't implicitly cast from " + from.toStringSingleLine() + " to " + to.toStringSingleLine());
+	static < T > T castErrImplicit(SimpleType from, SimpleType to, ErrorContext ctx) {
+		throw new CompileError(ctx, "can't implicitly cast from " + from.toStringSingleLine() + " to " + toToSLS(to));
 	}
 	
-	static <T> T castErrExplicit(SimpleType from, String to, ErrorContext ctx) {
+	static String toToSLS(SimpleType to) { return to == null ? "a native type" : to.toStringSingleLine(); }
+	
+	static < T > T castErrExplicit(SimpleType from, String to, ErrorContext ctx) {
 		throw new CompileError(ctx, "can't cast from " + from.toStringSingleLine() + " to " + to);
 	}
 	
-	static <T> T castErrImplicit(SimpleType from, String to, ErrorContext ctx) {
+	static < T > T castErrImplicit(SimpleType from, String to, ErrorContext ctx) {
 		throw new CompileError(ctx, "can't implicitly cast from " + from.toStringSingleLine() + " to " + to);
 	}
 	

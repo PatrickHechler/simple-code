@@ -30,4 +30,9 @@ public class VarDeclCmd extends SimpleCommand {
 		return null;
 	}
 	
+	@Override
+	public void toString(StringBuilder append, StringBuilder indent) {
+		append.append(sv).append(';');
+	}
+	
 }

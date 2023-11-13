@@ -21,4 +21,13 @@ public abstract class SimpleCommand implements SimpleScope {
 		return parent.nameValueOrNull(name, ctx);
 	}
 	
+	@Override
+	public String toString() {
+		StringBuilder sb = new StringBuilder();
+		toString(sb, new StringBuilder());
+		return sb.toString();
+	}
+	
+	public abstract void toString(StringBuilder append, StringBuilder indent);
+	
 }

@@ -11,13 +11,14 @@ public record PointerType(SimpleType target) implements SimpleType {
 	/**
 	 * a {@link PointerType} which points to a {@link StructType#FLAG_NOUSE non usable} structure
 	 */
-	public static final PointerType POINTER = create(StructType.create(List.of(), StructType.FLAG_NOUSE, ErrorContext.NO_CONTEXT), ErrorContext.NO_CONTEXT);
+	public static final PointerType POINTER = create(
+		StructType.create(List.of(), StructType.FLAG_NOUSE, ErrorContext.NO_CONTEXT), ErrorContext.NO_CONTEXT);
 	
 	public PointerType {
 		Objects.requireNonNull(target, "target");
 	}
 	
-	public static PointerType create(SimpleType target, @SuppressWarnings("unused") ErrorContext ctx) {
+	public static PointerType create(SimpleType target, @SuppressWarnings( "unused" ) ErrorContext ctx) {
 		return new PointerType(target);
 	}
 	
@@ -57,7 +58,7 @@ public record PointerType(SimpleType target) implements SimpleType {
 		if ( type instanceof PointerType ) {
 			return;
 		}
-		if ( type == NativeType.UNUM || type == NativeType.NUM ) {
+		if ( type == NativeType.UNUM || type == NativeType.NUM || type == null ) {
 			return;
 		}
 		if ( explicit ) SimpleType.castErrExplicit(this, type, ctx);

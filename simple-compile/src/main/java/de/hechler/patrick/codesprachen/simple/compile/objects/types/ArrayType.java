@@ -14,7 +14,7 @@ public record ArrayType(SimpleType target, long length) implements SimpleType {
 		}
 	}
 	
-	public static ArrayType create(SimpleType target, long length, @SuppressWarnings("unused") ErrorContext ctx) {
+	public static ArrayType create(SimpleType target, long length, @SuppressWarnings( "unused" ) ErrorContext ctx) {
 		return new ArrayType(target, length);
 	}
 	
@@ -48,7 +48,7 @@ public record ArrayType(SimpleType target, long length) implements SimpleType {
 		if ( type == NativeType.UNUM || type == NativeType.NUM ) {
 			return type;
 		}
-	return	SimpleType.castErrImplicit(this, type, ctx);
+		return SimpleType.castErrImplicit(this, type, ctx);
 	}
 	
 	@Override
@@ -59,7 +59,7 @@ public record ArrayType(SimpleType target, long length) implements SimpleType {
 		if ( type instanceof ArrayType ) {
 			return;
 		}
-		if ( type == NativeType.UNUM || type == NativeType.NUM ) {
+		if ( type == NativeType.UNUM || type == NativeType.NUM || type == null ) {
 			return;
 		}
 		if ( explicit ) SimpleType.castErrExplicit(this, type, ctx);

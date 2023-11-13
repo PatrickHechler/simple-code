@@ -1,10 +1,8 @@
 package de.hechler.patrick.codesprachen.simple.compile.objects.cmd;
 
 import de.hechler.patrick.codesprachen.simple.compile.error.ErrorContext;
-import de.hechler.patrick.codesprachen.simple.compile.objects.simplefile.SimpleVariable;
 import de.hechler.patrick.codesprachen.simple.compile.objects.simplefile.scope.SimpleScope;
 import de.hechler.patrick.codesprachen.simple.compile.objects.value.SimpleValue;
-import de.hechler.patrick.codesprachen.simple.compile.objects.value.VariableVal;
 
 public class AssignCmd extends SimpleCommand {
 	
@@ -24,10 +22,12 @@ public class AssignCmd extends SimpleCommand {
 	
 	@Override
 	public SimpleValue directNameValueOrNull(String name, ErrorContext ctx) {
-		if ( sv.name().equals(name) ) {
-			return VariableVal.create(sv, ctx);
-		}
 		return null;
+	}
+	
+	@Override
+	public void toString(StringBuilder append, StringBuilder indent) {
+		append.append(this.target).append(" <-- ").append(this.value).append(';');
 	}
 	
 }

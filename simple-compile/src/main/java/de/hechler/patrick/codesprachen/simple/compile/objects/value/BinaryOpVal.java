@@ -1,5 +1,6 @@
 package de.hechler.patrick.codesprachen.simple.compile.objects.value;
 
+import de.hechler.patrick.codesprachen.simple.compile.error.CompileError;
 import de.hechler.patrick.codesprachen.simple.compile.error.ErrorContext;
 import de.hechler.patrick.codesprachen.simple.compile.objects.types.ArrayType;
 import de.hechler.patrick.codesprachen.simple.compile.objects.types.FuncType;
@@ -61,7 +62,7 @@ public record BinaryOpVal(SimpleValue a, BinaryOp op, SimpleValue b, ErrorContex
 			} else if ( a.type() instanceof StructType st ) {
 				st.checkHasMember(name, ctx);
 			} else if ( a.type() instanceof FuncType ft ) {
-				ft.checkHasMember(name, ctx);
+				ft.checkHasMember(name, ctx, false);
 			} else {
 				SimpleType.castErrImplicit(a.type(), "something where I can dereference with a name", ctx);
 			}
@@ -130,6 +131,26 @@ public record BinaryOpVal(SimpleValue a, BinaryOp op, SimpleValue b, ErrorContex
 		return this.a.type();
 	}
 	
+	public void checkAssignable(SimpleType type, ErrorContext ctx) throws CompileError {
+		final SimpleType at = a.type();
+		SimpleType target;
+		if ( this.op == BinaryOp.DEREF_BY_NAME ) {
+			String name = ( (NameVal) b ).name();
+			if ( at instanceof StructType st ) {
+				target = st.member(name, ctx).type();
+			} else {
+				FuncType ft = (FuncType) at;
+				target = ft.member(name, ctx, false).type();
+			}
+		} else if ( this.op == BinaryOp.ARR_PNTR_INDEX ) {
+			target = at instanceof PointerType pt ? pt.target() : ( (ArrayType) at ).target();
+		} else {
+			throw new CompileError(ctx, "this value " + this + " is not assignable");
+		}
+		type.checkCastable(target, ctx, false);
+		a.checkAssignable(at, ctx);
+	}
+	
 	public enum BinaryOpType {
 		BOOL, BIT, CMP, MATH_ADDSUB, MATH, SHIFT, ARR_PNTR_INDEX, DEREF_BY_NAME,
 	}
@@ -137,24 +158,30 @@ public record BinaryOpVal(SimpleValue a, BinaryOp op, SimpleValue b, ErrorContex
 	public enum BinaryOp {//@formatter:off
 		BOOL_OR(BinaryOpType.BOOL),
 		BOOL_AND(BinaryOpType.BOOL),
+		
 		BIT_OR(BinaryOpType.BIT),
 		BIT_XOR(BinaryOpType.BIT),
 		BIT_AND(BinaryOpType.BIT),
+		
 		CMP_EQ(BinaryOpType.CMP),
 		CMP_NEQ(BinaryOpType.CMP),
 		CMP_GT(BinaryOpType.CMP),
 		CMP_GE(BinaryOpType.CMP),
 		CMP_LT(BinaryOpType.CMP),
 		CMP_LE(BinaryOpType.CMP),
+		
 		SHIFT_LEFT(BinaryOpType.SHIFT),
 		SHIFT_LOGIC_RIGTH(BinaryOpType.SHIFT),
 		SHIFT_ARITMETIC_RIGTH(BinaryOpType.SHIFT),
+		
 		MATH_ADD(BinaryOpType.MATH_ADDSUB),
 		MATH_SUB(BinaryOpType.MATH_ADDSUB),
 		MATH_MUL(BinaryOpType.MATH),
 		MATH_DIV(BinaryOpType.MATH),
 		MATH_MOD(BinaryOpType.MATH),
+		
 		ARR_PNTR_INDEX(BinaryOpType.ARR_PNTR_INDEX),
+		
 		DEREF_BY_NAME(BinaryOpType.DEREF_BY_NAME),
 		;//@formatter:on
 		

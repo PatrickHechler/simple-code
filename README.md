@@ -220,6 +220,10 @@ if marked with `const` there must be a constant initial value
             * `D|d`: `dword`/`udword`
             * `W|w`: `word`/`uword`
             * `B|b`: `byte`/`ubyte`
+    * `[FPNUM]([QqNn]|[Dd])?`
+        * the size postfix:
+            * `Q|q|N|n`: `fpnum`
+            * `D|d`: `fpdword`
     * SCALAR_NUM:
         * `[0-9]+`
             * same as `DEC-[0-9]+`

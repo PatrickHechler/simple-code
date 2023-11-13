@@ -100,7 +100,7 @@ public enum NativeType implements SimpleType {
 	
 	@Override
 	public void checkCastable(SimpleType type, ErrorContext ctx, boolean explicit) throws CompileError {
-		if ( type instanceof NativeType ) {
+		if ( type instanceof NativeType || type == null ) {
 			return;
 		}
 		if ( ( this == UNUM || this == NUM ) && type instanceof PointerType ) {

@@ -53,4 +53,19 @@ public class BlockCmd extends SimpleCommand {
 		throw new AssertionError("nameValue(String,ErrCtx) called on BlockCmd (there should be [BLOCK]:[NAME])!");
 	}
 	
+	@Override
+	public void toString(StringBuilder append, StringBuilder indent) {
+		if (this.cmds.isEmpty()) {
+			append.append("{ }");
+			return;
+		}
+		append.append("{\n");
+		indent.append("    ");
+		for (SimpleCommand c : cmds) {
+			append.append(indent).append(c);
+		}
+		indent.replace(indent.length() - 4, indent.length(), "");
+		append.append(indent).append('}');
+	}
+	
 }
