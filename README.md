@@ -207,7 +207,7 @@ if marked with `const` there must be a constant initial value
 * STRING
     * `"([^"\\\r\n\0]|\\(["rnt0\\]|u[0-9A-Fa-f]{4}))*"`
 * CHARACTER
-    * `'([^'\\\r\n\0]|\\(['rnt0\\]|u[0-9A-Fa-f]{4}))'`
+    * `'([^'\\\r\n\0]|\\(['rnt0\\]))'`
 * NUMBER
     * `[SCALAR_NUM]([Ss]|[Uu])?([QqNn]|[Dd]|[Ww]|[Bb])?`
         * the sign (first) postfix:
