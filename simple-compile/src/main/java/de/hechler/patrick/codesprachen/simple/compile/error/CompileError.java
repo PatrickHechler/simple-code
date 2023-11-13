@@ -14,15 +14,15 @@ public class CompileError extends RuntimeException {
 	private List<String> expectedTokens;// NOSONAR the list is serializable
 	
 	public CompileError(ErrorContext ctx, List<String> expectedTokens) {
-		this(ctx.file, ctx.line, ctx.charInLine, ctx.totalChar, ctx.offendingToken, expectedTokens, null);
+		this(ctx.file, ctx.line, ctx.charInLine, ctx.totalChar, ctx.offendingToken(), expectedTokens, null);
 	}
 	
 	public CompileError(ErrorContext ctx, String additionalMsg) {
-		this(ctx.file, ctx.line, ctx.charInLine, ctx.totalChar, ctx.offendingToken, null, additionalMsg);
+		this(ctx.file, ctx.line, ctx.charInLine, ctx.totalChar, ctx.offendingToken(), null, additionalMsg);
 	}
 	
 	public CompileError(ErrorContext ctx, List<String> expectedTokens, String additionalMsg) {
-		this(ctx.file, ctx.line, ctx.charInLine, ctx.totalChar, ctx.offendingToken, expectedTokens, additionalMsg);
+		this(ctx.file, ctx.line, ctx.charInLine, ctx.totalChar, ctx.offendingToken(), expectedTokens, additionalMsg);
 	}
 	
 	public CompileError(String file, int line, int charInLine, int totalChar, String offendingToken,

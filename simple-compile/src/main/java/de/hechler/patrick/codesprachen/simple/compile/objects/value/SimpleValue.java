@@ -8,10 +8,16 @@ public interface SimpleValue {
 	
 	SimpleType type();
 	
+	SimpleValue simplify();
+	
 	ErrorContext ctx();
 	
 	default void checkAssignable(@SuppressWarnings( "unused" ) SimpleType type, ErrorContext ctx) throws CompileError {
 		throw new CompileError(ctx, "this value (" + this + ") is not assignable");
+	}
+	
+	default boolean isConstant() {
+		return false;
 	}
 	
 }

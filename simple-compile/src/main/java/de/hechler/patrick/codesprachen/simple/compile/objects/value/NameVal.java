@@ -20,6 +20,9 @@ public record NameVal(String name) implements SimpleValue {
 	}
 	
 	@Override
+	public SimpleValue simplify() { return this; }
+	
+	@Override
 	public String toString() {
 		return this.name;
 	}

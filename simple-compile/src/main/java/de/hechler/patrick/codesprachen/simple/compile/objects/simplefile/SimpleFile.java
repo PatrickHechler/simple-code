@@ -14,19 +14,19 @@ import de.hechler.patrick.codesprachen.simple.compile.objects.value.VariableVal;
 
 public class SimpleFile extends SimpleDependency {
 	
-	private Map<String, SimpleDependency> dependencies;
-	private Map<String, SimpleType>       typedefs;
-	private Map<String, SimpleVariable>   variables;
-	private Map<String, SimpleFunction>   functions;
-	private String                        main;
-	private String                        init;
+	private Map<String,SimpleDependency> dependencies;
+	private Map<String,SimpleType>       typedefs;
+	private Map<String,SimpleVariable>   variables;
+	private Map<String,SimpleFunction>   functions;
+	private String                       main;
+	private String                       init;
 	
 	public SimpleFile(String binaryTarget) {
 		super(binaryTarget);
 		this.dependencies = new HashMap<>();
-		this.typedefs     = new HashMap<>();
-		this.variables    = new HashMap<>();
-		this.functions    = new HashMap<>();
+		this.typedefs = new HashMap<>();
+		this.variables = new HashMap<>();
+		this.functions = new HashMap<>();
 	}
 	
 	@Override
@@ -43,6 +43,17 @@ public class SimpleFile extends SimpleDependency {
 		if ( dep != null ) {
 			return DependencyVal.create(dep, ctx);
 		}
+		return null;
+	}
+	
+	@Override
+	public Object nameTypeOrDepOrFuncOrNull(String name, ErrorContext ctx) {
+		SimpleType t = typedefs.get(name);
+		if ( t != null ) return t;
+		SimpleDependency d = dependencies.get(name);
+		if ( d != null ) return d;
+		SimpleFunction f = functions.get(name);
+		if ( f != null ) return f;
 		return null;
 	}
 	

@@ -12,4 +12,6 @@ public interface SimpleScope {
 		throw new CompileError(ctx, "nothing with the name '" + name + "' could be found");
 	}
 	
+	Object nameTypeOrDepOrFuncOrNull(String typedefName, ErrorContext ctx);
+	
 }

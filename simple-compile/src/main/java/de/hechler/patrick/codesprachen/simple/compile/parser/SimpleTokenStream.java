@@ -58,35 +58,35 @@ public class SimpleTokenStream {
 	public static final int  DEP             = 34;
 	public static final int  DWORD           = 35;
 	public static final int  EXP             = 36;
-	public static final int  FPDWORD         = 37;
-	public static final int  FPNUM           = 38;
-	public static final int  FSTRUCT         = 39;
-	public static final int  FUNC            = 40;
-	public static final int  IF              = 41;
-	public static final int  INIT            = 42;
-	public static final int  MAIN            = 43;
-	public static final int  NOPAD           = 44;
-	public static final int  NUM             = 45;
-	public static final int  STRUCT          = 46;
-	public static final int  TYPEDEF         = 47;
-	public static final int  UBYTE           = 48;
-	public static final int  UDWORD          = 49;
-	public static final int  UNUM            = 50;
-	public static final int  UWORD           = 51;
-	public static final int  WHILE           = 52;
-	public static final int  WORD            = 53;
+	public static final int  FPDWORD         = 38;
+	public static final int  FPNUM           = 39;
+	public static final int  FSTRUCT         = 40;
+	public static final int  FUNC            = 41;
+	public static final int  IF              = 42;
+	public static final int  INIT            = 43;
+	public static final int  MAIN            = 44;
+	public static final int  NOPAD           = 45;
+	public static final int  NUM             = 46;
+	public static final int  STRUCT          = 47;
+	public static final int  TYPEDEF         = 48;
+	public static final int  UBYTE           = 49;
+	public static final int  UDWORD          = 50;
+	public static final int  UNUM            = 51;
+	public static final int  UWORD           = 52;
+	public static final int  WHILE           = 53;
+	public static final int  WORD            = 54;
 	private static final int MAX_NAME        = WORD;
-	public static final int  BLOCK_OPEN      = 54;
-	public static final int  BIT_OR          = 55;
-	public static final int  BOOL_OR         = 56;
-	public static final int  BLOCK_CLOSE     = 57;
-	public static final int  BIT_NOT         = 58;
-	private static final int FIRST_DYN       = 59;
+	public static final int  BLOCK_OPEN      = 55;
+	public static final int  BIT_OR          = 56;
+	public static final int  BOOL_OR         = 57;
+	public static final int  BLOCK_CLOSE     = 58;
+	public static final int  BIT_NOT         = 59;
+	private static final int FIRST_DYN       = 60;
 	public static final int  NAME            = FIRST_DYN;
-	public static final int  NUMBER          = 60;
-	public static final int  STRING          = 61;
-	public static final int  CHARACTER       = 62;
-	public static final int  ASM_BLOCK       = 63;
+	public static final int  NUMBER          = 61;
+	public static final int  STRING          = 62;
+	public static final int  CHARACTER       = 63;
+	public static final int  ASM_BLOCK       = 64;
 	
 	private static final String[] NAMES = { // @formatter:off
 		"!",           // BOOL_NOT
@@ -203,11 +203,6 @@ public class SimpleTokenStream {
 		return this.ctx;
 	}
 	
-	public void consume() {
-		this.tok = -1;
-		this.dynTok = null;
-	}
-	
 	public String offendingToken() {
 		if ( this.dynTok != null ) {
 			switch ( this.tok ) {
@@ -262,6 +257,12 @@ public class SimpleTokenStream {
 		int t = tok();
 		this.tok = -1;
 		return t;
+	}
+	
+	public void consume() {
+		assert tok != -1 || this.dynTok != null;
+		this.tok = -1;
+		this.dynTok = null;
 	}
 	
 	public int tok() {

@@ -20,6 +20,9 @@ public record DependencyVal(SimpleDependency dep, ErrorContext ctx) implements S
 	}
 	
 	@Override
+	public SimpleValue simplify() { return this; }
+	
+	@Override
 	public String toString() {
 		return "(dependency: " + dep.binaryTarget + ")";
 	}

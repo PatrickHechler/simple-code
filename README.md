@@ -40,7 +40,7 @@ simple-code is a simple programming language.
 
 ### function
 
-`func [FUNC_MARKS_AND_NAME] [FUNC_TYPE] [BLOCK]`
+`func [FUNC_MARKS_AND_NAME] [TYPE] [BLOCK]`
 
 a function is a block of commands used to do something for example convert the argument parameters to result parameters
 * marks:
@@ -61,10 +61,13 @@ a function is a block of commands used to do something for example convert the a
                 1. `ubyte` exitnum: the return number of the main function will be the exit number of the process
 * note that only one function can be marked with `init`/`main`
 * note that if a function is marked with `main` or `init` and has no name the function can not be called by any user generated program code
+* the type **must** be a function address type (function structure types are **not** allowed)
 
 ### dep-function
 
-`func [NAME] [FUNC_TYPE] ;`
+`func (exp)? [NAME] [TYPE] ;`
+
+* like `[function]`, but there are no `main`/`init` marks allowed and the `[BLOCK]` is replaced by a `;`
 
 ### variable
 
@@ -113,18 +116,19 @@ if marked with `const` there must be a constant initial value
     * `byte` : a signed 8-bit number
     * `ubyte` : an unsigned 8-bit number/character
     * `char` : implicit `typedef ubyte char;`
+    * `[NAME]` : a type defined with `typedef`
     * `struct (nopad)? { [NAMED_TYPE_LIST] }` : a memory structure
         * marks:
             * `nopad`: do not use padding
                 * when using this some entries may not be aligned
+    * `[FUNC_TYPE]` : a function address
+    * `fstuct ( [NAME] () | [FUNC_TYPE0] )` : a function call structure
     * `[TYPE] #` : a pointer to a value of TYPE
     * `[TYPE] \[ [VALUE]? \]` : an array of values of TYPE
-    * `[FUNC_TYPE]` : a function address
-    * `fstuct ( [NAME] | [FUNC_TYPE0] )` : a function call structure
 
 ### FUNC_TYPE
 
-`fstruct [NAME] | [FUNC_TYPE0]`
+`func [NAME] ( : [NAME] )* | [FUNC_TYPE0]`
 
 ### FUNC_TYPE0
 
@@ -135,7 +139,7 @@ if marked with `const` there must be a constant initial value
 
 #### FUNC_TYPE_RESULTS
 
-`( ( [NAMED_TYPE] | < ( [NAMED_TYPE_LIST] ) > ) <-- )?`
+`( < [NAMED_TYPE_LIST] > <-- )?`
 
 ### COMMAND
 

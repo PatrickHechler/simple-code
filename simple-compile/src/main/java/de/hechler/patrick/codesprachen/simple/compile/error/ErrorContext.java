@@ -25,6 +25,15 @@ public class ErrorContext {
 		this.offendingToken = offendingToken;
 	}
 	
+	public ErrorContext copy() {
+		ErrorContext copy = new ErrorContext(this.file, this.offendingTokenSup);
+		copy.charInLine = this.charInLine;
+		copy.line = this.line;
+		copy.totalChar = this.totalChar;
+		copy.offendingToken = this.offendingToken;
+		return copy;
+	}
+	
 	public String offendingToken() {
 		String ot = this.offendingToken;
 		if ( ot == null ) {

@@ -24,11 +24,13 @@ public record DataVal(byte[] value, SimpleType type, ErrorContext ctx) implement
 	}
 	
 	public static SimpleValue create(List<SimpleValue> value, ErrorContext ctx) {
-		if (value.isEmpty()) return new DataVal(new byte[0], ArrayType.create(StructType.create(List.of(), StructType.FLAG_NOUSE, ctx), 0, ctx), ctx);
+		if ( value.isEmpty() ) return new DataVal(new byte[0],
+			ArrayType.create(StructType.create(List.of(), StructType.FLAG_NOUSE, ctx), 0, ctx), ctx);
 		SimpleValue val = value.get(0);
 		SimpleType t = val.type();
 		long len = t.size() * value.size();
-		if (len != (int) len) throw new CompileError(ctx, "the maximum size of a constant array 2^31-1 bytes (at least for this compiler)");
+		if ( len != (int) len ) throw new CompileError(ctx,
+			"the maximum size of a constant array 2^31-1 bytes (at least for this compiler)");
 		byte[] data = new byte[(int) len];
 		return new DataVal(data, new ArrayType(t, value.size()), ctx);
 	}
@@ -39,8 +41,8 @@ public record DataVal(byte[] value, SimpleType type, ErrorContext ctx) implement
 	
 	@Override
 	public int hashCode() {
-		final int prime  = 31;
-		int       result = 1;
+		final int prime = 31;
+		int result = 1;
 		result = prime * result + this.type.hashCode();
 		result = prime * result + Arrays.hashCode(this.value);
 		return result;
@@ -57,13 +59,19 @@ public record DataVal(byte[] value, SimpleType type, ErrorContext ctx) implement
 	}
 	
 	@Override
+	public boolean isConstant() { return true; }
+	
+	@Override
+	public SimpleValue simplify() { return this; }
+	
+	@Override
 	public String toString() {
 		if ( this.type instanceof ArrayType at ) {
 			if ( at.target() == NativeType.UBYTE ) {
 				return "\"" + new String(Arrays.copyOf(this.value, this.value.length - 1), StandardCharsets.UTF_8)
 					.replace("\0", "\\0").replace("\r", "\\r").replace("\n", "\\n").replace("\t", "\\t")
 					.replace("\"", "\\\"") + "\""; // note that \u0000 escape sequences are not supported in the
-													 // backwards translation
+													// backwards translation
 			}
 			return fallbackToString();
 		}
@@ -81,7 +89,7 @@ public record DataVal(byte[] value, SimpleType type, ErrorContext ctx) implement
 				first = false;
 			}
 			String str = Integer.toHexString(0xFF & valb);
-			if (str.length() == 1) b.append('0');
+			if ( str.length() == 1 ) b.append('0');
 			b.append(str);
 		}
 		b.append(", type=");

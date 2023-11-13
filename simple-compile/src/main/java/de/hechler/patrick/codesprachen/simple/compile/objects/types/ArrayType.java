@@ -4,18 +4,32 @@ import java.util.Objects;
 
 import de.hechler.patrick.codesprachen.simple.compile.error.CompileError;
 import de.hechler.patrick.codesprachen.simple.compile.error.ErrorContext;
+import de.hechler.patrick.codesprachen.simple.compile.objects.value.ScalarNumericVal;
+import de.hechler.patrick.codesprachen.simple.compile.objects.value.SimpleValue;
 
 public record ArrayType(SimpleType target, long length) implements SimpleType {
 	
 	public ArrayType {
 		Objects.requireNonNull(target, "array target");
-		if ( length < -1 ) {
+		if ( length < -1L ) {
 			throw new IllegalArgumentException("invalid length: " + length);
 		}
 	}
 	
 	public static ArrayType create(SimpleType target, long length, @SuppressWarnings( "unused" ) ErrorContext ctx) {
 		return new ArrayType(target, length);
+	}
+	
+	public static ArrayType create(SimpleType target, SimpleValue length, ErrorContext ctx) {
+		if ( length == null ) create(target, -1L, ctx);
+		length = length.simplify();
+		if ( length instanceof ScalarNumericVal snv && snv.value() >= 0L ) {
+			return create(target, snv.value(), ctx);
+		}
+		if ( length.type() instanceof NativeType nt && nt != NativeType.FPNUM && nt != NativeType.FPDWORD ) {
+			throw new CompileError(ctx, "the array length value " + length + " is no compile time constant!");
+		}
+		throw new CompileError(ctx, "the array length value " + length + " is of an invalid type!");
 	}
 	
 	@Override

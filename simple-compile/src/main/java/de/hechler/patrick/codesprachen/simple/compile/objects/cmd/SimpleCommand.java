@@ -22,6 +22,11 @@ public abstract class SimpleCommand implements SimpleScope {
 	}
 	
 	@Override
+	public Object nameTypeOrDepOrFuncOrNull(String typedefName, ErrorContext ctx) {
+		return parent.nameTypeOrDepOrFuncOrNull(typedefName, ctx);
+	}
+	
+	@Override
 	public String toString() {
 		StringBuilder sb = new StringBuilder();
 		toString(sb, new StringBuilder());

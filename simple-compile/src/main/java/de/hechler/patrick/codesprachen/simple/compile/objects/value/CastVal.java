@@ -14,6 +14,9 @@ public record CastVal(SimpleValue value, SimpleType type, ErrorContext ctx) impl
 	}
 	
 	@Override
+	public boolean isConstant() { return this.value.isConstant(); }
+	
+	@Override
 	public String toString() {
 		return "((" + this.type + ") " + this.value + " )";
 	}

@@ -37,7 +37,19 @@ public class BlockCmd extends SimpleCommand {
 	
 	public SimpleScope currentAsParent() {
 		final int blkLen = this.cmds.size();
-		return (name, ctx) -> BlockCmd.this.nameValueOrNull(name, ctx, blkLen);
+		return new SimpleScope() {
+			
+			@Override
+			public SimpleValue nameValueOrNull(String name, ErrorContext ctx) {
+				return BlockCmd.this.nameValueOrNull(name, ctx, blkLen);
+			}
+			
+			@Override
+			public Object nameTypeOrDepOrFuncOrNull(String typedefName, ErrorContext ctx) {
+				return BlockCmd.this.nameTypeOrDepOrFuncOrNull(typedefName, ctx);
+			}
+			
+		};
 	}
 	
 	private SimpleValue nameValueOrNull(String name, ErrorContext ctx, int blockLength) {
@@ -55,7 +67,7 @@ public class BlockCmd extends SimpleCommand {
 	
 	@Override
 	public void toString(StringBuilder append, StringBuilder indent) {
-		if (this.cmds.isEmpty()) {
+		if ( this.cmds.isEmpty() ) {
 			append.append("{ }");
 			return;
 		}

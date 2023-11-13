@@ -220,4 +220,21 @@ public record BinaryOpVal(SimpleValue a, BinaryOp op, SimpleValue b, ErrorContex
 		};
 	}
 	
+	@Override
+	public boolean isConstant() {
+		return switch ( this.op ) {
+		case ARR_PNTR_INDEX -> this.a instanceof DataVal && this.b.isConstant();
+		case DEREF_BY_NAME -> this.a.isConstant();
+		case BOOL_AND -> this.a.isConstant() && this.b.isConstant()
+			|| ( this.a.simplify() instanceof ScalarNumericVal snv && snv.value() == 0L );
+		case BOOL_OR -> this.a.isConstant() && this.b.isConstant()
+			|| ( this.a.simplify() instanceof ScalarNumericVal snv && snv.value() != 0L );
+		default -> this.a.isConstant() && this.b.isConstant();
+		};
+	}
+
+	@Override
+	public SimpleValue simplify() { // TODO Auto-generated method stub
+	return null; }
+	
 }

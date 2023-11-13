@@ -10,6 +10,12 @@ public record FunctionVal(SimpleFunction func, SimpleType type, ErrorContext ctx
 	public static SimpleValue create(SimpleFunction func, ErrorContext ctx) {
 		return new FunctionVal(func, PointerType.create(func.type, ctx), ctx);
 	}
+	
+	@Override
+	public boolean isConstant() { return true; }
+	
+	@Override
+	public SimpleValue simplify() { return this; }
 
 	@Override
 	public String toString() {

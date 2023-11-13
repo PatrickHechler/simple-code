@@ -21,6 +21,12 @@ public record VariableVal(SimpleVariable sv, ErrorContext ctx) implements Simple
 	}
 	
 	@Override
+	public boolean isConstant() { return (sv.flags() & SimpleVariable.FLAG_CONSTANT) != 0; }
+	
+	@Override
+	public SimpleValue simplify() { return this; }
+	
+	@Override
 	public String toString() {
 		return sv.name();
 	}
