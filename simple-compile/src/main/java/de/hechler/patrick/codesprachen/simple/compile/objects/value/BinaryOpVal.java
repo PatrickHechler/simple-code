@@ -1,5 +1,7 @@
 package de.hechler.patrick.codesprachen.simple.compile.objects.value;
 
+import java.util.function.UnaryOperator;
+
 import de.hechler.patrick.codesprachen.simple.compile.error.CompileError;
 import de.hechler.patrick.codesprachen.simple.compile.error.ErrorContext;
 import de.hechler.patrick.codesprachen.simple.compile.objects.types.ArrayType;
@@ -8,6 +10,7 @@ import de.hechler.patrick.codesprachen.simple.compile.objects.types.NativeType;
 import de.hechler.patrick.codesprachen.simple.compile.objects.types.PointerType;
 import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleType;
 import de.hechler.patrick.codesprachen.simple.compile.objects.types.StructType;
+import de.hechler.patrick.codesprachen.simple.compile.objects.value.BinaryOpVal.BinaryOp;
 
 public record BinaryOpVal(SimpleValue a, BinaryOp op, SimpleValue b, ErrorContext ctx) implements SimpleValue {
 	
@@ -252,9 +255,9 @@ public record BinaryOpVal(SimpleValue a, BinaryOp op, SimpleValue b, ErrorContex
 	}
 	
 	@Override
-	public SimpleValue simplify() {
-		SimpleValue sa = this.a.simplify();
-		SimpleValue sb = this.b.simplify();
+	public SimpleValue simplify(UnaryOperator<SimpleValue> op) {
+		SimpleValue sa = op.apply(this.a);
+		SimpleValue sb = op.apply(this.b);
 		if ( !isConstant() ) {
 			if ( this.op == BinaryOp.CMP_EQ && sb instanceof ScalarNumericVal nb && nb.value() == 0L
 				&& sa instanceof BinaryOpVal ba && ba.op.type == BinaryOpType.CMP ) {
@@ -287,15 +290,43 @@ public record BinaryOpVal(SimpleValue a, BinaryOp op, SimpleValue b, ErrorContex
 				default:
 				}
 			}
-			return create(sb, this.op, sb, this.ctx);
+			return fallbackSimplify(sa, sb);
 		}
-		return switch ( this.op ) {
+		SimpleValue val = switch ( this.op ) {
 		case ARR_PNTR_INDEX -> {
-			
+			if ( sa instanceof DataVal d && sb instanceof ScalarNumericVal n ) {
+				yield new DataVal(d, n.value() * type().size(), true, type(), this.ctx);
+			}
+			yield null;
 		}
-		case BIT_AND -> null;
-		case BIT_OR -> null;
-		case BIT_XOR -> null;
+		case BIT_AND -> {
+			if ( sa instanceof ScalarNumericVal na && sb instanceof ScalarNumericVal nb ) {
+				yield ScalarNumericVal.createAllowTruncate(type(), na.value() & nb.value(), this.ctx);
+			}
+			if ( sa instanceof ScalarNumericVal na && na.value() == 0L
+				|| sb instanceof ScalarNumericVal nb && nb.value() == 0L ) {
+				yield ScalarNumericVal.createAllowTruncate(type(), 0L, this.ctx);
+			}
+			yield null;
+		}
+		case BIT_OR -> {
+			if ( sa instanceof ScalarNumericVal na && sb instanceof ScalarNumericVal nb ) {
+				yield ScalarNumericVal.createAllowTruncate(type(), na.value() & nb.value(), this.ctx);
+			}
+			long s    = type().size();
+			long mask = s == 8L ? -1L : 1L << ( s << 3 );
+			if ( sa instanceof ScalarNumericVal na && na.value() == mask
+				|| sb instanceof ScalarNumericVal nb && nb.value() == mask ) {
+				yield ScalarNumericVal.createAllowTruncate(type(), 0L, this.ctx);
+			}
+			yield null;
+		}
+		case BIT_XOR -> {
+			if ( sa instanceof ScalarNumericVal na && sb instanceof ScalarNumericVal nb ) {
+				yield ScalarNumericVal.createAllowTruncate(type(), na.value() ^ nb.value(), this.ctx);
+			}
+			yield null;
+		}
 		case BOOL_AND -> null;
 		case BOOL_OR -> null;
 		case CMP_EQ -> null;
@@ -320,6 +351,12 @@ public record BinaryOpVal(SimpleValue a, BinaryOp op, SimpleValue b, ErrorContex
 		case SHIFT_LEFT -> null;
 		case SHIFT_LOGIC_RIGTH -> null;
 		};
+		if ( val != null ) return val;
+		return fallbackSimplify(sa, sb);
+	}
+	
+	private SimpleValue fallbackSimplify(SimpleValue sa, SimpleValue sb) {
+		return create(sa, this.op, sb, this.ctx);
 	}
 	
 }

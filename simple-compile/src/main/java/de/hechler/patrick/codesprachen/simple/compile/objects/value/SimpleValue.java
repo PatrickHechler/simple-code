@@ -1,5 +1,7 @@
 package de.hechler.patrick.codesprachen.simple.compile.objects.value;
 
+import java.util.function.UnaryOperator;
+
 import de.hechler.patrick.codesprachen.simple.compile.error.CompileError;
 import de.hechler.patrick.codesprachen.simple.compile.error.ErrorContext;
 import de.hechler.patrick.codesprachen.simple.compile.objects.types.ArrayType;
@@ -11,10 +13,18 @@ public interface SimpleValue {
 	
 	SimpleType type();
 	
-	SimpleValue simplify();
+	default SimpleValue simplify() {
+		return simplify(simplyfyOperator());
+	}
+	
+	static UnaryOperator<SimpleValue> simplyfyOperator() {
+		return v -> v.simplify(simplyfyOperator());
+	}
+	
+	SimpleValue simplify(UnaryOperator<SimpleValue> simpifier);
 	
 	default SimpleValue superSimplify() {
-		SimpleValue res = simplify();
+		SimpleValue res = simplify(simplyfyOperator());
 		if ( res instanceof DataVal dv && dv.deref() ) {
 			return switch ( type() ) {// no need to extend the 64-bit unum to a 64-bit value
 			case NativeType.NUM, NativeType.UNUM -> _SSH.toScalar(this, dv, 8, false);
@@ -26,15 +36,17 @@ public interface SimpleValue {
 			case NativeType.UWORD -> _SSH.toScalar(this, dv, 2, true);
 			case NativeType.BYTE -> _SSH.toScalar(this, dv, 2, false);
 			case NativeType.UBYTE -> _SSH.toScalar(this, dv, 2, true);
-			case PointerType _a -> _SSH.toScalar(this, dv, 8, false);
-			case ArrayType _a -> _SSH.toScalar(this, dv, 8, false);
-			case SimpleType _a -> res;
+			case /* NOSONAR */ PointerType _a -> _SSH.toScalar(this, dv, 8, false);
+			case /* NOSONAR */ ArrayType _a -> _SSH.toScalar(this, dv, 8, false);
+			case /* NOSONAR */ SimpleType _a -> res;
 			};
 		}
 		return res;
 	}
 	
-	static class _SSH {
+	static class _SSH {// NOSONAR
+		
+		private _SSH() {}
 		
 		private static SimpleValue toScalar(SimpleValue orig, DataVal dv, int len, boolean signExtend) {
 			if ( invalid(orig, dv, len) ) {

@@ -1,6 +1,7 @@
 package de.hechler.patrick.codesprachen.simple.compile.objects.value;
 
 import java.util.List;
+import java.util.function.UnaryOperator;
 
 import de.hechler.patrick.codesprachen.simple.compile.error.ErrorContext;
 import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleType;
@@ -22,6 +23,9 @@ public record NameVal(String name) implements SimpleValue {
 	@Override
 	public SimpleValue simplify() { return this; }
 	
+	@Override
+	public SimpleValue simplify(@SuppressWarnings("unused") UnaryOperator<SimpleValue> op) { return this; }
+
 	@Override
 	public String toString() {
 		return this.name;

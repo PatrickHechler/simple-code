@@ -1,6 +1,7 @@
 package de.hechler.patrick.codesprachen.simple.compile.objects.value;
 
 import java.util.List;
+import java.util.function.UnaryOperator;
 
 import de.hechler.patrick.codesprachen.simple.compile.error.ErrorContext;
 import de.hechler.patrick.codesprachen.simple.compile.objects.simplefile.SimpleDependency;
@@ -21,6 +22,9 @@ public record DependencyVal(SimpleDependency dep, ErrorContext ctx) implements S
 	
 	@Override
 	public SimpleValue simplify() { return this; }
+	
+	@Override
+	public SimpleValue simplify(@SuppressWarnings("unused") UnaryOperator<SimpleValue> op) { return this; }
 	
 	@Override
 	public String toString() {

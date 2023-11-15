@@ -1,5 +1,7 @@
 package de.hechler.patrick.codesprachen.simple.compile.objects.value;
 
+import java.util.function.UnaryOperator;
+
 import de.hechler.patrick.codesprachen.simple.compile.error.ErrorContext;
 import de.hechler.patrick.codesprachen.simple.compile.objects.types.NativeType;
 
@@ -18,9 +20,12 @@ public record FPNumericVal(NativeType type, double value, ErrorContext ctx) impl
 	public SimpleValue simplify() { return this; }
 	
 	@Override
+	public SimpleValue simplify(@SuppressWarnings("unused") UnaryOperator<SimpleValue> op) { return this; }
+
+	@Override
 	public String toString() {
-		if ( type == NativeType.FPNUM ) return Double.toString(this.value);
+		if ( this.type == NativeType.FPNUM ) return Double.toString(this.value);
 		return Float.toString((float) this.value) + "D";
 	}
-	
+
 }

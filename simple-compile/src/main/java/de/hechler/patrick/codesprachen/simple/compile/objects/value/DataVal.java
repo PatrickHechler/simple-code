@@ -3,6 +3,7 @@ package de.hechler.patrick.codesprachen.simple.compile.objects.value;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.UnaryOperator;
 
 import de.hechler.patrick.codesprachen.simple.compile.error.CompileError;
 import de.hechler.patrick.codesprachen.simple.compile.error.ErrorContext;
@@ -19,8 +20,8 @@ public record DataVal(byte[] value, SimpleType type, ErrorContext ctx, DataVal o
 		this(value, type, ctx, null, 0L, false);
 	}
 	
-	public DataVal(DataVal orig, long off, boolean deref, SimpleType type, ErrorContext ctx) {
-		this(null, type, ctx, orig.orig == null ? orig : orig.orig, orig.orig == null ? off : off + orig.off, deref);
+	public DataVal(DataVal orig, long off, boolean derefValue, SimpleType type, ErrorContext ctx) {
+		this(null, type, ctx, orig.orig == null ? orig : orig.orig, orig.orig == null ? off : off + orig.off, derefValue);
 	}
 	
 	public static SimpleValue createString(String value, ErrorContext ctx) {
@@ -74,6 +75,9 @@ public record DataVal(byte[] value, SimpleType type, ErrorContext ctx, DataVal o
 	
 	@Override
 	public SimpleValue simplify() { return this; }
+	
+	@Override
+	public SimpleValue simplify(@SuppressWarnings("unused") UnaryOperator<SimpleValue> op) { return this; }
 	
 	@Override
 	public String toString() {
