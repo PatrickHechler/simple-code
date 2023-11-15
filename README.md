@@ -86,7 +86,7 @@ if marked with `const` there must be a constant initial value
 
 ### typedef
 
-`(exp)? typedef [TYPE] [NAME] ;`
+`typedef (exp)? [TYPE] [NAME] ;`
 
 ### FUNC_MARKS_AND_NAME
 
@@ -177,7 +177,7 @@ if marked with `const` there must be a constant initial value
 * VALUE
     * `[COND_EXP]`
 * COND_EXP
-    * `[LOR_EXP] ( \? [VALUE] : [COND_EXP] )?`
+    * `[LOR_EXP] ( \? [LOR_EXP] \?\? [COND_EXP] )?`
 * LOR_EXP
     * `[LAND_EXP] ( ( \|\| ) [LAND_EXP] )*`
 * LAND_EXP
@@ -208,23 +208,25 @@ if marked with `const` there must be a constant initial value
     * `[STRING]+`
     * `[CHARACTER]`
     * `[NUMBER]`
+    * `[NAME]`
     * `\( [VALUE] \)`
 * STRING
     * `"([^"\\\r\n\0]|\\(["rnt0\\]|u[0-9A-Fa-f]{4}))*"`
 * CHARACTER
     * `'([^'\\\r\n\0]|\\(['rnt0\\]))'`
 * NUMBER
-    * `[SCALAR_NUM]([Ss]|[Uu])?([QqNn]|[Dd]|[Ww]|[Bb])?`
+    * `[SCALAR_NUM]([Ss]|[Uu])?([QqNn]|[Dd]|[Ww]|[HhBb])?`
         * the sign (first) postfix:
             * `U|u` is only allowed for positive numbers (zero is positive)
             * if emited:
                 * positive numbers are unsigned
                 * negative numbers are signed
-        * if present, the size (second) postfix must not truncate the number (`256b` is disallowed)
+        * if present, the size (second) postfix must not truncate the number (`DEC-256B` is disallowed)
             * `Q|q|N|n`: `num`/`unum`
             * `D|d`: `dword`/`udword`
             * `W|w`: `word`/`uword`
-            * `B|b`: `byte`/`ubyte`
+            * `H|h|B|b`: `byte`/`ubyte`
+        * if present, the sign (first) postfix must not truncate the number (`DEC-128sb` is disallowed)
     * `[FPNUM]([QqNn]|[Dd])?`
         * the size postfix:
             * `Q|q|N|n`: `fpnum`

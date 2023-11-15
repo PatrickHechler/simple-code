@@ -52,11 +52,11 @@ public record FuncType(List<SimpleVariable> resMembers, List<SimpleVariable> arg
 		return new FuncType(resMembers, argMembers, flags);
 	}
 	
-	public FuncType asFAdr() {
-		if ( ( this.flags & FLAG_FUNC_ADDRESS ) != 0 ) {
-			throw new IllegalStateException("I am already a fadr");
+	public FuncType asFStruct() {
+		if ( ( this.flags & FLAG_FUNC_ADDRESS ) == 0 ) {
+			throw new IllegalStateException("I am already a fstruct");
 		}
-		return new FuncType(this.resMembers, this.argMembers, this.flags | FLAG_FUNC_ADDRESS);
+		return new FuncType(this.resMembers, this.argMembers, this.flags & ~FLAG_FUNC_ADDRESS);
 	}
 	
 	@Override

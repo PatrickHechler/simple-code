@@ -19,6 +19,7 @@ import de.hechler.patrick.codesprachen.simple.compile.error.ErrorContext;
 
 public class SimpleTokenStream {
 	
+	public static final int  INVALID         = -2;
 	public static final int  EOF             = -1;
 	public static final int  BOOL_NOT        = 0;
 	public static final int  NOT_EQ          = 1;
@@ -46,49 +47,51 @@ public class SimpleTokenStream {
 	public static final int  SHIFT_RIGTH_ARI = 23;
 	public static final int  SHIFT_RIGTH_LOG = 24;
 	public static final int  QUESTION        = 25;
-	public static final int  ARR_OPEN        = 26;
-	public static final int  ARR_CLOSE       = 27;
-	public static final int  BIT_XOR         = 28;
-	public static final int  ASM             = 29;
+	public static final int  DOUBLE_QUESTION = 26;
+	public static final int  ARR_OPEN        = 27;
+	public static final int  ARR_CLOSE       = 28;
+	public static final int  BIT_XOR         = 29;
+	public static final int  ASM             = 30;
 	private static final int MIN_NAME        = ASM;
-	public static final int  BYTE            = 30;
-	public static final int  CALL            = 31;
-	public static final int  CHAR            = 32;
-	public static final int  CONST           = 33;
-	public static final int  DEP             = 34;
-	public static final int  DWORD           = 35;
-	public static final int  EXP             = 36;
-	public static final int  FPDWORD         = 38;
-	public static final int  FPNUM           = 39;
-	public static final int  FSTRUCT         = 40;
-	public static final int  FUNC            = 41;
-	public static final int  IF              = 42;
-	public static final int  INIT            = 43;
-	public static final int  MAIN            = 44;
-	public static final int  NOPAD           = 45;
-	public static final int  NUM             = 46;
-	public static final int  STRUCT          = 47;
-	public static final int  TYPEDEF         = 48;
-	public static final int  UBYTE           = 49;
-	public static final int  UDWORD          = 50;
-	public static final int  UNUM            = 51;
-	public static final int  UWORD           = 52;
-	public static final int  WHILE           = 53;
-	public static final int  WORD            = 54;
+	public static final int  BYTE            = 31;
+	public static final int  CALL            = 32;
+	public static final int  CHAR            = 33;
+	public static final int  CONST           = 34;
+	public static final int  DEP             = 35;
+	public static final int  DWORD           = 36;
+	public static final int  EXP             = 38;
+	public static final int  FPDWORD         = 39;
+	public static final int  FPNUM           = 40;
+	public static final int  FSTRUCT         = 41;
+	public static final int  FUNC            = 42;
+	public static final int  IF              = 43;
+	public static final int  INIT            = 44;
+	public static final int  MAIN            = 45;
+	public static final int  NOPAD           = 46;
+	public static final int  NUM             = 47;
+	public static final int  STRUCT          = 48;
+	public static final int  TYPEDEF         = 49;
+	public static final int  UBYTE           = 50;
+	public static final int  UDWORD          = 51;
+	public static final int  UNUM            = 52;
+	public static final int  UWORD           = 53;
+	public static final int  WHILE           = 54;
+	public static final int  WORD            = 55;
 	private static final int MAX_NAME        = WORD;
-	public static final int  BLOCK_OPEN      = 55;
-	public static final int  BIT_OR          = 56;
-	public static final int  BOOL_OR         = 57;
-	public static final int  BLOCK_CLOSE     = 58;
-	public static final int  BIT_NOT         = 59;
-	private static final int FIRST_DYN       = 60;
+	public static final int  BLOCK_OPEN      = 56;
+	public static final int  BIT_OR          = 57;
+	public static final int  BOOL_OR         = 58;
+	public static final int  BLOCK_CLOSE     = 59;
+	public static final int  BIT_NOT         = 60;
+	static final int         FIRST_DYN       = 61;
 	public static final int  NAME            = FIRST_DYN;
-	public static final int  NUMBER          = 61;
-	public static final int  STRING          = 62;
-	public static final int  CHARACTER       = 63;
-	public static final int  ASM_BLOCK       = 64;
+	public static final int  NUMBER          = 62;
+	public static final int  STRING          = 63;
+	public static final int  CHARACTER       = 64;
+	public static final int  ASM_BLOCK       = 65;
 	
-	private static final String[] NAMES = { // @formatter:off
+	private static final String[] NAMES =
+		{ // @formatter:off
 		"!",           // BOOL_NOT
 		"!=",          // NOT_EQ
 		"#",           // DIAMOND
@@ -115,6 +118,7 @@ public class SimpleTokenStream {
 		">>",          // SHIFT_RIGTH_ARITMETIC
 		">>>",         // SHIFT_RIGTH_LOGIC
 		"?",           // QUESTION
+		"??",          // DOUBLE_QUESTION
 		"[",           // ARR_OPEN
 		"]",           // ARR_CLOSE
 		"^",           // BIT_XOR
@@ -154,13 +158,12 @@ public class SimpleTokenStream {
 		"[NUMBER]",    // NUMBER
 		"[ASM_BLOCK]", // ASM_BLOCK
 	};//@formatter:on
-	
+		
 	public static String name(int token) {
-		if ( token < 0 ) {
-			if ( token == -1 ) return "EOF";
+		if ( token < 0 || token >= NAMES.length ) {
+			if ( token == EOF ) return "EOF";
 			return "INVALID: <" + token + ">";
 		}
-		if ( token >= NAMES.length ) return "INVALID: <" + token + ">";
 		return NAMES[token];
 	}
 	
@@ -168,7 +171,7 @@ public class SimpleTokenStream {
 	private int charInLine;
 	private int line = 1;
 	
-	private int    tok = -1;
+	private int    tok = -2;
 	private String dynTok;
 	
 	private final InputStream in;
@@ -177,28 +180,28 @@ public class SimpleTokenStream {
 	private final ErrorContext ctx;
 	
 	public SimpleTokenStream(InputStream in, String file) {
-		this.in = in.markSupported() ? in : new BufferedInputStream(in);
+		this.in   = in.markSupported() ? in : new BufferedInputStream(in);
 		this.file = file;
-		this.ctx = new ErrorContext(file, this::offendingToken);
+		this.ctx  = new ErrorContext(file, this::offendingToken);
 	}
 	
 	
 	public int line() {
-		return line;
+		return this.line;
 	}
 	
 	public int charInLine() {
-		return charInLine;
+		return this.charInLine;
 	}
 	
 	public int totalChar() {
-		return totalChar;
+		return this.totalChar;
 	}
 	
 	public ErrorContext ctx() {
 		this.ctx.charInLine = this.charInLine;
-		this.ctx.line = this.line;
-		this.ctx.totalChar = this.totalChar;
+		this.ctx.line       = this.line;
+		this.ctx.totalChar  = this.totalChar;
 		this.ctx.setOffendingTokenCach(null);
 		return this.ctx;
 	}
@@ -230,6 +233,8 @@ public class SimpleTokenStream {
 				}
 			case ASM_BLOCK:
 				return ":::" + this.dynTok + ">>>";
+			default:
+				return "<DYNAMIC TOKEN: " + this.dynTok + ">";
 			}
 		}
 		return name(this.tok);
@@ -238,7 +243,7 @@ public class SimpleTokenStream {
 	public String consumeDynTokSpecialText() {
 		String dt = this.dynTok;
 		assert dt != null : "dynamicTokenSpecialText called, but there is no dynamic token";
-		this.tok = -1;
+		this.tok    = INVALID;
 		this.dynTok = null;
 		return dt;
 	}
@@ -252,29 +257,31 @@ public class SimpleTokenStream {
 	/**
 	 * note that this method only returns and consumes the token, if the {@link #dynTokSpecialText()} is needed it is
 	 * cached until {@link #consume()} or {@link #consumeDynTokSpecialText()} is called
+	 * 
+	 * @return the ID of the consumed token
 	 */
 	public int consumeTok() {
 		int t = tok();
-		this.tok = -1;
+		this.tok = INVALID;
 		return t;
 	}
 	
 	public void consume() {
-		assert tok != -1 || this.dynTok != null;
-		this.tok = -1;
+		assert this.tok != INVALID || this.dynTok != null;
+		this.tok    = INVALID;
 		this.dynTok = null;
 	}
 	
 	public int tok() {
-		if ( tok >= 0 ) {
-			return tok;
+		if ( this.tok >= 0 ) {
+			return this.tok;
 		}
 		try {
 			int r;
 			while ( true ) {
-				in.mark(16); // maximum length until I now which token it is
-				r = in.read(); // currently 8 should also work
-				if ( r == -1 ) return -1;
+				this.in.mark(16); // maximum length until I now which token it is
+				r = this.in.read(); // currently 8 should also work
+				if ( r == -1 ) return EOF;
 				if ( !Character.isWhitespace(r) ) {
 					break;
 				}
@@ -286,16 +293,16 @@ public class SimpleTokenStream {
 				}
 				this.totalChar++;
 			}
-			int low = 0;
+			int low  = 0;
 			int high = FIRST_DYN - 1;
 			return findToken(r, low, high);
-		} catch ( IOException e ) {
+		} catch (IOException e) {
 			throw new IllegalStateException(e);
 		}
 	}
 	
 	private int findToken(int r, int low, int high) throws IOException {
-		int depth = 0;
+		int depth  = 0;
 		int errRes = -1;
 		while ( true ) {
 			int mid = ( low + high ) >>> 1;
@@ -303,15 +310,16 @@ public class SimpleTokenStream {
 			if ( val < r ) {
 				low = mid + 1;
 			} else if ( val == r ) {
-				low = calcNewLow(r, low, depth, mid);
+				low  = calcNewLow(r, low, depth, mid);
 				high = calcNewHigh(r, high, depth, mid);
-				r = in.read();
+				r    = this.in.read();
 				depth++;
 				if ( r < 0 ) {
 					if ( NAMES[low].length() == depth ) {
 						this.charInLine += depth;
-						this.totalChar += depth;
-						this.tok = low;// if it is an exact match at the end of the file, no need to check dynamic
+						this.totalChar  += depth;
+						this.tok         = low;// if it is an exact match at the end of the file, no need to check
+												// dynamic
 						return low;
 					}
 				}
@@ -333,8 +341,8 @@ public class SimpleTokenStream {
 	}
 	
 	private int returnErrToken() throws IOException {
-		in.reset();
-		int r = in.read();
+		this.in.reset();
+		int r = this.in.read();
 		// assert r >= 0
 		if ( nameStart(r) ) {
 			return returnName(new StringBuilder().append((char) r));
@@ -348,7 +356,8 @@ public class SimpleTokenStream {
 		if ( r == '\'' ) {
 			return returnChar();
 		}
-		throw new CompileError(this.file, line, charInLine, totalChar, String.valueOf((char) r), null, null);
+		throw new CompileError(this.file, this.line, this.charInLine, this.totalChar, String.valueOf((char) r), null,
+			null);
 	}
 	
 	private int returnToken(int r, int tok) throws IOException {
@@ -361,15 +370,15 @@ public class SimpleTokenStream {
 			StringBuilder sb = new StringBuilder();
 			sb.append(NAMES[tok]).append((char) r);
 			return returnName(sb);
-		} else if ( tok == COLON && r == ':' && in.read() == ':' ) {
+		} else if ( tok == COLON && r == ':' && this.in.read() == ':' ) {
 			StringBuilder sb = new StringBuilder();
 			return returnAsm(sb);
 		} else {
-			in.reset();
-			in.skipNBytes(len);
+			this.in.reset();
+			this.in.skipNBytes(len);
 			this.charInLine += len;
-			this.totalChar += len;
-			this.tok = tok;
+			this.totalChar  += len;
+			this.tok         = tok;
 			return tok;
 		}
 	}
@@ -384,7 +393,7 @@ public class SimpleTokenStream {
 		case '.':
 			return readDecimal(bytes, sb, true);
 		case 'N': {
-			int r = in.read();
+			int r = this.in.read();
 			switch ( r ) {
 			case 'D':
 				return readNumberWithPrefix(bytes, sb.append('D'), "NDEC-", 10);
@@ -395,9 +404,10 @@ public class SimpleTokenStream {
 			case 'O':
 				return readNumberWithPrefix(bytes, sb.append('O'), "NOCT-", 8);
 			case -1:
-				throw new CompileError(file, line, charInLine, totalChar, "N", null, "expected more input");
+				throw new CompileError(this.file, this.line, this.charInLine, this.totalChar, "N", null,
+					"expected more input");
 			default:
-				throw new CompileError(file, line, charInLine, totalChar, "N", null, null);
+				throw new CompileError(this.file, this.line, this.charInLine, this.totalChar, "N", null, null);
 			}
 		}
 		case 'D':
@@ -417,8 +427,8 @@ public class SimpleTokenStream {
 	
 	private int readNumberWithPrefix(byte[] bytes, StringBuilder sb, String prefix, int number) throws IOException {
 		while ( true ) {
-			in.mark(8);
-			int r = in.readNBytes(bytes, 0, 8);
+			this.in.mark(8);
+			int r = this.in.readNBytes(bytes, 0, 8);
 			for (int i = 0; i < r; i++) {
 				if ( sb.length() < prefix.length() ) {
 					if ( bytes[i] != prefix.charAt(sb.length()) ) {
@@ -432,8 +442,8 @@ public class SimpleTokenStream {
 						sb.append(val);
 						if ( ++i >= r ) {
 							i = 0;
-							in.mark(1);
-							val = in.read();
+							this.in.mark(1);
+							val = this.in.read();
 						} else val = bytes[i];
 					}
 					switch ( val ) {
@@ -441,12 +451,12 @@ public class SimpleTokenStream {
 						sb.append(val);
 						i++;
 					}
-					in.reset();
-					in.skipNBytes(i);
-					this.dynTok = sb.toString();
+					this.in.reset();
+					this.in.skipNBytes(i);
+					this.dynTok      = sb.toString();
 					this.charInLine += this.dynTok.length();
-					this.totalChar += this.dynTok.length();
-					this.tok = NUMBER;
+					this.totalChar  += this.dynTok.length();
+					this.tok         = NUMBER;
 					return NUMBER;
 				}
 				sb.append((char) bytes[i]);
@@ -456,10 +466,10 @@ public class SimpleTokenStream {
 					throw new CompileError(this.file, this.line, this.charInLine, this.totalChar, sb.toString(), null,
 						"reached EOF too early, the number after the prefix is missing");
 				}
-				this.dynTok = sb.toString();
+				this.dynTok      = sb.toString();
 				this.charInLine += this.dynTok.length();
-				this.totalChar += this.dynTok.length();
-				this.tok = NUMBER;
+				this.totalChar  += this.dynTok.length();
+				this.tok         = NUMBER;
 				return NUMBER;
 			}
 		}
@@ -481,8 +491,8 @@ public class SimpleTokenStream {
 	
 	private int readDecimal(byte[] bytes, StringBuilder sb, boolean alreadyDot) throws IOException {
 		while ( true ) {
-			in.mark(8);
-			int r = in.readNBytes(bytes, 0, 8);
+			this.in.mark(8);
+			int r = this.in.readNBytes(bytes, 0, 8);
 			for (int i = 0; i < r; i++) {
 				if ( bytes[i] < '0' || bytes[i] > '9' ) {
 					if ( bytes[i] == '.' && !alreadyDot ) {
@@ -491,26 +501,27 @@ public class SimpleTokenStream {
 						this.dynTok = sb.toString();
 						if ( this.dynTok.length() == 1 && ".".equals(this.dynTok) ) {
 							this.dynTok = null; // needs to be changed when there is a . token
-							throw new CompileError(file, line, charInLine, totalChar, sb.toString(), null, ".");
+							throw new CompileError(this.file, this.line, this.charInLine, this.totalChar, sb.toString(),
+								null, ".");
 						} else if ( this.dynTok.length() == 2 && "-.".equals(this.dynTok) ) {
 							this.charInLine++; // this will soon fail, because there is no . token
 							this.totalChar++;
 							this.dynTok = null;
-							this.tok = MINUS;
+							this.tok    = MINUS;
 							return MINUS;
 						}
-						in.reset();
+						this.in.reset();
 						switch ( bytes[i] ) {
 						case 'Q', 'q', 'N', 'n', 'D', 'd':
 							sb.append((char) bytes[i]);
-							in.skipNBytes(i + 1);
+							this.in.skipNBytes(i + 1);
 							break;
 						default:
-							in.skipNBytes(i);
+							this.in.skipNBytes(i);
 						}
 						this.charInLine += this.dynTok.length();
-						this.totalChar += this.dynTok.length();
-						this.tok = NUMBER;
+						this.totalChar  += this.dynTok.length();
+						this.tok         = NUMBER;
 						return NUMBER;
 					}
 				}
@@ -521,8 +532,8 @@ public class SimpleTokenStream {
 	
 	private int returnChar() throws IOException {
 		byte[] bytes = new byte[4];
-		in.mark(4);
-		int r = in.readNBytes(bytes, 0, 4);
+		this.in.mark(4);
+		int r = this.in.readNBytes(bytes, 0, 4);
 		if ( r < 2 ) {
 			throw new CompileError(this.file, this.line, this.charInLine, this.totalChar, "\'", null,
 				"reached EOF too early, character could not be closed");
@@ -551,9 +562,9 @@ public class SimpleTokenStream {
 		}
 		default -> {
 			ByteBuffer bb = ByteBuffer.wrap(bytes, 0, 1);
-			CharBuffer cb = StandardCharsets.UTF_8.newDecoder().replaceWith("--")
-				.onMalformedInput(CodingErrorAction.REPLACE).onUnmappableCharacter(CodingErrorAction.REPLACE)
-				.decode(bb);
+			CharBuffer cb =
+				StandardCharsets.UTF_8.newDecoder().replaceWith("--").onMalformedInput(CodingErrorAction.REPLACE)
+					.onUnmappableCharacter(CodingErrorAction.REPLACE).decode(bb);
 			if ( cb.remaining() != 1 ) {
 				throw new CompileError(this.file, this.line, this.charInLine, this.totalChar, "'", null,
 					"invalid character sequence (maybe a non single byte character)");
@@ -563,26 +574,27 @@ public class SimpleTokenStream {
 		}
 		if ( bytes[off] != '\'' ) {
 			throw new CompileError(this.file, this.line, this.charInLine, this.totalChar,
-				"'" + ( off == 2 ? "\\" + (char) bytes[1] : (char) bytes[0] ), null, "character not directly closed");
+				"'" + ( off == 2 ? "\\" + (char) bytes[1] : Character.toString(bytes[0]) ), null,
+				"character not directly closed");
 		}
-		in.reset();
-		in.mark(off + 1);
+		this.in.reset();
+		this.in.mark(off + 1);
 		this.charInLine += off + 2;
-		this.totalChar += off + 2;
-		this.tok = CHARACTER; // dynTok is already set
+		this.totalChar  += off + 2;
+		this.tok         = CHARACTER; // dynTok is already set
 		return CHARACTER;
 	}
 	
 	private int returnString(StringBuilder sb) throws IOException {
 		CharsetDecoder decoder = StandardCharsets.UTF_8.newDecoder();
-		byte[] bytes = new byte[32];
-		char[] chars = new char[32];
-		ByteBuffer bbuf = ByteBuffer.wrap(bytes);
-		CharBuffer cbuf = CharBuffer.wrap(chars);
-		int len = 2;
+		byte[]         bytes   = new byte[32];
+		char[]         chars   = new char[32];
+		ByteBuffer     bbuf    = ByteBuffer.wrap(bytes);
+		CharBuffer     cbuf    = CharBuffer.wrap(chars);
+		int            len     = 2;
 		while ( true ) {
-			in.mark(32);
-			int r = in.readNBytes(bytes, bbuf.position(), 32 - bbuf.position());
+			this.in.mark(32);
+			int         r  = this.in.readNBytes(bytes, bbuf.position(), 32 - bbuf.position());
 			CoderResult cr = decoder.decode(bbuf, cbuf, true);
 			sb.append(chars, 0, cbuf.position());
 			checkInvalid("string", "\"", sb, cr);
@@ -593,12 +605,12 @@ public class SimpleTokenStream {
 				switch ( c ) {
 				case '"' -> {
 					len += i;
-					in.reset();
-					in.skipNBytes(i + 1);
-					this.charInLine = len;
-					this.totalChar += len;
-					this.dynTok = sb.toString();
-					this.tok = STRING;
+					this.in.reset();
+					this.in.skipNBytes(i + 1);
+					this.charInLine  = len;
+					this.totalChar  += len;
+					this.dynTok      = sb.toString();
+					this.tok         = STRING;
 					return STRING;
 				}
 				case '\n', '\r' -> {
@@ -699,29 +711,29 @@ public class SimpleTokenStream {
 	}
 	
 	private int returnAsm(StringBuilder sb) throws IOException {
-		int len = 6 + sb.length(); // directly include the start and end tokens
+		int            len     = 6 + sb.length(); // directly include the start and end tokens
 		CharsetDecoder decoder = StandardCharsets.UTF_8.newDecoder();
-		byte[] bytes = new byte[128];
-		char[] chars = new char[128];
-		ByteBuffer bbuf = ByteBuffer.wrap(bytes);
-		CharBuffer cbuf = CharBuffer.wrap(chars);
-		int lines = 0;
-		int lll = this.charInLine;
+		byte[]         bytes   = new byte[128];
+		char[]         chars   = new char[128];
+		ByteBuffer     bbuf    = ByteBuffer.wrap(bytes);
+		CharBuffer     cbuf    = CharBuffer.wrap(chars);
+		int            lines   = 0;
+		int            lll     = this.charInLine;
 		while ( true ) {
-			in.mark(128);
-			int r = in.readNBytes(bytes, bbuf.position(), 128 - bbuf.position());
+			this.in.mark(128);
+			int r     = this.in.readNBytes(bytes, bbuf.position(), 128 - bbuf.position());
 			int steps = bytes.length - 2;
 			for (int i = 0; i < steps; i++) {
 				if ( bytes[i] == '>' && bytes[i + 1] == '>' && bytes[i + 2] == '>' ) {
 					finishAppend("asm block", ":::", sb, decoder, chars, bbuf, cbuf);
 					len += i;
-					in.reset();
-					in.skipNBytes(i + 3);
-					this.line += lines;
-					this.charInLine = len - lll;
-					this.totalChar += len;
-					this.dynTok = sb.toString();
-					this.tok = ASM_BLOCK;
+					this.in.reset();
+					this.in.skipNBytes(i + 3);
+					this.line       += lines;
+					this.charInLine  = len - lll;
+					this.totalChar  += len;
+					this.dynTok      = sb.toString();
+					this.tok         = ASM_BLOCK;
 					return ASM_BLOCK;
 				} else if ( bytes[i] == '\n' ) {
 					lines++;
@@ -772,26 +784,26 @@ public class SimpleTokenStream {
 	private int returnName(StringBuilder sb) throws IOException {
 		// no need for a decoder: name only allows ASCII characters
 		byte[] bytes = new byte[16];
-		int len = sb.length();
+		int    len   = sb.length();
 		while ( true ) {
-			in.mark(16);
-			int r = in.readNBytes(bytes, 0, 16);
+			this.in.mark(16);
+			int r = this.in.readNBytes(bytes, 0, 16);
 			if ( r <= 0 ) {
 				this.charInLine += len;
-				this.totalChar += len;
-				this.dynTok = sb.toString();
-				this.tok = NAME;
+				this.totalChar  += len;
+				this.dynTok      = sb.toString();
+				this.tok         = NAME;
 				return NAME;
 			}
 			for (int i = 0; i < r; i++) {
 				if ( noName(bytes[i]) ) {
-					in.reset();
-					in.skipNBytes(i);
-					len += i;
+					this.in.reset();
+					this.in.skipNBytes(i);
+					len             += i;
 					this.charInLine += len;
-					this.totalChar += len;
-					this.dynTok = sb.toString();
-					this.tok = NAME;
+					this.totalChar  += len;
+					this.dynTok      = sb.toString();
+					this.tok         = NAME;
 					return NAME;
 				}
 				sb.append((char) bytes[i]);
@@ -842,7 +854,7 @@ public class SimpleTokenStream {
 	
 	public static void main(String[] args) throws IllegalArgumentException, IllegalAccessException {
 		ByteArrayInputStream bais = new ByteArrayInputStream("dep hello world".getBytes(StandardCharsets.UTF_8));
-		SimpleTokenStream sts = new SimpleTokenStream(bais, null);
+		SimpleTokenStream    sts  = new SimpleTokenStream(bais, null);
 		System.out.println(sts.tok() + " : " + name(sts.tok) + " : " + sts.dynTokSpecialText());
 		System.out.println("  at line " + sts.line + ':' + sts.charInLine + " (total char: " + sts.totalChar + ')');
 		sts.consume();
@@ -859,8 +871,8 @@ public class SimpleTokenStream {
 			if ( f.getType() != Integer.TYPE ) {
 				continue;
 			}
-			String fname = f.getName();
-			int fval = f.getInt(null);
+			String fname    = f.getName();
+			int    fval     = f.getInt(null);
 			String fvalName = name(fval);
 			if ( Character.isLetter(fvalName.charAt(0)) && ( !fname.equals(fvalName.toUpperCase())
 				|| !fvalName.equals(fname.toLowerCase()) && !"EOF".equals(fvalName) ) ) {
@@ -868,7 +880,7 @@ public class SimpleTokenStream {
 					+ " : " + fvalName);
 			}
 		}
-		String[] firstNames = Arrays.copyOf(NAMES, FIRST_DYN);
+		String[] firstNames       = Arrays.copyOf(NAMES, FIRST_DYN);
 		String[] sortedFirstNames = firstNames.clone();
 		Arrays.sort(sortedFirstNames);
 		if ( !Arrays.equals(firstNames, sortedFirstNames) ) {

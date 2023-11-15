@@ -6,7 +6,6 @@ import java.util.Map;
 import de.hechler.patrick.codesprachen.simple.compile.error.CompileError;
 import de.hechler.patrick.codesprachen.simple.compile.error.ErrorContext;
 import de.hechler.patrick.codesprachen.simple.compile.objects.types.FuncType;
-import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleType;
 import de.hechler.patrick.codesprachen.simple.compile.objects.value.DependencyVal;
 import de.hechler.patrick.codesprachen.simple.compile.objects.value.FunctionVal;
 import de.hechler.patrick.codesprachen.simple.compile.objects.value.SimpleValue;
@@ -14,19 +13,19 @@ import de.hechler.patrick.codesprachen.simple.compile.objects.value.VariableVal;
 
 public class SimpleFile extends SimpleDependency {
 	
-	private Map<String,SimpleDependency> dependencies;
-	private Map<String,SimpleType>       typedefs;
-	private Map<String,SimpleVariable>   variables;
-	private Map<String,SimpleFunction>   functions;
-	private String                       main;
-	private String                       init;
+	private Map<String, SimpleDependency> dependencies;
+	private Map<String, SimpleTypedef>    typedefs;
+	private Map<String, SimpleVariable>   variables;
+	private Map<String, SimpleFunction>   functions;
+	private SimpleFunction                main;
+	private SimpleFunction                init;
 	
 	public SimpleFile(String binaryTarget) {
 		super(binaryTarget);
 		this.dependencies = new HashMap<>();
-		this.typedefs = new HashMap<>();
-		this.variables = new HashMap<>();
-		this.functions = new HashMap<>();
+		this.typedefs     = new HashMap<>();
+		this.variables    = new HashMap<>();
+		this.functions    = new HashMap<>();
 	}
 	
 	@Override
@@ -47,12 +46,12 @@ public class SimpleFile extends SimpleDependency {
 	}
 	
 	@Override
-	public Object nameTypeOrDepOrFuncOrNull(String name, ErrorContext ctx) {
-		SimpleType t = typedefs.get(name);
-		if ( t != null ) return t;
-		SimpleDependency d = dependencies.get(name);
+	public Object nameTypeOrDepOrFuncOrNull(String name, @SuppressWarnings("unused") ErrorContext ctx) {
+		SimpleTypedef t = this.typedefs.get(name);
+		if ( t != null ) return t.type();
+		SimpleDependency d = this.dependencies.get(name);
 		if ( d != null ) return d;
-		SimpleFunction f = functions.get(name);
+		SimpleFunction f = this.functions.get(name);
 		if ( f != null ) return f;
 		return null;
 	}
@@ -62,9 +61,9 @@ public class SimpleFile extends SimpleDependency {
 		this.dependencies.put(name, dep);
 	}
 	
-	public void typedef(SimpleType type, String name, ErrorContext ctx) {
-		checkDuplicateName(name, ctx);
-		this.typedefs.put(name, type);
+	public void typedef(SimpleTypedef typedef, ErrorContext ctx) {
+		checkDuplicateName(typedef.name(), ctx);
+		this.typedefs.put(typedef.name(), typedef);
 	}
 	
 	public void variable(SimpleVariable sv, String name, ErrorContext ctx) {
@@ -72,23 +71,23 @@ public class SimpleFile extends SimpleDependency {
 		this.variables.put(name, sv);
 	}
 	
-	public void function(SimpleFunction func, String name, ErrorContext ctx) {
-		checkDuplicateName(name, ctx);
-		this.functions.put(name, func);
-		int flags = func.type.flags();
+	public void function(SimpleFunction func, ErrorContext ctx) {
+		checkDuplicateName(func.name(), ctx);
+		this.functions.put(func.name(), func);
+		int flags = func.type().flags();
 		if ( ( flags & FuncType.FLAG_INIT ) != 0 ) {
 			if ( this.init != null ) {
-				throw new CompileError(ctx, "there is already a function marked with init: "
-					+ this.functions.get(this.init) + " second init: " + func);
+				throw new CompileError(ctx,
+					"there is already a function marked with init: " + this.init + " second init: " + func);
 			}
-			this.init = name;
+			this.init = func;
 		}
 		if ( ( flags & FuncType.FLAG_MAIN ) != 0 ) {
 			if ( this.main != null ) {
-				throw new CompileError(ctx, "there is already a function marked with main: "
-					+ this.functions.get(this.main) + " second main: " + func);
+				throw new CompileError(ctx,
+					"there is already a function marked with main: " + this.main + " second main: " + func);
 			}
-			this.main = name;
+			this.main = func;
 		}
 	}
 	

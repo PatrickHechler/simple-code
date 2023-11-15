@@ -23,13 +23,14 @@ public record DataVal(byte[] value, SimpleType type, ErrorContext ctx, DataVal o
 		this(null, type, ctx, orig.orig == null ? orig : orig.orig, orig.orig == null ? off : off + orig.off, deref);
 	}
 	
-	public static SimpleValue createString(List<String> value, ErrorContext ctx) {
-		StringBuilder sb = new StringBuilder(value.stream().mapToInt(String::length).sum() + 1);
-		for (String str : value) {
-			sb.append(str);
-		}
-		sb.append('\0');
-		byte[] val = sb.toString().getBytes(StandardCharsets.UTF_8);
+	public static SimpleValue createString(String value, ErrorContext ctx) {
+		byte[] val = value.concat("\0").getBytes(StandardCharsets.UTF_8);
+		return new DataVal(val, stringType(val, ctx), ctx);
+	}
+	
+	public static SimpleValue createString(StringBuilder value, ErrorContext ctx) {
+		value.append('\0');
+		byte[] val = value.toString().getBytes(StandardCharsets.UTF_8);
 		return new DataVal(val, stringType(val, ctx), ctx);
 	}
 	

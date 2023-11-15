@@ -131,11 +131,12 @@ public record BinaryOpVal(SimpleValue a, BinaryOp op, SimpleValue b, ErrorContex
 		return this.a.type();
 	}
 	
+	@Override
 	public void checkAssignable(SimpleType type, ErrorContext ctx) throws CompileError {
-		final SimpleType at = a.type();
-		SimpleType target;
+		final SimpleType at = this.a.type();
+		SimpleType       target;
 		if ( this.op == BinaryOp.DEREF_BY_NAME ) {
-			String name = ( (NameVal) b ).name();
+			String name = ( (NameVal) this.b ).name();
 			if ( at instanceof StructType st ) {
 				target = st.member(name, ctx).type();
 			} else {
@@ -148,7 +149,7 @@ public record BinaryOpVal(SimpleValue a, BinaryOp op, SimpleValue b, ErrorContex
 			throw new CompileError(ctx, "this value " + this + " is not assignable");
 		}
 		type.checkCastable(target, ctx, false);
-		a.checkAssignable(at, ctx);
+		this.a.checkAssignable(at, ctx);
 	}
 	
 	public enum BinaryOpType {
@@ -169,6 +170,13 @@ public record BinaryOpVal(SimpleValue a, BinaryOp op, SimpleValue b, ErrorContex
 		CMP_GE(BinaryOpType.CMP),
 		CMP_LT(BinaryOpType.CMP),
 		CMP_LE(BinaryOpType.CMP),
+		
+		CMP_NAN_EQ(BinaryOpType.CMP),
+		CMP_NAN_NEQ(BinaryOpType.CMP),
+		CMP_NAN_GT(BinaryOpType.CMP),
+		CMP_NAN_GE(BinaryOpType.CMP),
+		CMP_NAN_LT(BinaryOpType.CMP),
+		CMP_NAN_LE(BinaryOpType.CMP),
 		
 		SHIFT_LEFT(BinaryOpType.SHIFT),
 		SHIFT_LOGIC_RIGTH(BinaryOpType.SHIFT),
@@ -209,6 +217,12 @@ public record BinaryOpVal(SimpleValue a, BinaryOp op, SimpleValue b, ErrorContex
 		case CMP_LE -> "(" + this.a + " <= " + this.b + ")";
 		case CMP_LT -> "(" + this.a + " < " + this.b + ")";
 		case CMP_NEQ -> "(" + this.a + " != " + this.b + ")";
+		case CMP_NAN_EQ -> "( !(" + this.a + " == " + this.b + ") )";
+		case CMP_NAN_GE -> "( !(" + this.a + " >= " + this.b + ") )";
+		case CMP_NAN_GT -> "( !(" + this.a + " > " + this.b + ") )";
+		case CMP_NAN_LE -> "( !(" + this.a + " <= " + this.b + ") )";
+		case CMP_NAN_LT -> "( !(" + this.a + " < " + this.b + ") )";
+		case CMP_NAN_NEQ -> "( !(" + this.a + " != " + this.b + ") )";
 		case MATH_ADD -> "(" + this.a + " + " + this.b + ")";
 		case MATH_SUB -> "(" + this.a + " - " + this.b + ")";
 		case MATH_MUL -> "(" + this.a + " * " + this.b + ")";
@@ -222,23 +236,59 @@ public record BinaryOpVal(SimpleValue a, BinaryOp op, SimpleValue b, ErrorContex
 	
 	@Override
 	public boolean isConstant() {
-		return switch ( this.op ) {
-		case DEREF_BY_NAME -> this.a.isConstant();
-		case BOOL_AND -> this.a.isConstant() && this.b.isConstant()
-			|| ( this.a.superSimplify() instanceof ScalarNumericVal snv && snv.value() == 0L );
-		case BOOL_OR -> this.a.isConstant() && this.b.isConstant()
-			|| ( this.a.superSimplify() instanceof ScalarNumericVal snv && snv.value() != 0L );
-		default -> this.a.isConstant() && this.b.isConstant();
-		};
+		switch ( this.op ) {
+		case DEREF_BY_NAME:
+			return this.a.isConstant();
+		case BOOL_AND:
+			return this.a.isConstant() && this.b.isConstant()
+				|| ( this.a.superSimplify() instanceof ScalarNumericVal snv && snv.value() == 0L );
+		case BOOL_OR:
+			return this.a.isConstant() && this.b.isConstant()
+				|| ( this.a.superSimplify() instanceof ScalarNumericVal snv && snv.value() != 0L );
+		// $CASES-OMITTED$
+		default:
+			return this.a.isConstant() && this.b.isConstant();
+		}
 	}
 	
 	@Override
 	public SimpleValue simplify() {
-		if ( !isConstant() ) {
-			return create(this.a.simplify(), this.op, this.b.simplify(), ctx);
-		}
 		SimpleValue sa = this.a.simplify();
 		SimpleValue sb = this.b.simplify();
+		if ( !isConstant() ) {
+			if ( this.op == BinaryOp.CMP_EQ && sb instanceof ScalarNumericVal nb && nb.value() == 0L
+				&& sa instanceof BinaryOpVal ba && ba.op.type == BinaryOpType.CMP ) {
+				switch ( ba.op ) {
+				case CMP_EQ:
+					return create(ba.a, BinaryOp.CMP_NAN_NEQ, ba.b, this.ctx);
+				case CMP_GE:
+					return create(ba.a, BinaryOp.CMP_NAN_LT, ba.b, this.ctx);
+				case CMP_GT:
+					return create(ba.a, BinaryOp.CMP_NAN_LE, ba.b, this.ctx);
+				case CMP_LE:
+					return create(ba.a, BinaryOp.CMP_NAN_GT, ba.b, this.ctx);
+				case CMP_LT:
+					return create(ba.a, BinaryOp.CMP_NAN_GE, ba.b, this.ctx);
+				case CMP_NEQ:
+					return create(ba.a, BinaryOp.CMP_NAN_EQ, ba.b, this.ctx);
+				case CMP_NAN_EQ:
+					return create(ba.a, BinaryOp.CMP_NEQ, ba.b, this.ctx);
+				case CMP_NAN_GE:
+					return create(ba.a, BinaryOp.CMP_LT, ba.b, this.ctx);
+				case CMP_NAN_GT:
+					return create(ba.a, BinaryOp.CMP_LE, ba.b, this.ctx);
+				case CMP_NAN_LE:
+					return create(ba.a, BinaryOp.CMP_GT, ba.b, this.ctx);
+				case CMP_NAN_LT:
+					return create(ba.a, BinaryOp.CMP_GE, ba.b, this.ctx);
+				case CMP_NAN_NEQ:
+					return create(ba.a, BinaryOp.CMP_EQ, ba.b, this.ctx);
+				// $CASES-OMITTED$
+				default:
+				}
+			}
+			return create(sb, this.op, sb, this.ctx);
+		}
 		return switch ( this.op ) {
 		case ARR_PNTR_INDEX -> {
 			
@@ -254,6 +304,12 @@ public record BinaryOpVal(SimpleValue a, BinaryOp op, SimpleValue b, ErrorContex
 		case CMP_LE -> null;
 		case CMP_LT -> null;
 		case CMP_NEQ -> null;
+		case CMP_NAN_EQ -> null;
+		case CMP_NAN_GE -> null;
+		case CMP_NAN_GT -> null;
+		case CMP_NAN_LE -> null;
+		case CMP_NAN_LT -> null;
+		case CMP_NAN_NEQ -> null;
 		case DEREF_BY_NAME -> null;
 		case MATH_ADD -> null;
 		case MATH_DIV -> null;

@@ -11,7 +11,6 @@ public interface SimpleValue {
 	
 	SimpleType type();
 	
-	@Deprecated
 	SimpleValue simplify();
 	
 	default SimpleValue superSimplify() {
@@ -49,15 +48,15 @@ public interface SimpleValue {
 			if ( invalid(orig, dv, len) ) {
 				return dv;
 			}
-			long value = toLong(dv, len, false);
+			long   value = toLong(dv, len, false);
 			double fpVal = len == 4 ? Float.intBitsToFloat((int) value) : Double.longBitsToDouble(value);
 			return FPNumericVal.create((NativeType) orig.type(), fpVal, ErrorContext.NO_CONTEXT);
 		}
 		
 		private static long toLong(DataVal dv, int len, boolean signExtend) {
-			long value = 0;
-			byte[] data = dv.orig().value();
-			int off = (int) dv.off();
+			long   value = 0;
+			byte[] data  = dv.orig().value();
+			int    off   = (int) dv.off();
 			for (int i = 0; i < len; i++) {
 				value |= ( 0xFFL & data[off + i] ) << ( i << 3 );
 			}
@@ -88,7 +87,7 @@ public interface SimpleValue {
 	
 	ErrorContext ctx();
 	
-	default void checkAssignable(@SuppressWarnings( "unused" ) SimpleType type, ErrorContext ctx) throws CompileError {
+	default void checkAssignable(@SuppressWarnings("unused") SimpleType type, ErrorContext ctx) throws CompileError {
 		throw new CompileError(ctx, "this value (" + this + ") is not assignable");
 	}
 	
