@@ -124,7 +124,7 @@ public class SimpleExportFileParser {
 		if ( this.in.tok() == QUESTION ) {
 			this.in.consume();
 			SimpleValue b = parseValue(scope);
-			consumeToken(COLON, "expected `: [COND_EXP]´ after `[LOR_EXP] ? [VALUE]´");
+			consumeToken(BOOL_NOT, "expected `! [COND_EXP]´ after `[LOR_EXP] ? [VALUE]´");
 			SimpleValue c = parseValueCondExp(ctx, scope);
 			a = CondVal.create(a, b, c, ctx);
 		}

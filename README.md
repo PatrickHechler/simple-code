@@ -177,7 +177,7 @@ if marked with `const` there must be a constant initial value
 * VALUE
     * `[COND_EXP]`
 * COND_EXP
-    * `[LOR_EXP] ( \? [LOR_EXP] ! [COND_EXP] )?`
+    * `[LOR_EXP] ( \? [VALUE] ! [COND_EXP] )?`
 * LOR_EXP
     * `[LAND_EXP] ( ( \|\| ) [LAND_EXP] )*`
 * LAND_EXP
