@@ -10,7 +10,6 @@ import de.hechler.patrick.codesprachen.simple.compile.objects.types.NativeType;
 import de.hechler.patrick.codesprachen.simple.compile.objects.types.PointerType;
 import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleType;
 import de.hechler.patrick.codesprachen.simple.compile.objects.types.StructType;
-import de.hechler.patrick.codesprachen.simple.compile.objects.value.BinaryOpVal.BinaryOp;
 
 public record BinaryOpVal(SimpleValue a, BinaryOp op, SimpleValue b, ErrorContext ctx) implements SimpleValue {
 	
@@ -300,12 +299,11 @@ public record BinaryOpVal(SimpleValue a, BinaryOp op, SimpleValue b, ErrorContex
 			yield null;
 		}
 		case BIT_AND -> {
+			if ( sa instanceof ScalarNumericVal na && na.value() == 0L ) {
+				yield ScalarNumericVal.createAllowTruncate(type(), 0L, this.ctx);
+			}
 			if ( sa instanceof ScalarNumericVal na && sb instanceof ScalarNumericVal nb ) {
 				yield ScalarNumericVal.createAllowTruncate(type(), na.value() & nb.value(), this.ctx);
-			}
-			if ( sa instanceof ScalarNumericVal na && na.value() == 0L
-				|| sb instanceof ScalarNumericVal nb && nb.value() == 0L ) {
-				yield ScalarNumericVal.createAllowTruncate(type(), 0L, this.ctx);
 			}
 			yield null;
 		}
@@ -315,8 +313,7 @@ public record BinaryOpVal(SimpleValue a, BinaryOp op, SimpleValue b, ErrorContex
 			}
 			long s    = type().size();
 			long mask = s == 8L ? -1L : 1L << ( s << 3 );
-			if ( sa instanceof ScalarNumericVal na && na.value() == mask
-				|| sb instanceof ScalarNumericVal nb && nb.value() == mask ) {
+			if ( sa instanceof ScalarNumericVal na && na.value() == mask ) {
 				yield ScalarNumericVal.createAllowTruncate(type(), 0L, this.ctx);
 			}
 			yield null;
@@ -327,8 +324,26 @@ public record BinaryOpVal(SimpleValue a, BinaryOp op, SimpleValue b, ErrorContex
 			}
 			yield null;
 		}
-		case BOOL_AND -> null;
-		case BOOL_OR -> null;
+		case BOOL_AND -> {
+			if ( sa instanceof ScalarNumericVal na && na.value() == 0L ) {
+				yield ScalarNumericVal.createAllowTruncate(type(), 0L, this.ctx);
+			}
+			if ( sa instanceof ScalarNumericVal na && sb instanceof ScalarNumericVal nb ) {
+				yield ScalarNumericVal.createAllowTruncate(type(), ( na.value() != 0L && nb.value() != 0L ) ? 1L : 0L,
+					this.ctx);
+			}
+			yield null;
+		}
+		case BOOL_OR -> {
+			if ( sa instanceof ScalarNumericVal na && na.value() != 0L ) {
+				yield ScalarNumericVal.createAllowTruncate(type(), 1L, this.ctx);
+			}
+			if ( sa instanceof ScalarNumericVal na && sb instanceof ScalarNumericVal nb ) {
+				yield ScalarNumericVal.createAllowTruncate(type(), ( na.value() != 0L || nb.value() != 0L ) ? 1L : 0L,
+					this.ctx);
+			}
+			yield null;
+		}
 		case CMP_EQ -> null;
 		case CMP_GE -> null;
 		case CMP_GT -> null;
