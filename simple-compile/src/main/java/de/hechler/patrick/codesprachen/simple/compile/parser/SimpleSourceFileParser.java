@@ -16,10 +16,12 @@ import de.hechler.patrick.codesprachen.simple.compile.objects.cmd.FuncCallCmd;
 import de.hechler.patrick.codesprachen.simple.compile.objects.cmd.IfCmd;
 import de.hechler.patrick.codesprachen.simple.compile.objects.cmd.SimpleCommand;
 import de.hechler.patrick.codesprachen.simple.compile.objects.cmd.StructFuncCallCmd;
+import de.hechler.patrick.codesprachen.simple.compile.objects.cmd.VarDeclCmd;
 import de.hechler.patrick.codesprachen.simple.compile.objects.cmd.WhileCmd;
 import de.hechler.patrick.codesprachen.simple.compile.objects.simplefile.SimpleDependency;
 import de.hechler.patrick.codesprachen.simple.compile.objects.simplefile.SimpleFile;
 import de.hechler.patrick.codesprachen.simple.compile.objects.simplefile.SimpleFunction;
+import de.hechler.patrick.codesprachen.simple.compile.objects.simplefile.SimpleVariable;
 import de.hechler.patrick.codesprachen.simple.compile.objects.simplefile.scope.SimpleScope;
 import de.hechler.patrick.codesprachen.simple.compile.objects.types.FuncType;
 import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleType;
@@ -47,6 +49,33 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 	}
 	
 	@Override
+	protected void parseDependency(SimpleFile sf) {
+		this.in.consume();
+		String name;
+		if ( this.in.tok() == ME ) {
+			this.in.consume();
+			name = "<ME>";
+		} else {
+			expectToken(NAME, "expected to get `[NAME] [STRING] ;´ after `dep´");
+			name = this.in.consumeDynTokSpecialText();
+		}
+		expectToken(STRING, "expected to get `[STRING] ;´ after `dep [NAME]´");
+		String srcPath = this.in.consumeDynTokSpecialText();
+		String binPath = null;
+		if ( this.in.tok() != SEMI ) {
+			expectToken(STRING, "expected to get `( [STRING] )? ;´ after `dep [NAME] [STRING]´");
+			binPath = this.in.consumeDynTokSpecialText();
+		}
+		consumeToken(SEMI, "expected to get `;´ after `dep [NAME] [STRING]´");
+		sf.dependency(this.dep.apply(srcPath, binPath), name, this.in.ctx());
+	}
+	
+	@Override
+	protected SimpleVariable parseSFScopeVariable(SimpleFile sf) {
+		return parseAnyScopeVariable(sf);
+	}
+	
+	@Override
 	protected void parseFunction(SimpleFile sf) {
 		this.in.consume();
 		int flags = 0;
@@ -65,7 +94,7 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 		if ( flags != 0 ) {
 			ftype = FuncType.create(ftype.resMembers(), ftype.argMembers(), flags, ctx);
 		}
-		BlockCmd       block = new BlockCmd(sf);
+		BlockCmd       block = new BlockCmd(SimpleScope.newFuncScope(sf, ftype, ctx));
 		SimpleFunction func  = new SimpleFunction(name, ftype, block);
 		sf.function(func, ctx);
 		parseCmdBlock(block);
@@ -90,9 +119,9 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 			parseCmdBlock(cmd);
 			yield cmd;
 		}
-		case CONST -> parseCmdVarDecl(scope, true);
-		case VAR -> parseCmdVarDecl(scope, false);
-		case CALL -> parseCmdCall(scope);
+		case CONST -> parseCmdVarDecl(scope, SimpleVariable.FLAG_CONSTANT);
+		case VAR -> parseCmdVarDecl(scope, 0);
+		case CALL -> parseCmdCallFStruct(scope);
 		case WHILE -> parseCmdWhile(scope);
 		case IF -> parseCmdIf(scope);
 		case ASM -> parseCmdAsm(scope);
@@ -111,7 +140,9 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 			return AssignCmd.create(scope, val0, val1, this.in.ctx());
 		}
 		case LT:
-			results = parseCommaSepValues();
+			if ( this.in.tok() != GT ) {
+				results = parseCommaSepValues(scope);
+			}
 			consumeToken(GT,
 				"expected `> <-- \\( ( [VALUE] ( , [VALUE] )* )? \\)´ after `call < ( [VALUE] ( , [VALUE] )* )?´");
 			consumeToken(LARROW, "expected `<-- \\( ( [VALUE] ( , [VALUE] )* )? \\)´ after `call [FUNC_CALL_RESULT]´");
@@ -119,7 +150,10 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 				"expected `\\( ( [VALUE] ( , [VALUE] )* )? \\)´ after `call [FUNC_CALL_RESULT] <--´");
 			//$FALL-THROUGH$
 		case SMALL_OPEN:
-			List<SimpleValue> args = parseCommaSepValues();
+			List<SimpleValue> args = List.of();
+			if ( this.in.tok() != SMALL_CLOSE ) {
+				args = parseCommaSepValues(scope);
+			}
 			consumeToken(SMALL_CLOSE,
 				"expected `\\)´ after `call ( [FUNC_CALL_RESULT] <-- )? \\( ( [VALUE] ( , [VALUE] )* )?´");
 			consumeToken(SEMI, "expected `;´ after `call [VALUE]  ( [FUNC_CALL_RESULT] <-- )? [FUNC_CALL_ARGS]´");
@@ -131,18 +165,57 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 		}
 	}
 	
+	private SimpleCommand parseCmdVarDecl(SimpleScope scope, int flags) {
+		SimpleType type = parseType(scope);
+		expectToken(NAME, "expected `[NAME]´ after `( const | var ) [TYPE]´");
+		String      name       = this.in.consumeDynTokSpecialText();
+		SimpleValue initialVal = null;
+		if ( flags != 0 ) { // the Constant flag is the only one permitted in this context
+			assert flags == SimpleVariable.FLAG_CONSTANT;
+			expectToken(LARROW, "expected `<-- [VALUE] ;´ after ´const [TYPE] [NAME]´");
+			initialVal = parseValue(scope);
+		} else if ( this.in.tok() == LARROW ) {
+			this.in.consume();
+			initialVal = parseValue(scope);
+		}
+		consumeToken(SEMI, "expected `;´ after `( const | var ) [TYPE] [NAME] ( <-- [VALUE] )?´");
+		SimpleVariable sv = new SimpleVariable(type, name, initialVal, flags);
+		return VarDeclCmd.create(scope, sv, this.in.ctx());
+	}
+	
 	private SimpleCommand parseCmdAsm(SimpleScope scope) {
 		List<AsmCmd.AsmParam> params = null;
 		if ( this.in.tok() == STRING ) {
 			params = new ArrayList<>();
-			do {
+			while ( true ) {
 				String target = this.in.consumeDynTokSpecialText();
+				consumeToken(LARROW, "expected `<--´ after `asm ( [STRING] <-- [VALUE] , )* [STRING]´");
 				SimpleValue val = parseValue(scope);
-				if ( this.in.tok() == COMMA ) this.in.consume();
-			} while ( this.in.tok() == STRING );
+				params.add(AsmCmd.AsmParam.create(target, val, this.in.ctx()));
+				if ( this.in.tok() != COMMA ) break;
+				this.in.consume();
+				expectToken(STRING, "expected `[STRING]´ after `asm ( [STRING] <-- [VALUE] , )+");
+			}
 		}
-		// TODO Auto-generated method stub
-		return null;
+		expectToken(ASM_BLOCK,
+			"expected `[ASM_BLOCK]´ after `asm ( [STRING] <-- [VALUE] ( , [STRING] <-- [VALUE] )* )?´");
+		String                 asmBlock = this.in.consumeDynTokSpecialText();
+		List<AsmCmd.AsmResult> results  = null;
+		if ( this.in.tok() != SEMI ) {
+			results = new ArrayList<>();
+			while ( true ) {
+				SimpleValue target = parseValue(scope);
+				consumeToken(LARROW,
+					"expected `<--´ after `[ASM_BLOCK] ( [VALUE] <-- [STRING] ( , [VALUE] <-- [STRING] )* )? [VALUE]´");
+				expectToken(STRING,
+					"expected `[STRING]´ after `[ASM_BLOCK] ( [VALUE] <-- [STRING] ( , [VALUE] <-- [STRING] )* )? [VALUE] <--´");
+				String source = this.in.consumeDynTokSpecialText();
+				results.add(AsmCmd.AsmResult.create(target, source, this.in.ctx()));
+				if ( this.in.tok() != COMMA ) break;
+				this.in.consume();
+			}
+		}
+		return AsmCmd.create(scope, params, asmBlock, results, this.in.ctx());
 	}
 	
 	private SimpleCommand parseCmdIf(SimpleScope scope) {
@@ -168,32 +241,20 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 		return WhileCmd.create(scope, cond, cmd, this.in.ctx());
 	}
 	
-	private SimpleCommand parseCmdCall(SimpleScope scope) {
-		SimpleValue func = super.parseValue(scope);
-		if ( this.in.tok() == LT || this.in.tok() == SMALL_OPEN ) {
-			List<SimpleValue> results = null;
-			if ( this.in.consumeTok() == LT ) {
-				results = parseCommaSepValues();
-				consumeToken(GT,
-					"expected `> <-- \\( ( [VALUE] ( , [VALUE] )* )? \\)´ after `call < ( [VALUE] ( , [VALUE] )* )?´");
-				consumeToken(LARROW,
-					"expected `<-- \\( ( [VALUE] ( , [VALUE] )* )? \\)´ after `call [FUNC_CALL_RESULT]´");
-				consumeToken(SMALL_OPEN,
-					"expected `\\( ( [VALUE] ( , [VALUE] )* )? \\)´ after `call [FUNC_CALL_RESULT] <--´");
-			}
-			List<SimpleValue> args = parseCommaSepValues();
-			consumeToken(SMALL_CLOSE,
-				"expected `\\)´ after `call ( [FUNC_CALL_RESULT] <-- )? \\( ( [VALUE] ( , [VALUE] )* )?´");
-			consumeToken(SEMI, "expected `;´ after `call [VALUE]  ( [FUNC_CALL_RESULT] <-- )? [FUNC_CALL_ARGS]´");
-			return FuncCallCmd.create(scope, func, results, args, this.in.ctx());
-		}
+	private SimpleCommand parseCmdCallFStruct(SimpleScope scope) {
+		SimpleValue func   = super.parseValue(scope);
 		SimpleValue fstuct = super.parseValue(scope);
 		consumeToken(SEMI, "expected `;´ after `call [VALUE] [VALUE]´");
 		return StructFuncCallCmd.create(scope, func, fstuct, this.in.ctx());
 	}
 	
-	private List<SimpleValue> parseCommaSepValues() {
-		// TODO Auto-generated method stub
+	private List<SimpleValue> parseCommaSepValues(SimpleScope scope) {
+		List<SimpleValue> values = new ArrayList<>();
+		while ( true ) {
+			values.add(parseValue(scope));
+			if ( this.in.tok() != COMMA ) return values;
+			this.in.consume();
+		}
 	}
 	
 }

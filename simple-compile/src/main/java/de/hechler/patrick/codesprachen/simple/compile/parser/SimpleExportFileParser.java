@@ -96,15 +96,14 @@ public class SimpleExportFileParser {
 	}
 	
 	protected SimpleVariable parseSFScopeVariable(SimpleFile sf) {
-		ErrorContext   ctx = this.in.ctx();
-		SimpleVariable sv  = parseAnyScopeVariable(sf, ctx);
+		SimpleVariable sv  = parseAnyScopeVariable(sf);
 		if ( ( sv.flags() & SimpleVariable.FLAG_CONSTANT ) == 0 && sv.initialValue() != null ) {
-			throw new CompileError(ctx, "a non constant value must not have a initial value set");
+			throw new CompileError(this.in.ctx(), "a non constant value must not have a initial value set");
 		}
 		return sv;
 	}
 	
-	protected SimpleVariable parseAnyScopeVariable(SimpleScope scope, ErrorContext ctx) {
+	protected SimpleVariable parseAnyScopeVariable(SimpleScope scope) {
 		int flags = 0;
 		switch ( this.in.tok() ) {
 		case CONST:
@@ -126,7 +125,7 @@ public class SimpleExportFileParser {
 			this.in.consume();
 			initialValue = parseValue(scope);
 		} else if ( ( flags & SimpleVariable.FLAG_CONSTANT ) != 0 ) {
-			throw new CompileError(ctx, "a constant value must have a initial value set");
+			throw new CompileError(this.in.ctx(), "a constant value must have a initial value set");
 		}
 		return new SimpleVariable(type, name, initialValue, flags);
 	}

@@ -48,7 +48,7 @@ public class FuncCallCmd extends SimpleCommand {
 		if ( !( type instanceof FuncType ft ) || ( ft.flags() & FuncType.FLAG_FUNC_ADDRESS ) == 0 ) {
 			throw new CompileError(ctx, "I need something of type function address to call it!");
 		}
-		List<SimpleValue> res = convert(results, ft.resMembers(), ctx);
+		List<SimpleValue> res = convert(results == null ? List.of() : results, ft.resMembers(), ctx);
 		List<SimpleValue> args = convert(arguments, ft.argMembers(), ctx);
 		return new FuncCallCmd(parent, func, res, args);
 	}

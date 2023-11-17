@@ -20,7 +20,7 @@ import java.util.List;
 
 import de.hechler.patrick.codesprachen.simple.compile.error.CompileError;
 import de.hechler.patrick.codesprachen.simple.compile.error.ErrorContext;
-import de.hechler.patrick.codesprachen.simple.compile.objects.simplefile.SimpleFunction;
+import de.hechler.patrick.codesprachen.simple.compile.objects.simplefile.SimpleFile;
 import de.hechler.patrick.codesprachen.simple.compile.objects.simplefile.SimpleVariable;
 import de.hechler.patrick.codesprachen.simple.compile.objects.types.FuncType;
 import de.hechler.patrick.codesprachen.simple.compile.objects.value.SimpleValue;
@@ -36,9 +36,9 @@ public interface SimpleScope {
 	
 	Object nameTypeOrDepOrFuncOrNull(String typedefName, ErrorContext ctx);
 	
-	static SimpleScope newFuncScope(SimpleScope parent, String funcName, FuncType ft, ErrorContext ctx) {
-		checkDuplicates(parent, ctx, ft.argMembers());
-		checkDuplicates(parent, ctx, ft.resMembers());
+	static SimpleScope newFuncScope(SimpleFile sf, FuncType ft, ErrorContext ctx) {
+		checkDuplicates(sf, ctx, ft.argMembers());
+		checkDuplicates(sf, ctx, ft.resMembers());
 		assert ( ft.flags() & FuncType.FLAG_FUNC_ADDRESS ) != 0; // NOSONAR
 		return new SimpleScope() {
 			
@@ -46,12 +46,12 @@ public interface SimpleScope {
 			public SimpleValue nameValueOrNull(String name, ErrorContext ctx) {
 				SimpleVariable val = ft.memberOrNull(name, ctx, true);
 				if ( val != null ) return VariableVal.create(val, ctx);
-				return parent.nameValueOrNull(name, ctx);
+				return sf.nameValueOrNull(name, ctx);
 			}
 			
 			@Override
 			public Object nameTypeOrDepOrFuncOrNull(String typedefName, ErrorContext ctx) {
-				return parent.nameTypeOrDepOrFuncOrNull(typedefName, ctx);
+				return sf.nameTypeOrDepOrFuncOrNull(typedefName, ctx);
 			}
 		};
 	}
