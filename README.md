@@ -149,15 +149,17 @@ if marked with `const` there must be a constant initial value
 
 * BLOCK
     * `{ ( [COMMAND] )* }`
+* CONSTANT_DECL
+    * `const [NAMED_TYPE] <-- [VALUE] ;`
 * VAR_DECL
-    * `[variable]`
+	* `var [NAMED_TYPE] ( <-- [VALUE] )? ;`
 * ASSIGN
     * `[POSTFIX_EXP] <-- [VALUE] ;`
 * FUNC_CALL
     * `call [VALUE] [VALUE] ;`
-    * `[POSTFIX_EXP] [FUNC_CALL_RESULT] [FUNC_CALL_ARGS] ;`
+    * `call [VALUE] [FUNC_CALL_RESULT] [FUNC_CALL_ARGS] ;`
         * FUNC_CALL_RESULT
-            * `( ( [POSTFIX_EXP] | < ( [POSTFIX_EXP] ( , [POSTFIX_EXP] )* )? > ) <-- )?`
+            * `( ( < ( [VALUE] ( , [VALUE] )* )? > ) <-- )?`
         * FUNC_CALL_ARGS
             * `\( ([VALUE] ( , [VALUE] )* )? \)`
 * WHILE
@@ -263,24 +265,12 @@ some functions, variables, constants and structures are predefined
 
 these are from the automatically imported dependency `std`
 
-the `std` dependency must be a compile time only dependency, `std` is not allowed to also be a runtime dependency.
-
-(to call for exampe a function, use `call std:streams_write write_args;`)
+the `std` dependency must be a compile time only dependency, `std` is **not** allowed to also be a runtime dependency.
 
 ### functions
 
-the compiler is allowed to inline all, some or none of the predefined functions
-
 ### variables
-
-`exp num errno;`
-* the compiler must ensure that the `errno` variable has always the same value as the primitive `ERRNO` register
-    * the compiler should just redirect all operations on the given variable to the `ERRNO` register.
-        * the compiler is encuraged to not reserve any additional memory for the `errno` variable, but is free to do so
-    * this simplifies the error handling when mixin simple-code and primitive-code
 
 ### constants
 
 ### structures
-
-there are currently no structures in the `std` dependency

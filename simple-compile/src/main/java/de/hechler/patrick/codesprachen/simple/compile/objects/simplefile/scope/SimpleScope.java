@@ -16,9 +16,15 @@
 //along with this program.  If not, see <https://www.gnu.org/licenses/>.
 package de.hechler.patrick.codesprachen.simple.compile.objects.simplefile.scope;
 
+import java.util.List;
+
 import de.hechler.patrick.codesprachen.simple.compile.error.CompileError;
 import de.hechler.patrick.codesprachen.simple.compile.error.ErrorContext;
+import de.hechler.patrick.codesprachen.simple.compile.objects.simplefile.SimpleFunction;
+import de.hechler.patrick.codesprachen.simple.compile.objects.simplefile.SimpleVariable;
+import de.hechler.patrick.codesprachen.simple.compile.objects.types.FuncType;
 import de.hechler.patrick.codesprachen.simple.compile.objects.value.SimpleValue;
+import de.hechler.patrick.codesprachen.simple.compile.objects.value.VariableVal;
 
 public interface SimpleScope {
 	
@@ -29,5 +35,33 @@ public interface SimpleScope {
 	}
 	
 	Object nameTypeOrDepOrFuncOrNull(String typedefName, ErrorContext ctx);
+	
+	static SimpleScope newFuncScope(SimpleScope parent, String funcName, FuncType ft, ErrorContext ctx) {
+		checkDuplicates(parent, ctx, ft.argMembers());
+		checkDuplicates(parent, ctx, ft.resMembers());
+		assert ( ft.flags() & FuncType.FLAG_FUNC_ADDRESS ) != 0; // NOSONAR
+		return new SimpleScope() {
+			
+			@Override
+			public SimpleValue nameValueOrNull(String name, ErrorContext ctx) {
+				SimpleVariable val = ft.memberOrNull(name, ctx, true);
+				if ( val != null ) return VariableVal.create(val, ctx);
+				return parent.nameValueOrNull(name, ctx);
+			}
+			
+			@Override
+			public Object nameTypeOrDepOrFuncOrNull(String typedefName, ErrorContext ctx) {
+				return parent.nameTypeOrDepOrFuncOrNull(typedefName, ctx);
+			}
+		};
+	}
+	
+	static void checkDuplicates(SimpleScope parent, ErrorContext ctx, List<SimpleVariable> members) {
+		for (SimpleVariable arg : members) {
+			if ( parent.nameValueOrNull(arg.name(), ctx) != null ) {
+				throw new CompileError(ctx, "there is alredy a value associated with the name " + arg.name());
+			}
+		}
+	}
 	
 }

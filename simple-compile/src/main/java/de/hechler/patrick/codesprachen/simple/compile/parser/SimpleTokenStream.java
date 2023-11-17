@@ -69,36 +69,37 @@ public class SimpleTokenStream {
 	public static final int  CONST           = 32;
 	public static final int  DEP             = 33;
 	public static final int  DWORD           = 34;
-	public static final int  EXP             = 35;
-	public static final int  FPDWORD         = 36;
-	public static final int  FPNUM           = 37;
-	public static final int  FSTRUCT         = 38;
-	public static final int  FUNC            = 39;
-	public static final int  IF              = 40;
-	public static final int  INIT            = 41;
-	public static final int  MAIN            = 42;
-	public static final int  NOPAD           = 43;
-	public static final int  NUM             = 44;
-	public static final int  STRUCT          = 45;
-	public static final int  TYPEDEF         = 46;
-	public static final int  UBYTE           = 47;
-	public static final int  UDWORD          = 48;
-	public static final int  UNUM            = 49;
-	public static final int  UWORD           = 50;
-	public static final int  WHILE           = 51;
-	public static final int  WORD            = 52;
+	public static final int  ELSE            = 35;
+	public static final int  EXP             = 36;
+	public static final int  FPDWORD         = 37;
+	public static final int  FPNUM           = 38;
+	public static final int  FSTRUCT         = 39;
+	public static final int  FUNC            = 40;
+	public static final int  IF              = 41;
+	public static final int  INIT            = 42;
+	public static final int  MAIN            = 43;
+	public static final int  NOPAD           = 44;
+	public static final int  NUM             = 45;
+	public static final int  STRUCT          = 46;
+	public static final int  TYPEDEF         = 47;
+	public static final int  UBYTE           = 48;
+	public static final int  UDWORD          = 49;
+	public static final int  UNUM            = 50;
+	public static final int  UWORD           = 51;
+	public static final int  WHILE           = 52;
+	public static final int  WORD            = 53;
 	private static final int MAX_NAME        = WORD;
-	public static final int  BLOCK_OPEN      = 53;
-	public static final int  BIT_OR          = 54;
-	public static final int  BOOL_OR         = 55;
-	public static final int  BLOCK_CLOSE     = 56;
-	public static final int  BIT_NOT         = 57;
-	public static final int  NAME            = 58;
+	public static final int  BLOCK_OPEN      = 54;
+	public static final int  BIT_OR          = 55;
+	public static final int  BOOL_OR         = 56;
+	public static final int  BLOCK_CLOSE     = 57;
+	public static final int  BIT_NOT         = 58;
+	public static final int  NAME            = 59;
 	static final int         FIRST_DYN       = NAME;
-	public static final int  NUMBER          = 59;
-	public static final int  STRING          = 60;
-	public static final int  CHARACTER       = 61;
-	public static final int  ASM_BLOCK       = 62;
+	public static final int  NUMBER          = 60;
+	public static final int  STRING          = 61;
+	public static final int  CHARACTER       = 62;
+	public static final int  ASM_BLOCK       = 63;
 	
 	private static final String[] NAMES =
 		{ // @formatter:off
@@ -137,6 +138,7 @@ public class SimpleTokenStream {
 		"const",       // CONST
 		"dep",         // DEP
 		"dword",       // DWORD
+		"else",        // ELSE
 		"exp",         // EXP
 		"fpdword",     // FPDWORD
 		"fpnum",       // FPNUM
@@ -322,14 +324,12 @@ public class SimpleTokenStream {
 				high = calcNewHigh(r, high, depth, mid);
 				r    = this.in.read();
 				depth++;
-				if ( r < 0 ) {
-					if ( NAMES[low].length() == depth ) {
-						this.charInLine += depth;
-						this.totalChar  += depth;
-						this.tok         = low;// if it is an exact match at the end of the file, no need to check
-												// dynamic
-						return low;
-					}
+				if ( r < 0 && NAMES[low].length() == depth ) {
+					this.charInLine += depth;
+					this.totalChar  += depth;
+					this.tok         = low;
+					// if it is an exact match at the end of the file, no need to check dynamic
+					return low;
 				}
 				if ( NAMES[low].length() == depth ) {
 					if ( low == high ) return returnToken(r, low);
@@ -388,7 +388,7 @@ public class SimpleTokenStream {
 				skipBlockComment();
 			}
 			return tok();
-			//theoretical a StackOverflow could occur when there are too many comments before the next real token
+			// theoretical a StackOverflow could occur when there are too many comments before the next real token
 		} else {
 			this.in.reset();
 			this.in.skipNBytes(len);
@@ -426,8 +426,8 @@ public class SimpleTokenStream {
 	
 	
 	private void skipBlockComment() throws IOException {
-		byte[] buf = new byte[128];
-		int state = 0;
+		byte[] buf   = new byte[128];
+		int    state = 0;
 		while ( true ) {
 			this.in.mark(128);
 			int r = this.in.readNBytes(buf, 0, 128);
@@ -507,7 +507,8 @@ public class SimpleTokenStream {
 		while ( true ) {
 			this.in.mark(8);
 			int r = this.in.readNBytes(bytes, 0, 8);
-			for (int i = 0; i < r; i++) {
+			int i;
+			for (i = 0; i < r; i++) {
 				if ( sb.length() < prefix.length() ) {
 					if ( bytes[i] != prefix.charAt(sb.length()) ) {
 						throw new CompileError(this.file, this.line, this.charInLine, this.totalChar,
@@ -515,8 +516,7 @@ public class SimpleTokenStream {
 					}
 				} else if ( invalidNumber(bytes[i], number) ) {
 					int val = bytes[i];
-					switch ( val ) {
-					case 'S', 's', 'U', 'u':
+					if ( val == 'S' || val == 's' || val == 'U' || val == 'u' ) {// NOSONAR
 						sb.append(val);
 						if ( ++i >= r ) {
 							i = 0;
@@ -525,9 +525,15 @@ public class SimpleTokenStream {
 						} else val = bytes[i];
 					}
 					switch ( val ) {
-					case 'Q', 'q', 'N', 'n', 'D', 'd', 'W', 'w', 'B', 'b':
+					case 'Q', 'q', 'N', 'n':
+					case 'D', 'd':
+					case 'W', 'w':
+					case 'B', 'b':
+					case 'H', 'h':
 						sb.append(val);
 						i++;
+						//$FALL-THROUGH$
+					default:
 					}
 					this.in.reset();
 					this.in.skipNBytes(i);
@@ -556,15 +562,13 @@ public class SimpleTokenStream {
 	private static boolean invalidNumber(byte num, int system) {
 		if ( num < '0' ) return true;
 		if ( system <= 10 ) {
-			if ( num <= '0' + system ) return false;
-			return true;
+			return num >= '0' + system;
 		}
 		if ( num <= '9' ) return false;
 		if ( num < 'A' ) return true;
 		if ( num < 'A' + system - 10 ) return false;
 		if ( num < 'a' ) return true;
-		if ( num < 'a' + system - 10 ) return false;
-		return true;
+		return num >= 'a' + system - 10;
 	}
 	
 	private int readDecimal(byte[] bytes, StringBuilder sb, boolean alreadyDot) throws IOException {
@@ -578,12 +582,15 @@ public class SimpleTokenStream {
 					} else {
 						this.dynTok = sb.toString();
 						if ( this.dynTok.length() == 1 && ".".equals(this.dynTok) ) {
-							this.dynTok = null; // needs to be changed when there is a . token
+							this.dynTok = null; // needs to be changed when a '.' token is added
 							throw new CompileError(this.file, this.line, this.charInLine, this.totalChar, sb.toString(),
-								null, ".");
+								null, null);
 						} else if ( this.dynTok.length() == 2 && "-.".equals(this.dynTok) ) {
-							this.charInLine++; // this will soon fail, because there is no . token, but maybe we the
-												 // parser can handle this
+							// this will (currently) soon fail, because there is (currently) no '.' token
+							// maybe we the parser can handle this
+							this.in.reset();
+							this.in.skipNBytes(i);
+							this.charInLine++;
 							this.totalChar++;
 							this.dynTok = null;
 							this.tok    = MINUS;
@@ -591,9 +598,12 @@ public class SimpleTokenStream {
 						}
 						this.in.reset();
 						switch ( bytes[i] ) {
-						case 'Q', 'q', 'N', 'n', 'D', 'd':
+						case 'Q', 'q', 'N', 'n':
+						case 'D', 'd':
+						case 'W', 'w':
+						case 'B', 'b', 'H', 'h':
 							sb.append((char) bytes[i]);
-							this.in.skipNBytes(i + 1);
+							this.in.skipNBytes(i + 1L);
 							break;
 						default:
 							this.in.skipNBytes(i);
@@ -619,14 +629,10 @@ public class SimpleTokenStream {
 		}
 		int off = 1;
 		switch ( bytes[0] ) {
-		case '\n', '\r' -> {
-			throw new CompileError(this.file, this.line, this.charInLine, this.totalChar, "\'" + (char) r, null,
-				"line seperator inside of a character");
-		}
-		case '\'' -> {
-			throw new CompileError(this.file, this.line, this.charInLine, this.totalChar, "''", null,
-				"character closed before a character occured");
-		}
+		case '\n', '\r' -> throw new CompileError(this.file, this.line, this.charInLine, this.totalChar,
+			"\'" + (char) r, null, "line seperator inside of a character");
+		case '\'' -> throw new CompileError(this.file, this.line, this.charInLine, this.totalChar, "''", null,
+			"character closed before a character occured");
 		case '\\' -> {
 			off = 2;
 			switch ( bytes[1] ) {
@@ -666,83 +672,93 @@ public class SimpleTokenStream {
 	
 	private int returnString(StringBuilder sb) throws IOException {
 		CharsetDecoder decoder = StandardCharsets.UTF_8.newDecoder();
-		byte[]         bytes   = new byte[32];
-		char[]         chars   = new char[32];
-		ByteBuffer     bbuf    = ByteBuffer.wrap(bytes);
-		CharBuffer     cbuf    = CharBuffer.wrap(chars);
-		int            len     = 2;
+		decoder.onMalformedInput(CodingErrorAction.REPORT);
+		byte[]     bytes = new byte[32];
+		char[]     chars = new char[32];
+		ByteBuffer bbuf  = ByteBuffer.wrap(bytes);
+		CharBuffer cbuf  = CharBuffer.wrap(chars);
+		int        len   = 2;
 		while ( true ) {
-			this.in.mark(32);
-			int         r  = this.in.readNBytes(bytes, bbuf.position(), 32 - bbuf.position());
+			final int origBBufPos = bbuf.position();
+			this.in.mark(32 - origBBufPos);
+			int         r  = this.in.readNBytes(bytes, bbuf.position(), 32 - origBBufPos);
 			CoderResult cr = decoder.decode(bbuf, cbuf, true);
-			sb.append(chars, 0, cbuf.position());
 			checkInvalid("string", "\"", sb, cr);
 			int sbi = 0;
 			cbuf.position(0);
-			for (int i = 0; i < 32; i++) {
+			int i;
+			for (i = 0; i < 32; i++) {
 				char c = chars[i];
 				switch ( c ) {
 				case '"' -> {
+					sb.append(chars, sbi, i - sbi);
 					len += i;
 					this.in.reset();
-					this.in.skipNBytes(i + 1);
+					// XXX: find a better way to get the UTF-8 length
+					int utf8Len = String.valueOf(chars, origBBufPos, i).getBytes(StandardCharsets.UTF_8).length;
+					this.in.skipNBytes(utf8Len + 1L - origBBufPos);
 					this.charInLine  = len;
 					this.totalChar  += len;
 					this.dynTok      = sb.toString();
 					this.tok         = STRING;
 					return STRING;
 				}
-				case '\n', '\r' -> {
-					throw new CompileError(this.file, this.line, this.charInLine, this.totalChar,
-						sb.insert(0, '"').append(chars, sbi, i).toString(), null, "line seperator inside of a string");
-				}
+				case '\n',
+					'\r' -> throw new CompileError(this.file, this.line, this.charInLine, this.totalChar,
+						sb.insert(0, '"').append(chars, sbi, i - sbi).toString(), null,
+						"line seperator inside of a string");
 				case '\\' -> {
 					if ( i == 31 ) {
 						if ( sbi == 0 ) {
 							sbi++;
 							sb.append(chars[0]);
 						}
-						chars[0] = '\\';// temporary remove the \ from the string builder
-						sb.replace(sb.length() - 1, sb.length(), "");
+						chars[0] = '\\';
+						//
 						cbuf.position(1);
 					} else {
 						sb.append(chars, sbi, i - sbi);
 						switch ( chars[i + 1] ) {
 						case 'u' -> {
-							if ( i >= 27 ) {
-								if ( sbi <= 6 ) {
-									sbi = 6;
-									sb.append(chars, 0, 6);
-								}
+							if ( i > 32 - 6 ) {
 								System.arraycopy(chars, i, chars, 0, r - i);
 								cbuf.position(r - i);
+								sbi = r;
+								i   = r;
+							} else {
+								int val = parseBSUHex(sb, chars[i + 2]) << 12;
+								val |= parseBSUHex(sb, chars[i + 3]) << 8;
+								val |= parseBSUHex(sb, chars[i + 4]) << 4;
+								val |= parseBSUHex(sb, chars[i + 5]);
+								sb.append((char) val);
+								i   += 6;
+								sbi  = i;
 							}
-							int val = parseBSUHex(sb, chars[i + 2]) | parseBSUHex(sb, chars[i + 3]) << 4;
-							val |= ( parseBSUHex(sb, chars[i + 4]) << 8 ) | ( parseBSUHex(sb, chars[i + 5]) << 12 );
-							sb.append((char) val);
-							sbi = i + 6;
 						}
-						case '\\', '"' -> {
-							sbi = i + 1;// simply include those in the next append
-						}
+						case '\\', '"' -> sbi = ++i;// simply include those two in the next append
+						
 						case '0' -> {
-							sbi = i + 2;
+							i   += 2;
+							sbi  = i;
 							sb.append('\0');
 						}
 						case 'n' -> {
-							sbi = i + 2;
+							i   += 2;
+							sbi  = i;
 							sb.append('\n');
 						}
 						case 'r' -> {
-							sbi = i + 2;
+							i   += 2;
+							sbi  = i;
 							sb.append('\r');
 						}
 						case 't' -> {
-							sbi = i + 2;
+							i   += 2;
+							sbi  = i;
 							sb.append('\t');
 						}
 						default -> throw new CompileError(this.file, this.line, this.charInLine, this.totalChar,
-							sb.insert(0, '"').append(chars, sbi, i).toString(), null, "invalid string escape");
+							sb.insert(0, '"').append(chars, sbi, i - sbi).toString(), null, "invalid string escape");
 						}
 					}
 				}
@@ -792,12 +808,13 @@ public class SimpleTokenStream {
 	private int returnAsm(StringBuilder sb) throws IOException {
 		int            len     = 6 + sb.length(); // directly include the start and end tokens
 		CharsetDecoder decoder = StandardCharsets.UTF_8.newDecoder();
-		byte[]         bytes   = new byte[128];
-		char[]         chars   = new char[128];
-		ByteBuffer     bbuf    = ByteBuffer.wrap(bytes);
-		CharBuffer     cbuf    = CharBuffer.wrap(chars);
-		int            lines   = 0;
-		int            lll     = -this.charInLine;
+		decoder.onMalformedInput(CodingErrorAction.REPORT);
+		byte[]     bytes = new byte[128];
+		char[]     chars = new char[128];
+		ByteBuffer bbuf  = ByteBuffer.wrap(bytes);
+		CharBuffer cbuf  = CharBuffer.wrap(chars);
+		int        lines = 0;
+		int        lll   = -this.charInLine;
 		while ( true ) {
 			this.in.mark(128);
 			int r     = this.in.readNBytes(bytes, bbuf.position(), 128 - bbuf.position());
@@ -854,7 +871,7 @@ public class SimpleTokenStream {
 	}
 	
 	private void checkInvalid(String token, String insert, StringBuilder sb, CoderResult cr) {
-		if ( cr.isError() ) {
+		if ( cr.isError() || cr.isMalformed() ) {
 			throw new CompileError(this.file, this.line, this.charInLine, this.totalChar,
 				sb.insert(0, insert).toString(), null, "the " + token + " contains invalid UTF-8 characters!");
 		}
@@ -899,7 +916,12 @@ public class SimpleTokenStream {
 	private static boolean numberStart(int r) {
 		switch ( r ) {
 		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
-		case 'D', 'N', 'H', 'U', 'B', 'O':
+		case 'D':// DEC
+		case 'N':// N*
+		case 'H':// HEX
+		case 'U':// UHEX
+		case 'B':// BIN
+		case 'O':// OCT
 		case '.', '-':
 			return true;
 		default:

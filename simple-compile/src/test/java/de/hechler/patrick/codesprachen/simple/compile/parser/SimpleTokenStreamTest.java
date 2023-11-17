@@ -1,9 +1,6 @@
 package de.hechler.patrick.codesprachen.simple.compile.parser;
 
-import static de.hechler.patrick.codesprachen.simple.compile.parser.SimpleTokenStream.DEP;
-import static de.hechler.patrick.codesprachen.simple.compile.parser.SimpleTokenStream.FIRST_DYN;
-import static de.hechler.patrick.codesprachen.simple.compile.parser.SimpleTokenStream.NAME;
-import static de.hechler.patrick.codesprachen.simple.compile.parser.SimpleTokenStream.name;
+import static de.hechler.patrick.codesprachen.simple.compile.parser.SimpleTokenStream.*;
 import static de.hechler.patrick.zeugs.check.Assert.assertEquals;
 import static de.hechler.patrick.zeugs.check.Assert.assertFalse;
 import static de.hechler.patrick.zeugs.check.Assert.assertThrows;
@@ -32,7 +29,7 @@ class SimpleTokenStreamTest {
 	
 	@Check
 	void simpleCheck() throws IllegalArgumentException, IllegalAccessException {
-		ByteArrayInputStream bais = new ByteArrayInputStream("dep hello\n  world".getBytes(StandardCharsets.UTF_8));
+		ByteArrayInputStream bais = new ByteArrayInputStream("dep hello\n  world\n\" \\t	HALLO SUPER tolle wElT\\u0020!\"".getBytes(StandardCharsets.UTF_8));
 		SimpleTokenStream    sts  = new SimpleTokenStream(bais, null);
 		assertEquals(DEP, sts.tok());
 		assertThrows(AssertionError.class, () -> sts.dynTokSpecialText());
@@ -47,6 +44,10 @@ class SimpleTokenStreamTest {
 		assertEquals(NAME, sts.tok());
 		assertEquals("world", sts.dynTokSpecialText());
 		assertEquals(ctx(2, 7, 17, "world"), sts.ctx());
+		sts.consume();
+		assertEquals(STRING, sts.tok());
+		assertEquals(" \t	HALLO SUPER tolle wElT\u0020!", sts.dynTokSpecialText());
+		assertEquals(ctx(3, 35, 53, "\" \\t\\tHALLO SUPER tolle wElT !\""), sts.ctx());
 	}
 	
 	@Check

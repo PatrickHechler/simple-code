@@ -50,8 +50,8 @@ import de.hechler.patrick.codesprachen.simple.compile.objects.value.UnaryOpVal.U
 
 public class SimpleExportFileParser {
 	
-	private final SimpleTokenStream                            in;
-	private final BiFunction<String, String, SimpleDependency> dep;
+	protected final SimpleTokenStream                            in;
+	protected final BiFunction<String, String, SimpleDependency> dep;
 	
 	public SimpleExportFileParser(InputStream in, String file, BiFunction<String, String, SimpleDependency> dep) {
 		this(new SimpleTokenStream(in, file), dep);
@@ -131,11 +131,11 @@ public class SimpleExportFileParser {
 		return new SimpleVariable(type, name, initialValue, flags);
 	}
 	
-	private SimpleValue parseValue(SimpleScope scope) {
+	protected SimpleValue parseValue(SimpleScope scope) {
 		return parseValueCondExp(this.in.ctx().copy(), scope);
 	}
 	
-	private SimpleValue parseValueCondExp(ErrorContext ctx, SimpleScope scope) {
+	protected SimpleValue parseValueCondExp(ErrorContext ctx, SimpleScope scope) {
 		SimpleValue a = parseValueLOrExp(ctx, scope);
 		if ( this.in.tok() == QUESTION ) {
 			this.in.consume();
@@ -147,7 +147,7 @@ public class SimpleExportFileParser {
 		return a;
 	}
 	
-	private SimpleValue parseValueLOrExp(ErrorContext ctx, SimpleScope scope) {
+	protected SimpleValue parseValueLOrExp(ErrorContext ctx, SimpleScope scope) {
 		SimpleValue a = parseValueLAndExp(ctx, scope);
 		while ( this.in.tok() == BOOL_OR ) {
 			this.in.consume();
@@ -157,7 +157,7 @@ public class SimpleExportFileParser {
 		return a;
 	}
 	
-	private SimpleValue parseValueLAndExp(ErrorContext ctx, SimpleScope scope) {
+	protected SimpleValue parseValueLAndExp(ErrorContext ctx, SimpleScope scope) {
 		SimpleValue a = parseValueOrExp(ctx, scope);
 		while ( this.in.tok() == BOOL_AND ) {
 			this.in.consume();
@@ -167,7 +167,7 @@ public class SimpleExportFileParser {
 		return a;
 	}
 	
-	private SimpleValue parseValueOrExp(ErrorContext ctx, SimpleScope scope) {
+	protected SimpleValue parseValueOrExp(ErrorContext ctx, SimpleScope scope) {
 		SimpleValue a = parseValueXOrExp(ctx, scope);
 		while ( this.in.tok() == BIT_OR ) {
 			this.in.consume();
@@ -177,7 +177,7 @@ public class SimpleExportFileParser {
 		return a;
 	}
 	
-	private SimpleValue parseValueXOrExp(ErrorContext ctx, SimpleScope scope) {
+	protected SimpleValue parseValueXOrExp(ErrorContext ctx, SimpleScope scope) {
 		SimpleValue a = parseValueAndExp(ctx, scope);
 		while ( this.in.tok() == BIT_XOR ) {
 			this.in.consume();
@@ -187,7 +187,7 @@ public class SimpleExportFileParser {
 		return a;
 	}
 	
-	private SimpleValue parseValueAndExp(ErrorContext ctx, SimpleScope scope) {
+	protected SimpleValue parseValueAndExp(ErrorContext ctx, SimpleScope scope) {
 		SimpleValue a = parseValueEqExp(ctx, scope);
 		while ( this.in.tok() == BIT_AND ) {
 			this.in.consume();
@@ -197,7 +197,7 @@ public class SimpleExportFileParser {
 		return a;
 	}
 	
-	private SimpleValue parseValueEqExp(ErrorContext ctx, SimpleScope scope) {
+	protected SimpleValue parseValueEqExp(ErrorContext ctx, SimpleScope scope) {
 		SimpleValue a = parseValueRelExp(ctx, scope);
 		int         t = this.in.tok();
 		while ( t == EQ || t == NOT_EQ ) {
@@ -209,7 +209,7 @@ public class SimpleExportFileParser {
 		return a;
 	}
 	
-	private SimpleValue parseValueRelExp(ErrorContext ctx, SimpleScope scope) {
+	protected SimpleValue parseValueRelExp(ErrorContext ctx, SimpleScope scope) {
 		SimpleValue a = parseValueShiftExp(ctx, scope);
 		int         t = this.in.tok();
 		while ( t == GT || t == GE || t == LE || t == LT ) {
@@ -221,7 +221,7 @@ public class SimpleExportFileParser {
 		return a;
 	}
 	
-	private SimpleValue parseValueShiftExp(ErrorContext ctx, SimpleScope scope) {
+	protected SimpleValue parseValueShiftExp(ErrorContext ctx, SimpleScope scope) {
 		SimpleValue a = parseValueAddExp(ctx, scope);
 		int         t = this.in.tok();
 		while ( t == SHIFT_LEFT || t == SHIFT_RIGTH_LOG || t == SHIFT_RIGTH_ARI ) {
@@ -233,7 +233,7 @@ public class SimpleExportFileParser {
 		return a;
 	}
 	
-	private SimpleValue parseValueAddExp(ErrorContext ctx, SimpleScope scope) {
+	protected SimpleValue parseValueAddExp(ErrorContext ctx, SimpleScope scope) {
 		SimpleValue a = parseValueMulExp(ctx, scope);
 		int         t = this.in.tok();
 		while ( t == PLUS || t == MINUS ) {
@@ -245,7 +245,7 @@ public class SimpleExportFileParser {
 		return a;
 	}
 	
-	private SimpleValue parseValueMulExp(ErrorContext ctx, SimpleScope scope) {
+	protected SimpleValue parseValueMulExp(ErrorContext ctx, SimpleScope scope) {
 		SimpleValue a = parseValueCastExp(ctx, scope);
 		int         t = this.in.tok();
 		while ( t == STAR || t == DIV || t == MOD ) {
@@ -257,7 +257,7 @@ public class SimpleExportFileParser {
 		return a;
 	}
 	
-	private SimpleValue parseValueCastExp(ErrorContext ctx, SimpleScope scope) {
+	protected SimpleValue parseValueCastExp(ErrorContext ctx, SimpleScope scope) {
 		if ( this.in.tok() == SMALL_OPEN ) {
 			this.in.consume();
 			SimpleType t = parseType(scope);
@@ -268,7 +268,7 @@ public class SimpleExportFileParser {
 		return parseValueUnaryExp(ctx, scope);
 	}
 	
-	private SimpleValue parseValueUnaryExp(ErrorContext ctx, SimpleScope scope) {
+	protected SimpleValue parseValueUnaryExp(ErrorContext ctx, SimpleScope scope) {
 		UnaryOp op;
 		switch ( this.in.tok() ) {
 		case PLUS -> op = UnaryOp.PLUS;
@@ -285,7 +285,7 @@ public class SimpleExportFileParser {
 		return UnaryOpVal.create(op, a, ctx);
 	}
 	
-	private SimpleValue parseValuePostfixExp(ErrorContext ctx, SimpleScope scope) {
+	protected SimpleValue parseValuePostfixExp(ErrorContext ctx, SimpleScope scope) {
 		SimpleValue a = parseValueDirectExp(ctx, scope);
 		while ( true ) {
 			switch ( this.in.tok() ) {
@@ -311,7 +311,7 @@ public class SimpleExportFileParser {
 		}
 	}
 	
-	private SimpleValue parseValueDirectExp(ErrorContext ctx, SimpleScope scope) {
+	protected SimpleValue parseValueDirectExp(ErrorContext ctx, SimpleScope scope) {
 		int t = this.in.consumeTok();
 		switch ( t ) {
 		case STRING -> {

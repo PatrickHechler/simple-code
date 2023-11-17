@@ -158,6 +158,23 @@ public record FuncType(List<SimpleVariable> resMembers, List<SimpleVariable> arg
 		return result;
 	}
 	
+	public SimpleVariable memberOrNull(String name, ErrorContext ctx, boolean allowFuncAddr) {
+		if ( !allowFuncAddr && ( this.flags & FLAG_FUNC_ADDRESS ) != 0 ) {
+			throw new CompileError(ctx, "a function address is no structure!");
+		}
+		for (SimpleVariable sv : this.resMembers) {
+			if ( name.equals(sv.name()) ) {
+				return sv;
+			}
+		}
+		for (SimpleVariable sv : this.argMembers) {
+			if ( name.equals(sv.name()) ) {
+				return sv;
+			}
+		}
+		return null;
+	}
+	
 	public SimpleVariable member(String name, ErrorContext ctx, boolean allowFuncAddr) {
 		if ( !allowFuncAddr && ( this.flags & FLAG_FUNC_ADDRESS ) != 0 ) {
 			throw new CompileError(ctx, "a function address is no structure!");
