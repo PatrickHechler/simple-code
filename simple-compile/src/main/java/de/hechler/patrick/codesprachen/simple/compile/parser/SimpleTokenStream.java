@@ -381,6 +381,14 @@ public class SimpleTokenStream {
 		} else if ( tok == COLON && r == ':' && this.in.read() == ':' ) {
 			StringBuilder sb = new StringBuilder();
 			return returnAsm(sb);
+		} else if ( tok == DIV && ( r == '/' || r == '*' ) ) {
+			if ( r == '/' ) {
+				skipLineComment();
+			} else {
+				skipBlockComment();
+			}
+			return tok();
+			//theoretical a StackOverflow could occur when there are too many comments before the next real token
 		} else {
 			this.in.reset();
 			this.in.skipNBytes(len);
@@ -390,6 +398,68 @@ public class SimpleTokenStream {
 			return tok;
 		}
 	}
+	
+	private void skipLineComment() throws IOException {
+		byte[] buf = new byte[32];
+		while ( true ) {
+			this.in.mark(32);
+			int r = this.in.readNBytes(buf, 0, 32);
+			if ( r <= 0 ) {
+				return;
+			}
+			for (int i = 0; i < r; i++) {
+				if ( buf[i] == '\n' ) {
+					if ( i != r - 1 ) {
+						this.in.reset();
+						this.in.skipNBytes(i);
+					}
+					this.charInLine  = 0;
+					this.totalChar  += i + 1;
+					this.line++;
+					return;
+				}
+			}
+			this.charInLine += r;
+			this.totalChar  += r;
+		}
+	}
+	
+	
+	private void skipBlockComment() throws IOException {
+		byte[] buf = new byte[128];
+		int state = 0;
+		while ( true ) {
+			this.in.mark(128);
+			int r = this.in.readNBytes(buf, 0, 128);
+			if ( r <= 0 ) {
+				return;
+			}
+			for (int i = 0; i < r; i++) {
+				if ( buf[i] == '\n' ) {
+					this.charInLine = 0;
+					this.line++;
+					state = 0;
+					continue;
+				}
+				this.charInLine++;
+				if ( buf[i] == '*' ) {
+					state = 1;
+				} else if ( state == 1 ) {
+					if ( buf[i] == '/' ) {
+						if ( i != r - 1 ) {
+							this.in.reset();
+							this.in.skipNBytes(i);
+						}
+						this.totalChar += i + 1;
+						return;
+					}
+					state = 0;
+				}
+			}
+			this.totalChar += r;
+		}
+	}
+	
 	
 	private int returnNumber(StringBuilder sb) throws IOException {
 		byte[] bytes = new byte[8];
