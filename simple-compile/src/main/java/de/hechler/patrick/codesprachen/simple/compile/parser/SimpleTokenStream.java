@@ -1,18 +1,30 @@
+//This file is part of the Simple Code Project
+//DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+//Copyright (C) 2023  Patrick Hechler
+//
+//This program is free software: you can redistribute it and/or modify
+//it under the terms of the GNU General Public License as published by
+//the Free Software Foundation, either version 3 of the License, or
+//(at your option) any later version.
+//
+//This program is distributed in the hope that it will be useful,
+//but WITHOUT ANY WARRANTY; without even the implied warranty of
+//MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//GNU General Public License for more details.
+//
+//You should have received a copy of the GNU General Public License
+//along with this program.  If not, see <https://www.gnu.org/licenses/>.
 package de.hechler.patrick.codesprachen.simple.compile.parser;
 
 import java.io.BufferedInputStream;
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.lang.reflect.Field;
-import java.lang.reflect.Modifier;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CoderResult;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
 
 import de.hechler.patrick.codesprachen.simple.compile.error.CompileError;
 import de.hechler.patrick.codesprachen.simple.compile.error.ErrorContext;
@@ -47,48 +59,46 @@ public class SimpleTokenStream {
 	public static final int  SHIFT_RIGTH_ARI = 23;
 	public static final int  SHIFT_RIGTH_LOG = 24;
 	public static final int  QUESTION        = 25;
-	public static final int  DOUBLE_QUESTION = 26;
-	public static final int  ARR_OPEN        = 27;
-	public static final int  ARR_CLOSE       = 28;
-	public static final int  BIT_XOR         = 29;
-	public static final int  ASM             = 30;
+	public static final int  ARR_OPEN        = 26;
+	public static final int  ARR_CLOSE       = 27;
+	public static final int  BIT_XOR         = 28;
+	public static final int  ASM             = 29;
 	private static final int MIN_NAME        = ASM;
-	public static final int  BYTE            = 31;
-	public static final int  CALL            = 32;
-	public static final int  CHAR            = 33;
-	public static final int  CONST           = 34;
-	public static final int  DEP             = 35;
-	public static final int  DWORD           = 36;
-	public static final int  EXP             = 38;
-	public static final int  FPDWORD         = 39;
-	public static final int  FPNUM           = 40;
-	public static final int  FSTRUCT         = 41;
-	public static final int  FUNC            = 42;
-	public static final int  IF              = 43;
-	public static final int  INIT            = 44;
-	public static final int  MAIN            = 45;
-	public static final int  NOPAD           = 46;
-	public static final int  NUM             = 47;
-	public static final int  STRUCT          = 48;
-	public static final int  TYPEDEF         = 49;
-	public static final int  UBYTE           = 50;
-	public static final int  UDWORD          = 51;
-	public static final int  UNUM            = 52;
-	public static final int  UWORD           = 53;
-	public static final int  WHILE           = 54;
-	public static final int  WORD            = 55;
+	public static final int  BYTE            = 30;
+	public static final int  CALL            = 31;
+	public static final int  CONST           = 32;
+	public static final int  DEP             = 33;
+	public static final int  DWORD           = 34;
+	public static final int  EXP             = 35;
+	public static final int  FPDWORD         = 36;
+	public static final int  FPNUM           = 37;
+	public static final int  FSTRUCT         = 38;
+	public static final int  FUNC            = 39;
+	public static final int  IF              = 40;
+	public static final int  INIT            = 41;
+	public static final int  MAIN            = 42;
+	public static final int  NOPAD           = 43;
+	public static final int  NUM             = 44;
+	public static final int  STRUCT          = 45;
+	public static final int  TYPEDEF         = 46;
+	public static final int  UBYTE           = 47;
+	public static final int  UDWORD          = 48;
+	public static final int  UNUM            = 49;
+	public static final int  UWORD           = 50;
+	public static final int  WHILE           = 51;
+	public static final int  WORD            = 52;
 	private static final int MAX_NAME        = WORD;
-	public static final int  BLOCK_OPEN      = 56;
-	public static final int  BIT_OR          = 57;
-	public static final int  BOOL_OR         = 58;
-	public static final int  BLOCK_CLOSE     = 59;
-	public static final int  BIT_NOT         = 60;
-	static final int         FIRST_DYN       = 61;
-	public static final int  NAME            = FIRST_DYN;
-	public static final int  NUMBER          = 62;
-	public static final int  STRING          = 63;
-	public static final int  CHARACTER       = 64;
-	public static final int  ASM_BLOCK       = 65;
+	public static final int  BLOCK_OPEN      = 53;
+	public static final int  BIT_OR          = 54;
+	public static final int  BOOL_OR         = 55;
+	public static final int  BLOCK_CLOSE     = 56;
+	public static final int  BIT_NOT         = 57;
+	public static final int  NAME            = 58;
+	static final int         FIRST_DYN       = NAME;
+	public static final int  NUMBER          = 59;
+	public static final int  STRING          = 60;
+	public static final int  CHARACTER       = 61;
+	public static final int  ASM_BLOCK       = 62;
 	
 	private static final String[] NAMES =
 		{ // @formatter:off
@@ -118,14 +128,12 @@ public class SimpleTokenStream {
 		">>",          // SHIFT_RIGTH_ARITMETIC
 		">>>",         // SHIFT_RIGTH_LOGIC
 		"?",           // QUESTION
-		"??",          // DOUBLE_QUESTION
 		"[",           // ARR_OPEN
 		"]",           // ARR_CLOSE
 		"^",           // BIT_XOR
 		"asm",         // ASM
 		"byte",        // BYTE
 		"call",        // CALL
-		"char",        // CHAR
 		"const",       // CONST
 		"dep",         // DEP
 		"dword",       // DWORD
@@ -153,13 +161,13 @@ public class SimpleTokenStream {
 		"}",           // BLOCK_CLOSE
 		"~",           // BIT_NOT
 		"[NAME]",      // NAME
+		"[NUMBER]",    // NUMBER
 		"[STRING]",    // STRING
 		"[CHARACTER]", // CHARACTER
-		"[NUMBER]",    // NUMBER
 		"[ASM_BLOCK]", // ASM_BLOCK
 	};//@formatter:on
 		
-	public static String name(int token) {
+	public static String name(int token) { // NOSONAR
 		if ( token < 0 || token >= NAMES.length ) {
 			if ( token == EOF ) return "EOF";
 			return "INVALID: <" + token + ">";
@@ -167,9 +175,9 @@ public class SimpleTokenStream {
 		return NAMES[token];
 	}
 	
-	private int totalChar;
-	private int charInLine;
-	private int line = 1;
+	private int totalChar  = 0;
+	private int charInLine = 0;
+	private int line       = 1;
 	
 	private int    tok = -2;
 	private String dynTok;
@@ -214,7 +222,7 @@ public class SimpleTokenStream {
 			case STRING:
 				return "\"" + this.dynTok.replace("\\", "\\\\").replace("\t", "\\t").replace("\r", "\\r")
 					.replace("\n", "\\n").replace("\0", "\\0") + "\"";
-			case CHAR:
+			case CHARACTER:
 				switch ( this.dynTok ) {
 				case "\\":
 					return "'\\\\'";
@@ -250,7 +258,7 @@ public class SimpleTokenStream {
 	
 	public String dynTokSpecialText() {
 		String dt = this.dynTok;
-		assert dt != null : "dynamicTokenSpecialText called, but there is no dynamic token";
+		assert dt != null : "dynamicTokenSpecialText called, but there is no dynamic token: " + ctx();
 		return dt;
 	}
 	
@@ -504,7 +512,8 @@ public class SimpleTokenStream {
 							throw new CompileError(this.file, this.line, this.charInLine, this.totalChar, sb.toString(),
 								null, ".");
 						} else if ( this.dynTok.length() == 2 && "-.".equals(this.dynTok) ) {
-							this.charInLine++; // this will soon fail, because there is no . token
+							this.charInLine++; // this will soon fail, because there is no . token, but maybe we the
+												 // parser can handle this
 							this.totalChar++;
 							this.dynTok = null;
 							this.tok    = MINUS;
@@ -718,7 +727,7 @@ public class SimpleTokenStream {
 		ByteBuffer     bbuf    = ByteBuffer.wrap(bytes);
 		CharBuffer     cbuf    = CharBuffer.wrap(chars);
 		int            lines   = 0;
-		int            lll     = this.charInLine;
+		int            lll     = -this.charInLine;
 		while ( true ) {
 			this.in.mark(128);
 			int r     = this.in.readNBytes(bytes, bbuf.position(), 128 - bbuf.position());
@@ -728,7 +737,7 @@ public class SimpleTokenStream {
 					finishAppend("asm block", ":::", sb, decoder, chars, bbuf, cbuf);
 					len += i;
 					this.in.reset();
-					this.in.skipNBytes(i + 3);
+					this.in.skipNBytes(i + 3L);
 					this.line       += lines;
 					this.charInLine  = len - lll;
 					this.totalChar  += len;
@@ -784,13 +793,12 @@ public class SimpleTokenStream {
 	private int returnName(StringBuilder sb) throws IOException {
 		// no need for a decoder: name only allows ASCII characters
 		byte[] bytes = new byte[16];
-		int    len   = sb.length();
 		while ( true ) {
 			this.in.mark(16);
 			int r = this.in.readNBytes(bytes, 0, 16);
 			if ( r <= 0 ) {
-				this.charInLine += len;
-				this.totalChar  += len;
+				this.charInLine += sb.length();
+				this.totalChar  += sb.length();
 				this.dynTok      = sb.toString();
 				this.tok         = NAME;
 				return NAME;
@@ -799,9 +807,8 @@ public class SimpleTokenStream {
 				if ( noName(bytes[i]) ) {
 					this.in.reset();
 					this.in.skipNBytes(i);
-					len             += i;
-					this.charInLine += len;
-					this.totalChar  += len;
+					this.charInLine += sb.length();
+					this.totalChar  += sb.length();
 					this.dynTok      = sb.toString();
 					this.tok         = NAME;
 					return NAME;
@@ -850,51 +857,6 @@ public class SimpleTokenStream {
 			high++;
 		}
 		return high;
-	}
-	
-	public static void main(String[] args) throws IllegalArgumentException, IllegalAccessException {
-		ByteArrayInputStream bais = new ByteArrayInputStream("dep hello world".getBytes(StandardCharsets.UTF_8));
-		SimpleTokenStream    sts  = new SimpleTokenStream(bais, null);
-		System.out.println(sts.tok() + " : " + name(sts.tok) + " : " + sts.dynTokSpecialText());
-		System.out.println("  at line " + sts.line + ':' + sts.charInLine + " (total char: " + sts.totalChar + ')');
-		sts.consume();
-		System.out.println(sts.tok() + " : " + name(sts.tok) + " : " + sts.dynTokSpecialText());
-		System.out.println("  at line " + sts.line + ':' + sts.charInLine + " (total char: " + sts.totalChar + ')');
-		sts.consume();
-		System.out.println(sts.tok() + " : " + name(sts.tok) + " : " + sts.dynTokSpecialText());
-		System.out.println("  at line " + sts.line + ':' + sts.charInLine + " (total char: " + sts.totalChar + ')');
-		for (Field f : SimpleTokenStream.class.getDeclaredFields()) {
-			int fmods = f.getModifiers();
-			if ( !Modifier.isFinal(fmods) || !Modifier.isStatic(fmods) || !Modifier.isPublic(fmods) ) {
-				continue;
-			}
-			if ( f.getType() != Integer.TYPE ) {
-				continue;
-			}
-			String fname    = f.getName();
-			int    fval     = f.getInt(null);
-			String fvalName = name(fval);
-			if ( Character.isLetter(fvalName.charAt(0)) && ( !fname.equals(fvalName.toUpperCase())
-				|| !fvalName.equals(fname.toLowerCase()) && !"EOF".equals(fvalName) ) ) {
-				System.err.println("[ERROR]: " + fname + "                ".substring(fname.length()) + ": " + fval
-					+ " : " + fvalName);
-			}
-		}
-		String[] firstNames       = Arrays.copyOf(NAMES, FIRST_DYN);
-		String[] sortedFirstNames = firstNames.clone();
-		Arrays.sort(sortedFirstNames);
-		if ( !Arrays.equals(firstNames, sortedFirstNames) ) {
-			System.err.println("the algo expects the static tokens to be sorted!");
-			System.err.println("the correct order whould be:");
-			for (String name : sortedFirstNames) {
-				System.err.println(name);
-			}
-		}
-		for (int i = 1; i < sortedFirstNames.length; i++) {
-			if ( sortedFirstNames[i - 1].equals(sortedFirstNames[i]) ) {
-				System.err.println("duplicate token name detected: " + sortedFirstNames[i]);
-			}
-		}
 	}
 	
 }

@@ -1,3 +1,19 @@
+//This file is part of the Simple Code Project
+//DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+//Copyright (C) 2023  Patrick Hechler
+//
+//This program is free software: you can redistribute it and/or modify
+//it under the terms of the GNU General Public License as published by
+//the Free Software Foundation, either version 3 of the License, or
+//(at your option) any later version.
+//
+//This program is distributed in the hope that it will be useful,
+//but WITHOUT ANY WARRANTY; without even the implied warranty of
+//MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//GNU General Public License for more details.
+//
+//You should have received a copy of the GNU General Public License
+//along with this program.  If not, see <https://www.gnu.org/licenses/>.
 package de.hechler.patrick.codesprachen.simple.compile.objects.types;
 
 import static de.hechler.patrick.codesprachen.simple.compile.error.ErrorContext.NO_CONTEXT;
@@ -20,6 +36,12 @@ public record FuncType(List<SimpleVariable> resMembers, List<SimpleVariable> arg
 	public static final int STRUCTURAL_FLAGS = FLAG_NOPAD | FLAG_FUNC_ADDRESS;
 	public static final int FLAG_NO_STRUCT = FLAG_FUNC_ADDRESS;
 	
+	static {
+		if ( Integer.bitCount(ALL_FLAGS) != 5 ) {
+			throw new AssertionError("StructType.FLAG_NOPAD uses a bit I want to use for an other purpose");
+		}
+	}
+	
 	public static final FuncType MAIN_TYPE = create(List.of(//
 		new SimpleVariable(NativeType.UNUM, "argc", null, 0), //
 		new SimpleVariable(PointerType.create(PointerType.create(NativeType.UBYTE, NO_CONTEXT), NO_CONTEXT), "argv",
@@ -27,12 +49,6 @@ public record FuncType(List<SimpleVariable> resMembers, List<SimpleVariable> arg
 	), List.of(new SimpleVariable(NativeType.UBYTE, "exitnum", null, 0)), FLAG_MAIN, NO_CONTEXT);
 	
 	public static final FuncType INIT_TYPE = create(List.of(), List.of(), FLAG_INIT, NO_CONTEXT);
-	
-	static {
-		if ( Integer.bitCount(ALL_FLAGS) != 4 ) {
-			throw new AssertionError("bit count of FuncType.ALL_FLAGS is not 4");
-		}
-	}
 	
 	public static FuncType create(List<SimpleVariable> resMembers, List<SimpleVariable> argMembers, int flags,
 		ErrorContext ctx) {
@@ -87,6 +103,11 @@ public record FuncType(List<SimpleVariable> resMembers, List<SimpleVariable> arg
 	
 	@Override
 	public String toString() {
+		return toString("");
+	}
+	
+	@Override
+	public String toString(String idention) {
 		StringBuilder sb = new StringBuilder();
 		if ( ( this.flags & FLAG_EXPORT ) != 0 ) {
 			sb.append("exp ");
@@ -103,18 +124,21 @@ public record FuncType(List<SimpleVariable> resMembers, List<SimpleVariable> arg
 		if ( ( this.flags & FLAG_NOPAD ) != 0 ) {
 			sb.append("nopad ");
 		}
+		idention = idention.concat("    ");
 		sb.append('<');
-		append(sb, this.resMembers);
+		append(sb, idention, this.resMembers);
 		sb.append("> <-- (");
-		append(sb, this.resMembers);
+		append(sb, idention, this.argMembers);
 		return sb.append(')').toString();
 	}
 	
-	private static void append(StringBuilder sb, List<SimpleVariable> m) {
+	private static void append(StringBuilder sb, String idention, List<SimpleVariable> m) {
 		if ( !m.isEmpty() ) {
-			sb.append(m.get(0));
+			SimpleVariable val = m.get(0);
+			sb.append(val.type().toString(idention)).append(' ').append(val.name());
 			for (int i = 1, s = m.size(); i < s; i++) {
-				sb.append(", ").append(m.get(i));
+				val = m.get(i);
+				sb.append(", ").append(val.type().toString(idention)).append(' ').append(val.name());
 			}
 		}
 	}
@@ -126,8 +150,8 @@ public record FuncType(List<SimpleVariable> resMembers, List<SimpleVariable> arg
 	
 	@Override
 	public int hashCode() {
-		final int prime = 31;
-		int result = 1;
+		final int prime  = 31;
+		int       result = 1;
 		result = prime * result + this.flags;
 		result = StructType.hashCode(result, this.argMembers);
 		result = StructType.hashCode(result, this.resMembers);

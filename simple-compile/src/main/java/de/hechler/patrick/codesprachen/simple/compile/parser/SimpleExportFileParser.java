@@ -1,3 +1,19 @@
+//This file is part of the Simple Code Project
+//DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+//Copyright (C) 2023  Patrick Hechler
+//
+//This program is free software: you can redistribute it and/or modify
+//it under the terms of the GNU General Public License as published by
+//the Free Software Foundation, either version 3 of the License, or
+//(at your option) any later version.
+//
+//This program is distributed in the hope that it will be useful,
+//but WITHOUT ANY WARRANTY; without even the implied warranty of
+//MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//GNU General Public License for more details.
+//
+//You should have received a copy of the GNU General Public License
+//along with this program.  If not, see <https://www.gnu.org/licenses/>.
 package de.hechler.patrick.codesprachen.simple.compile.parser;
 
 import static de.hechler.patrick.codesprachen.simple.compile.parser.SimpleTokenStream.*;
@@ -431,7 +447,7 @@ public class SimpleExportFileParser {
 		case UDWORD -> type = NativeType.UDWORD;
 		case WORD -> type = NativeType.WORD;
 		case UWORD -> type = NativeType.UWORD;
-		case BYTE, CHAR -> type = NativeType.BYTE;
+		case BYTE -> type = NativeType.BYTE;
 		case UBYTE -> type = NativeType.UBYTE;
 		case NAME -> type = parseTypeTypedef(ctx, scope);
 		case STRUCT -> type = parseTypeStruct(ctx, scope);
@@ -442,7 +458,7 @@ public class SimpleExportFileParser {
 		case SMALL_OPEN -> type = parseTypeFuncType0(SMALL_OPEN, ctx, scope);
 		default -> throw new CompileError(ctx,
 			List.of(name(NUM), name(UNUM), name(FPNUM), name(FPDWORD), name(DWORD), name(WORD), name(UWORD), name(BYTE),
-				name(CHAR), name(UBYTE), name(STRUCT), name(FSTRUCT), name(NOPAD), name(LT), name(SMALL_OPEN)));
+				name(UBYTE), name(STRUCT), name(FSTRUCT), name(NOPAD), name(LT), name(SMALL_OPEN), name(NAME)));
 		}
 		while ( true ) {
 			switch ( this.in.tok() ) {
@@ -475,8 +491,15 @@ public class SimpleExportFileParser {
 		while ( true ) {
 			Object obj = scope.nameTypeOrDepOrFuncOrNull(this.in.dynTokSpecialText(), ctx);
 			if ( cls.isInstance(obj) ) return cls.cast(obj);
-			if ( !( obj instanceof SimpleDependency nscope ) ) throw new CompileError(this.in.ctx(),
-				"expected the `[NAME]´ to be the [NAME] of a " + cls.getSimpleName() + " or a dependency´");
+			if ( !( obj instanceof SimpleDependency nscope ) ) {
+				if ( obj == null ) {
+					throw new CompileError(this.in.ctx(), "expected the `[NAME]´ to be the [NAME] of a "
+						+ cls.getSimpleName() + " or a dependency, but there is nothing with the given name");
+				}
+				throw new CompileError(this.in.ctx(),
+					"expected the `[NAME]´ to be the [NAME] of a " + cls.getSimpleName()
+						+ " or a dependency, but it is " + obj.getClass().getSimpleName() + " : " + obj);
+			}
 			scope = nscope;
 			consumeToken(COLON, "expected `:[NAME]´ after a dependency `[NAME]´");
 			consumeToken(NAME, "expected `[NAME]´ after a dependency `[NAME]:´");
@@ -492,10 +515,11 @@ public class SimpleExportFileParser {
 			flags |= StructType.FLAG_NOPAD;
 		}
 		consumeToken(BLOCK_OPEN, "expected `{´ after `struct (nopad)?´");
-		return StructType.create(parseNamedTypeList(BLOCK_CLOSE, scope), flags, ctx);
+		return StructType.create(parseNamedTypeList(BLOCK_CLOSE, SEMI, true, scope), flags, ctx);
 	}
 	
-	protected List<SimpleVariable> parseNamedTypeList(final int end, SimpleScope scope) {
+	protected List<SimpleVariable> parseNamedTypeList(final int end, final int sep, final boolean sepBeforeEnd,
+		SimpleScope scope) {
 		if ( this.in.tok() == end ) {
 			this.in.consume();
 			return List.of();
@@ -507,12 +531,31 @@ public class SimpleExportFileParser {
 		members.add(new SimpleVariable(type, name, null, 0));
 		while ( true ) {
 			int t = this.in.consumeTok();
-			if ( t != COMMA ) {
-				if ( t != end ) {
-					throw new CompileError(this.in.ctx(), List.of(name(end)),
-						"expected to end the [NAMED_TYPE_LIST] with the given token");
+			if ( t != sep ) {
+				if ( sepBeforeEnd || t != end ) {
+					ErrorContext ctx = this.in.ctx();
+					if ( t < FIRST_DYN ) {
+						ctx.setOffendingTokenCach(name(t));
+					}
+					List<String> list;
+					String       msg;
+					if ( sepBeforeEnd ) {
+						list = List.of(name(sep));
+						msg  = "expected `" + name(sep) + "´ after `[NAMED_TYPE]´";
+					} else {
+						list = List.of(name(sep), name(end));
+						msg  = "expected to end the [NAMED_TYPE_LIST] with `" + name(end)
+							+ "´ or seperate two named types with `" + name(sep) + "´";
+					}
+					throw new CompileError(ctx, list, msg);
 				}
 				return members;
+			} else if ( sepBeforeEnd ) {
+				t = this.in.tok();
+				if ( t == end ) {
+					this.in.consume();
+					return members;
+				}
 			}
 			type = parseType(scope);
 			expectToken(NAME, "expected `[NAME]´ after `[TYPE]´");
@@ -522,13 +565,14 @@ public class SimpleExportFileParser {
 	}
 	
 	protected SimpleType parseTypeFStruct(ErrorContext ctx, SimpleScope scope, boolean address) {
+		consumeToken(NAME, "expected `[NAME]´ after `fstruct´");
 		FuncType func = parseTypeNamedType(ctx, scope, SimpleFunction.class).type();
 		if ( address ) return func;
 		return func.asFStruct();
 	}
 	
 	protected SimpleType parseTypeFuncType0(int t, ErrorContext ctx, SimpleScope scope) {
-		int                  flags   = 0;
+		int                  flags   = FuncType.FLAG_FUNC_ADDRESS;
 		List<SimpleVariable> results = List.of();
 		switch ( t ) {
 		case NOPAD:
@@ -541,7 +585,7 @@ public class SimpleExportFileParser {
 			}
 			//$FALL-THROUGH$
 		case LT:
-			results = parseNamedTypeList(GT, scope);
+			results = parseNamedTypeList(GT, COMMA, false, scope);
 			consumeToken(LARROW, "expectedd `<-- \\( [NAMED_TYPE_LIST] \\)´ after `(nopad)? < [NAMED_TYPE_LIST] >´");
 			consumeToken(SMALL_OPEN,
 				"expectedd `\\( [NAMED_TYPE_LIST] \\)´ after `(nopad)? < [NAMED_TYPE_LIST] > <--´");
@@ -551,7 +595,7 @@ public class SimpleExportFileParser {
 		default:
 			throw new AssertionError("invalid token passed to parseTypeFuncType0: " + t + " : " + name(t));
 		}
-		List<SimpleVariable> args = parseNamedTypeList(SMALL_CLOSE, scope);
+		List<SimpleVariable> args = parseNamedTypeList(SMALL_CLOSE, COMMA, false, scope);
 		return FuncType.create(results, args, flags, ctx);
 	}
 	
@@ -564,7 +608,8 @@ public class SimpleExportFileParser {
 		}
 		SimpleType type = parseType(sf);
 		expectToken(NAME, "expected `[NAME] ;´ after `typedef (exp)? [TYPE]´");
-		String nam\uuuuuuuuuuuu0065 = null;
+		String name = this.in.consumeDynTokSpecialText();
+		consumeToken(SEMI, "expected `;´ after `typedef (exp)? [TYPE] [NAME]´");
 		sf.typedef(new SimpleTypedef(name, flags, type), ctx);
 	}
 	
@@ -580,8 +625,10 @@ public class SimpleExportFileParser {
 		ErrorContext ctx  = this.in.ctx();
 		SimpleType   type = parseType(sf);
 		if ( !( type instanceof FuncType ftype ) || ( ftype.flags() & FuncType.FLAG_FUNC_ADDRESS ) == 0 ) {
-			throw new CompileError(ctx, "the [TYPE] of a function MUST be a function address type");
+			ctx.setOffendingTokenCach(type.toString());
+			throw new CompileError(ctx, "the [TYPE] of a function MUST be a function address type: " + type);
 		}
+		consumeToken(SEMI, "expected `;´ after `(exp)? [NAME] [TYPE]´");
 		if ( flags != 0 ) {
 			ftype = FuncType.create(ftype.resMembers(), ftype.argMembers(), flags, ctx);
 		}

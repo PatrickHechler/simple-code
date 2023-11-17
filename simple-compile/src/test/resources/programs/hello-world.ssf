@@ -15,9 +15,9 @@
 //You should have received a copy of the GNU General Public License
 //along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// this function exits with the sum of 5 and 4 (9)
-func main add_main(num argc, char## argv) --> <num exitnum> {
-	var num a <-- 50;
-	var num b <-- 40;
-	exitnum <-- a + b;
+// this function prints hello world and exits with 0 if the print was successful
+func main <ubyte exitnum> <-- (num argc, char## argv) {
+	num wrote;
+	std:puts <wrote> <-- ("hello world\n");
+	exitnum <-- wrote > 0;
 }

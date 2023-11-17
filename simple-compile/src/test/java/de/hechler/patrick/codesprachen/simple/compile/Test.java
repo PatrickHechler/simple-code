@@ -19,7 +19,6 @@ package de.hechler.patrick.codesprachen.simple.compile;
 import de.hechler.patrick.zeugs.check.objects.BigCheckResult;
 import de.hechler.patrick.zeugs.check.objects.BigChecker;
 
-@SuppressWarnings("javadoc")
 public class Test { // NOSONAR
 	
 	public void testname() throws Exception {
@@ -27,7 +26,7 @@ public class Test { // NOSONAR
 	}
 	
 	public static void main(String[] args) {
-		System.out.println(System.getProperty("java.version"));
+		System.out.println("java.version=" + System.getProperty("java.version"));
 		BigCheckResult check = BigChecker.tryCheckAll(true, Test.class.getPackage(), Test.class.getClassLoader());
 		check.print();
 		if ( check.wentUnexpected() ) {

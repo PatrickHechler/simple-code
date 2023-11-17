@@ -1,3 +1,19 @@
+//This file is part of the Simple Code Project
+//DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+//Copyright (C) 2023  Patrick Hechler
+//
+//This program is free software: you can redistribute it and/or modify
+//it under the terms of the GNU General Public License as published by
+//the Free Software Foundation, either version 3 of the License, or
+//(at your option) any later version.
+//
+//This program is distributed in the hope that it will be useful,
+//but WITHOUT ANY WARRANTY; without even the implied warranty of
+//MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//GNU General Public License for more details.
+//
+//You should have received a copy of the GNU General Public License
+//along with this program.  If not, see <https://www.gnu.org/licenses/>.
 package de.hechler.patrick.codesprachen.simple.compile.objects.types;
 
 import java.util.List;
@@ -42,11 +58,11 @@ public record StructType(List<SimpleVariable> members, int flags) implements Sim
 	
 	static long size(List<SimpleVariable> members, int flags) {
 		if ( members.isEmpty() ) return 0L;
-		long mySize = members.get(0).type().size();
-		int totalAlign = members.get(0).type().align();
+		long mySize     = members.get(0).type().size();
+		int  totalAlign = members.get(0).type().align();
 		for (int i = 1, s = members.size(); i < s; i++) {
-			SimpleType t = members.get(i).type();
-			long tsize = t.size();
+			SimpleType t     = members.get(i).type();
+			long       tsize = t.size();
 			if ( ( flags & FLAG_NOPAD ) == 0 ) {
 				int talign = t.align();
 				if ( talign > totalAlign ) {
@@ -97,16 +113,22 @@ public record StructType(List<SimpleVariable> members, int flags) implements Sim
 	
 	@Override
 	public String toString() {
+		return toString("");
+	}
+	
+	@Override
+	public String toString(String idention) {
 		StringBuilder sb = new StringBuilder().append("struct ");
 		if ( ( this.flags & FLAG_NOPAD ) != 0 ) {
 			sb.append("nopad ");
 		}
 		sb.append('{');
+		String inner = idention.concat("  ");
 		for (SimpleVariable sv : this.members) {
-			sb.append("\n  ").append(sv).append(';');
+			sb.append('\n').append(inner).append(sv.type().toString(inner)).append(' ').append(sv.name()).append(';');
 		}
 		if ( !this.members.isEmpty() ) {
-			sb.append('\n');
+			sb.append('\n').append(idention);
 		}
 		return sb.append('}').toString();
 	}
@@ -122,15 +144,15 @@ public record StructType(List<SimpleVariable> members, int flags) implements Sim
 		}
 		sb.append('{');
 		for (SimpleVariable sv : this.members) {
-			sb.append(' ').append(sv).append(';');
+			sb.append(' ').append(sv.type().toStringSingleLine()).append(' ').append(sv.name()).append(';');
 		}
 		return sb.append('}').toString();
 	}
 	
 	@Override
 	public int hashCode() {
-		final int prime = 31;
-		int result = 1;
+		final int prime  = 31;
+		int       result = 1;
 		result = prime * result + this.flags;
 		return hashCode(result, this.members);
 	}

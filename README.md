@@ -99,6 +99,9 @@ if marked with `const` there must be a constant initial value
 ### NAMED_TYPE_LIST
 `( [NAMED_TYPE] ( , [NAMED_TYPE] )* )?`
 
+### NAMED_TYPE_LIST_SEMI_SEP
+`( [NAMED_TYPE] ; )*`
+
 ### NAMED_TYPE
 
 `[TYPE] [NAME]`
@@ -118,7 +121,7 @@ if marked with `const` there must be a constant initial value
     * `ubyte` : an unsigned 8-bit number/character
     * `char` : implicit `typedef ubyte char;`
     * `[NAME]` : a type defined with `typedef`
-    * `struct (nopad)? { [NAMED_TYPE_LIST] }` : a memory structure
+    * `struct (nopad)? { [NAMED_TYPE_LIST_SEMI_SEP] }` : a memory structure
         * marks:
             * `nopad`: do not use padding
                 * when using this some entries may not be aligned
