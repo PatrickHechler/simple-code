@@ -154,20 +154,23 @@ if marked with `const` there must be a constant initial value
 * VAR_DECL
 	* `var [NAMED_TYPE] ( <-- [VALUE] )? ;`
 * ASSIGN
-    * `[POSTFIX_EXP] <-- [VALUE] ;`
+    * `[VALUE] <-- [VALUE] ;`
 * FUNC_CALL
-    * `call [VALUE] [VALUE] ;`
-    * `call [VALUE] [FUNC_CALL_RESULT] [FUNC_CALL_ARGS] ;`
+    * `[VALUE] [FUNC_CALL_RESULT] [FUNC_CALL_ARGS] ;`
         * FUNC_CALL_RESULT
             * `( ( < ( [VALUE] ( , [VALUE] )* )? > ) <-- )?`
         * FUNC_CALL_ARGS
             * `\( ([VALUE] ( , [VALUE] )* )? \)`
+* FUNC_CALL_WITH_FUNCTION_STRUCTURE
+    * `call [VALUE] [VALUE] ;`
+    	* the first value is the function address
+    	* the second value is the function structure
 * WHILE
     * `while \( [VALUE] \) [COMMAND]`
 * IF
     * `if \( [VALUE] \) [COMMAND] ( else [COMMAND] )?`
 * ASSEMBLER
-    * `asm ( [STRING] <-- [VALUE] ,? )* [ASM_BLOCK] ( [POSTFIX_EXP] <-- [STRING] ,? | [STRING] <-- \? ,? )* ;`
+    * `asm ( [STRING] <-- [VALUE] ( , [STRING] <-- [VALUE] )* )? [ASM_BLOCK] ( [VALUE] <-- [STRING] ,? | [STRING] <-- \? ( , [VALUE] <-- [STRING] ,? | [STRING] <-- \? )* )? ;`
         * ASM_BLOCK
             * `::: ( [^>] | > [^>] | >> [^>] )* >>>`
         * each STRING represents a native register or address supported by the assembler

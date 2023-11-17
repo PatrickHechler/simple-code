@@ -1,26 +1,18 @@
 package de.hechler.patrick.codesprachen.simple.compile.parser;
 
-import static de.hechler.patrick.codesprachen.simple.compile.parser.SimpleTokenStream.ASM;
-import static de.hechler.patrick.codesprachen.simple.compile.parser.SimpleTokenStream.BLOCK_CLOSE;
-import static de.hechler.patrick.codesprachen.simple.compile.parser.SimpleTokenStream.BLOCK_OPEN;
-import static de.hechler.patrick.codesprachen.simple.compile.parser.SimpleTokenStream.CALL;
-import static de.hechler.patrick.codesprachen.simple.compile.parser.SimpleTokenStream.ELSE;
-import static de.hechler.patrick.codesprachen.simple.compile.parser.SimpleTokenStream.EXP;
-import static de.hechler.patrick.codesprachen.simple.compile.parser.SimpleTokenStream.IF;
-import static de.hechler.patrick.codesprachen.simple.compile.parser.SimpleTokenStream.LT;
-import static de.hechler.patrick.codesprachen.simple.compile.parser.SimpleTokenStream.NAME;
-import static de.hechler.patrick.codesprachen.simple.compile.parser.SimpleTokenStream.SEMI;
-import static de.hechler.patrick.codesprachen.simple.compile.parser.SimpleTokenStream.SMALL_CLOSE;
-import static de.hechler.patrick.codesprachen.simple.compile.parser.SimpleTokenStream.SMALL_OPEN;
-import static de.hechler.patrick.codesprachen.simple.compile.parser.SimpleTokenStream.WHILE;
+import static de.hechler.patrick.codesprachen.simple.compile.parser.SimpleTokenStream.*;
 
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.function.BiFunction;
 
 import de.hechler.patrick.codesprachen.simple.compile.error.CompileError;
 import de.hechler.patrick.codesprachen.simple.compile.error.ErrorContext;
+import de.hechler.patrick.codesprachen.simple.compile.objects.cmd.AsmCmd;
+import de.hechler.patrick.codesprachen.simple.compile.objects.cmd.AssignCmd;
 import de.hechler.patrick.codesprachen.simple.compile.objects.cmd.BlockCmd;
+import de.hechler.patrick.codesprachen.simple.compile.objects.cmd.FuncCallCmd;
 import de.hechler.patrick.codesprachen.simple.compile.objects.cmd.IfCmd;
 import de.hechler.patrick.codesprachen.simple.compile.objects.cmd.SimpleCommand;
 import de.hechler.patrick.codesprachen.simple.compile.objects.cmd.StructFuncCallCmd;
@@ -98,20 +90,57 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 			parseCmdBlock(cmd);
 			yield cmd;
 		}
+		case CONST -> parseCmdVarDecl(scope, true);
+		case VAR -> parseCmdVarDecl(scope, false);
 		case CALL -> parseCmdCall(scope);
 		case WHILE -> parseCmdWhile(scope);
 		case IF -> parseCmdIf(scope);
 		case ASM -> parseCmdAsm(scope);
-		default -> parseCmdAssignOrVarDecl(scope);
+		default -> parseCmdDefault(scope);
 		};
 	}
 	
-	private SimpleCommand parseCmdAssignOrVarDecl(SimpleScope scope) {
-		// TODO Auto-generated method stub
-		return null;
+	private SimpleCommand parseCmdDefault(SimpleScope scope) {
+		SimpleValue       val0    = parseValue(scope);
+		List<SimpleValue> results = null;
+		int               t       = this.in.consumeTok();
+		switch ( t ) {
+		case LARROW: {
+			SimpleValue val1 = parseValue(scope);
+			consumeToken(SEMI, "expected `;´ after `[VALUE] <-- [VALUE]´");
+			return AssignCmd.create(scope, val0, val1, this.in.ctx());
+		}
+		case LT:
+			results = parseCommaSepValues();
+			consumeToken(GT,
+				"expected `> <-- \\( ( [VALUE] ( , [VALUE] )* )? \\)´ after `call < ( [VALUE] ( , [VALUE] )* )?´");
+			consumeToken(LARROW, "expected `<-- \\( ( [VALUE] ( , [VALUE] )* )? \\)´ after `call [FUNC_CALL_RESULT]´");
+			consumeToken(SMALL_OPEN,
+				"expected `\\( ( [VALUE] ( , [VALUE] )* )? \\)´ after `call [FUNC_CALL_RESULT] <--´");
+			//$FALL-THROUGH$
+		case SMALL_OPEN:
+			List<SimpleValue> args = parseCommaSepValues();
+			consumeToken(SMALL_CLOSE,
+				"expected `\\)´ after `call ( [FUNC_CALL_RESULT] <-- )? \\( ( [VALUE] ( , [VALUE] )* )?´");
+			consumeToken(SEMI, "expected `;´ after `call [VALUE]  ( [FUNC_CALL_RESULT] <-- )? [FUNC_CALL_ARGS]´");
+			return FuncCallCmd.create(scope, val0, results, args, this.in.ctx());
+		default:
+			ErrorContext ctx = this.in.ctx();
+			ctx.setOffendingTokenCach(name(t));
+			throw new CompileError(ctx, List.of(name(LARROW), name(LT), name(SMALL_OPEN)));
+		}
 	}
 	
 	private SimpleCommand parseCmdAsm(SimpleScope scope) {
+		List<AsmCmd.AsmParam> params = null;
+		if ( this.in.tok() == STRING ) {
+			params = new ArrayList<>();
+			do {
+				String target = this.in.consumeDynTokSpecialText();
+				SimpleValue val = parseValue(scope);
+				if ( this.in.tok() == COMMA ) this.in.consume();
+			} while ( this.in.tok() == STRING );
+		}
 		// TODO Auto-generated method stub
 		return null;
 	}
@@ -141,15 +170,26 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 	
 	private SimpleCommand parseCmdCall(SimpleScope scope) {
 		SimpleValue func = super.parseValue(scope);
-		if ( this.in.tok() == LT ) {
-			this.in.consume();
-			List<SimpleValue> results = parseCommaSepValues();
-			
-		} else {
-			SimpleValue fstuct = super.parseValue(scope);
-			consumeToken(SEMI, "expected `;´ after `call [VALUE] [VALUE]´");
-			return StructFuncCallCmd.create(scope, func, fstuct, this.in.ctx());
+		if ( this.in.tok() == LT || this.in.tok() == SMALL_OPEN ) {
+			List<SimpleValue> results = null;
+			if ( this.in.consumeTok() == LT ) {
+				results = parseCommaSepValues();
+				consumeToken(GT,
+					"expected `> <-- \\( ( [VALUE] ( , [VALUE] )* )? \\)´ after `call < ( [VALUE] ( , [VALUE] )* )?´");
+				consumeToken(LARROW,
+					"expected `<-- \\( ( [VALUE] ( , [VALUE] )* )? \\)´ after `call [FUNC_CALL_RESULT]´");
+				consumeToken(SMALL_OPEN,
+					"expected `\\( ( [VALUE] ( , [VALUE] )* )? \\)´ after `call [FUNC_CALL_RESULT] <--´");
+			}
+			List<SimpleValue> args = parseCommaSepValues();
+			consumeToken(SMALL_CLOSE,
+				"expected `\\)´ after `call ( [FUNC_CALL_RESULT] <-- )? \\( ( [VALUE] ( , [VALUE] )* )?´");
+			consumeToken(SEMI, "expected `;´ after `call [VALUE]  ( [FUNC_CALL_RESULT] <-- )? [FUNC_CALL_ARGS]´");
+			return FuncCallCmd.create(scope, func, results, args, this.in.ctx());
 		}
+		SimpleValue fstuct = super.parseValue(scope);
+		consumeToken(SEMI, "expected `;´ after `call [VALUE] [VALUE]´");
+		return StructFuncCallCmd.create(scope, func, fstuct, this.in.ctx());
 	}
 	
 	private List<SimpleValue> parseCommaSepValues() {
