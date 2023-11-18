@@ -126,7 +126,7 @@ if marked with `const` there must be a constant initial value
             * `nopad`: do not use padding
                 * when using this some entries may not be aligned
     * `[FUNC_TYPE]` : a function address
-    * `fstuct ( [NAME] () | [FUNC_TYPE0] )` : a function call structure
+    * `fstuct ( [NAME] ( : [NAME] ) | [FUNC_TYPE0] )` : a function call structure
     * `[TYPE] #` : a pointer to a value of TYPE
     * `[TYPE] \[ [VALUE]? \]` : an array of values of TYPE
 

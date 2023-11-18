@@ -25,6 +25,7 @@ import de.hechler.patrick.codesprachen.simple.compile.objects.simplefile.SimpleV
 import de.hechler.patrick.codesprachen.simple.compile.objects.simplefile.scope.SimpleScope;
 import de.hechler.patrick.codesprachen.simple.compile.objects.types.FuncType;
 import de.hechler.patrick.codesprachen.simple.compile.objects.types.SimpleType;
+import de.hechler.patrick.codesprachen.simple.compile.objects.value.CastVal;
 import de.hechler.patrick.codesprachen.simple.compile.objects.value.SimpleValue;
 
 public class SimpleSourceFileParser extends SimpleExportFileParser {
@@ -127,6 +128,36 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 		case ASM -> parseCmdAsm(scope);
 		default -> parseCmdDefault(scope);
 		};
+	}
+	
+	protected record ValueOrType(SimpleValue value, SimpleType type) {}
+	
+	protected Object parseValueOrType(SimpleScope scope) {
+		switch ( this.in.tok() ) {
+		case NUM, UNUM, FPNUM, FPDWORD, DWORD, UDWORD, WORD, UWORD, BYTE, UBYTE, STRUCT, FSTRUCT, FUNC, NOPAD, LT:
+			return parseType(scope);
+		case STRING, CHARACTER, NUMBER, PLUS, MINUS, BIT_AND, BIT_NOT, BOOL_AND:
+			return parseValue(scope);
+		case SMALL_OPEN: {
+			ErrorContext ctx = this.in.ctx();
+			this.in.consume();
+			if ( this.in.tok() == SMALL_CLOSE ) {
+				return FuncType.create(List.of(), List.of(), FuncType.FLAG_FUNC_ADDRESS, ctx);
+			}
+			SimpleType type0 = parseType(scope);
+			if ( this.in.tok() != NAME ) {
+				SimpleValue unaryVal = parseValueUnaryExp(ctx, scope, 0, null);
+				SimpleValue castVal  = CastVal.create(unaryVal, type0, ctx);
+				return parseValue(scope, CAST_MAGIC, castVal);
+			}
+			String               name = this.in.consumeDynTokSpecialText();
+			List<SimpleVariable> list = new ArrayList<>();
+			list.add(new SimpleVariable(type0, name, null, 0));
+			switch ( this.in.consumeTok() ) {
+				parseNamedTypeList(SMALL_CLOSE, COMMA, false, scope, list);
+			}
+		}
+		}
 	}
 	
 	private SimpleCommand parseCmdDefault(SimpleScope scope) {

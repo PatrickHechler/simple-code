@@ -96,7 +96,7 @@ public class SimpleExportFileParser {
 	}
 	
 	protected SimpleVariable parseSFScopeVariable(SimpleFile sf) {
-		SimpleVariable sv  = parseAnyScopeVariable(sf);
+		SimpleVariable sv = parseAnyScopeVariable(sf);
 		if ( ( sv.flags() & SimpleVariable.FLAG_CONSTANT ) == 0 && sv.initialValue() != null ) {
 			throw new CompileError(this.in.ctx(), "a non constant value must not have a initial value set");
 		}
@@ -131,143 +131,204 @@ public class SimpleExportFileParser {
 	}
 	
 	protected SimpleValue parseValue(SimpleScope scope) {
-		return parseValueCondExp(this.in.ctx().copy(), scope);
+		return parseValueCondExp(this.in.ctx().copy(), scope, 0, null);
 	}
 	
-	protected SimpleValue parseValueCondExp(ErrorContext ctx, SimpleScope scope) {
-		SimpleValue a = parseValueLOrExp(ctx, scope);
+	protected SimpleValue parseValue(SimpleScope scope, int magic, SimpleValue mvalue) {
+		return parseValueCondExp(this.in.ctx().copy(), scope, magic, mvalue);
+	}
+	
+	protected static final int COND_MAGIC = 1;
+	
+	protected SimpleValue parseValueCondExp(ErrorContext ctx, SimpleScope scope, int magic, SimpleValue mvalue) {
+		if ( magic == COND_MAGIC ) return mvalue;
+		SimpleValue a = parseValueLOrExp(ctx, scope, magic, mvalue);
 		if ( this.in.tok() == QUESTION ) {
 			this.in.consume();
 			SimpleValue b = parseValue(scope);
 			consumeToken(BOOL_NOT, "expected `! [COND_EXP]´ after `[LOR_EXP] ? [VALUE]´");
-			SimpleValue c = parseValueCondExp(ctx, scope);
+			SimpleValue c = parseValueCondExp(ctx, scope, 0, null);
 			a = CondVal.create(a, b, c, ctx);
 		}
 		return a;
 	}
 	
-	protected SimpleValue parseValueLOrExp(ErrorContext ctx, SimpleScope scope) {
-		SimpleValue a = parseValueLAndExp(ctx, scope);
+	protected static final int LOR_MAGIC = 2;
+	
+	protected SimpleValue parseValueLOrExp(ErrorContext ctx, SimpleScope scope, int magic, SimpleValue mvalue) {
+		if ( magic == LOR_MAGIC ) return mvalue;
+		SimpleValue a = parseValueLAndExp(ctx, scope, magic, mvalue);
 		while ( this.in.tok() == BOOL_OR ) {
 			this.in.consume();
-			SimpleValue b = parseValueLAndExp(ctx, scope);
+			SimpleValue b = parseValueLAndExp(ctx, scope, 0, null);
 			a = BinaryOpVal.create(a, BinaryOp.BOOL_OR, b, ctx);
 		}
 		return a;
 	}
 	
-	protected SimpleValue parseValueLAndExp(ErrorContext ctx, SimpleScope scope) {
-		SimpleValue a = parseValueOrExp(ctx, scope);
+	protected static final int LAND_MAGIC = 3;
+	
+	protected SimpleValue parseValueLAndExp(ErrorContext ctx, SimpleScope scope, int magic, SimpleValue mvalue) {
+		if ( magic == LAND_MAGIC ) return mvalue;
+		SimpleValue a = parseValueOrExp(ctx, scope, magic, mvalue);
 		while ( this.in.tok() == BOOL_AND ) {
 			this.in.consume();
-			SimpleValue b = parseValueOrExp(ctx, scope);
+			SimpleValue b = parseValueOrExp(ctx, scope, 0, null);
 			a = BinaryOpVal.create(a, BinaryOp.BOOL_AND, b, ctx);
 		}
 		return a;
 	}
 	
-	protected SimpleValue parseValueOrExp(ErrorContext ctx, SimpleScope scope) {
-		SimpleValue a = parseValueXOrExp(ctx, scope);
+	protected static final int OR_MAGIC = 4;
+	
+	protected SimpleValue parseValueOrExp(ErrorContext ctx, SimpleScope scope, int magic, SimpleValue mvalue) {
+		if ( magic == OR_MAGIC ) return mvalue;
+		SimpleValue a = parseValueXOrExp(ctx, scope, magic, mvalue);
 		while ( this.in.tok() == BIT_OR ) {
 			this.in.consume();
-			SimpleValue b = parseValueXOrExp(ctx, scope);
+			SimpleValue b = parseValueXOrExp(ctx, scope, 0, null);
 			a = BinaryOpVal.create(a, BinaryOp.BIT_OR, b, ctx);
 		}
 		return a;
 	}
 	
-	protected SimpleValue parseValueXOrExp(ErrorContext ctx, SimpleScope scope) {
-		SimpleValue a = parseValueAndExp(ctx, scope);
+	protected static final int XOR_MAGIC = 5;
+	
+	protected SimpleValue parseValueXOrExp(ErrorContext ctx, SimpleScope scope, int magic, SimpleValue mvalue) {
+		if ( magic == XOR_MAGIC ) return mvalue;
+		SimpleValue a = parseValueAndExp(ctx, scope, magic, mvalue);
 		while ( this.in.tok() == BIT_XOR ) {
 			this.in.consume();
-			SimpleValue b = parseValueAndExp(ctx, scope);
+			SimpleValue b = parseValueAndExp(ctx, scope, 0, null);
 			a = BinaryOpVal.create(a, BinaryOp.BIT_XOR, b, ctx);
 		}
 		return a;
 	}
 	
-	protected SimpleValue parseValueAndExp(ErrorContext ctx, SimpleScope scope) {
-		SimpleValue a = parseValueEqExp(ctx, scope);
+	protected static final int AND_MAGIC = 6;
+	
+	protected SimpleValue parseValueAndExp(ErrorContext ctx, SimpleScope scope, int magic, SimpleValue mvalue) {
+		if ( magic == AND_MAGIC ) return mvalue;
+		SimpleValue a = parseValueEqExp(ctx, scope, magic, mvalue);
 		while ( this.in.tok() == BIT_AND ) {
 			this.in.consume();
-			SimpleValue b = parseValueEqExp(ctx, scope);
+			SimpleValue b = parseValueEqExp(ctx, scope, 0, null);
 			a = BinaryOpVal.create(a, BinaryOp.BIT_AND, b, ctx);
 		}
 		return a;
 	}
 	
-	protected SimpleValue parseValueEqExp(ErrorContext ctx, SimpleScope scope) {
-		SimpleValue a = parseValueRelExp(ctx, scope);
+	protected static final int EQ_MAGIC = 7;
+	
+	protected SimpleValue parseValueEqExp(ErrorContext ctx, SimpleScope scope, int magic, SimpleValue mvalue) {
+		if ( magic == EQ_MAGIC ) return mvalue;
+		SimpleValue a = parseValueRelExp(ctx, scope, magic, mvalue);
 		int         t = this.in.tok();
 		while ( t == EQ || t == NOT_EQ ) {
 			this.in.consume();
-			SimpleValue b = parseValueRelExp(ctx, scope);
-			a = BinaryOpVal.create(a, BinaryOp.BIT_AND, b, ctx);
+			SimpleValue b = parseValueRelExp(ctx, scope, 0, null);
+			a = BinaryOpVal.create(a, t == EQ ? BinaryOp.CMP_EQ : BinaryOp.CMP_NEQ, b, ctx);
 			t = this.in.tok();
 		}
 		return a;
 	}
 	
-	protected SimpleValue parseValueRelExp(ErrorContext ctx, SimpleScope scope) {
-		SimpleValue a = parseValueShiftExp(ctx, scope);
+	protected static final int REL_MAGIC = 8;
+	
+	protected SimpleValue parseValueRelExp(ErrorContext ctx, SimpleScope scope, int magic, SimpleValue mvalue) {
+		if ( magic == REL_MAGIC ) return mvalue;
+		SimpleValue a = parseValueShiftExp(ctx, scope, magic, mvalue);
 		int         t = this.in.tok();
 		while ( t == GT || t == GE || t == LE || t == LT ) {
 			this.in.consume();
-			SimpleValue b = parseValueShiftExp(ctx, scope);
-			a = BinaryOpVal.create(a, BinaryOp.BIT_AND, b, ctx);
+			SimpleValue b = parseValueShiftExp(ctx, scope, 0, null);
+			a = BinaryOpVal.create(a, switch ( t ) {
+				case GT -> BinaryOp.CMP_GT;
+				case GE -> BinaryOp.CMP_GE;
+				case LE -> BinaryOp.CMP_LE;
+				case LT -> BinaryOp.CMP_LT;
+				default -> throw new AssertionError();
+				}, b, ctx);
 			t = this.in.tok();
 		}
 		return a;
 	}
 	
-	protected SimpleValue parseValueShiftExp(ErrorContext ctx, SimpleScope scope) {
-		SimpleValue a = parseValueAddExp(ctx, scope);
+	protected static final int SHIFT_MAGIC = 9;
+	
+	protected SimpleValue parseValueShiftExp(ErrorContext ctx, SimpleScope scope, int magic, SimpleValue mvalue) {
+		if ( magic == SHIFT_MAGIC ) return mvalue;
+		SimpleValue a = parseValueAddExp(ctx, scope, magic, mvalue);
 		int         t = this.in.tok();
 		while ( t == SHIFT_LEFT || t == SHIFT_RIGTH_LOG || t == SHIFT_RIGTH_ARI ) {
 			this.in.consume();
-			SimpleValue b = parseValueAddExp(ctx, scope);
-			a = BinaryOpVal.create(a, BinaryOp.BIT_AND, b, ctx);
+			SimpleValue b = parseValueAddExp(ctx, scope, 0, null);
+			a = BinaryOpVal.create(a, switch ( t ) {
+				case SHIFT_LEFT -> BinaryOp.SHIFT_LEFT;
+				case SHIFT_RIGTH_ARI -> BinaryOp.SHIFT_ARITMETIC_RIGTH;
+				case SHIFT_RIGTH_LOG -> BinaryOp.SHIFT_LOGIC_RIGTH;
+				default -> throw new AssertionError();
+				}, b, ctx);
 			t = this.in.tok();
 		}
 		return a;
 	}
 	
-	protected SimpleValue parseValueAddExp(ErrorContext ctx, SimpleScope scope) {
-		SimpleValue a = parseValueMulExp(ctx, scope);
+	protected static final int ADD_MAGIC = 10;
+	
+	protected SimpleValue parseValueAddExp(ErrorContext ctx, SimpleScope scope, int magic, SimpleValue mvalue) {
+		if ( magic == ADD_MAGIC ) return mvalue;
+		SimpleValue a = parseValueMulExp(ctx, scope, magic, mvalue);
 		int         t = this.in.tok();
 		while ( t == PLUS || t == MINUS ) {
 			this.in.consume();
-			SimpleValue b = parseValueMulExp(ctx, scope);
-			a = BinaryOpVal.create(a, BinaryOp.BIT_AND, b, ctx);
+			SimpleValue b = parseValueMulExp(ctx, scope, 0, null);
+			a = BinaryOpVal.create(a, t == PLUS ? BinaryOp.MATH_ADD : BinaryOp.MATH_SUB, b, ctx);
 			t = this.in.tok();
 		}
 		return a;
 	}
 	
-	protected SimpleValue parseValueMulExp(ErrorContext ctx, SimpleScope scope) {
-		SimpleValue a = parseValueCastExp(ctx, scope);
+	protected static final int MUL_MAGIC = 11;
+	
+	protected SimpleValue parseValueMulExp(ErrorContext ctx, SimpleScope scope, int magic, SimpleValue mvalue) {
+		if ( magic == MUL_MAGIC ) return mvalue;
+		SimpleValue a = parseValueCastExp(ctx, scope, magic, mvalue);
 		int         t = this.in.tok();
 		while ( t == STAR || t == DIV || t == MOD ) {
 			this.in.consume();
-			SimpleValue b = parseValueCastExp(ctx, scope);
-			a = BinaryOpVal.create(a, BinaryOp.BIT_AND, b, ctx);
+			SimpleValue b = parseValueCastExp(ctx, scope, 0, null);
+			a = BinaryOpVal.create(a, switch ( t ) {
+				case STAR -> BinaryOp.MATH_MUL;
+				case DIV -> BinaryOp.MATH_DIV;
+				case MOD -> BinaryOp.MATH_MOD;
+				default -> throw new AssertionError();
+				}, b, ctx);
 			t = this.in.tok();
 		}
 		return a;
 	}
 	
-	protected SimpleValue parseValueCastExp(ErrorContext ctx, SimpleScope scope) {
+	protected static final int CAST_MAGIC = 12;
+	
+	protected SimpleValue parseValueCastExp(ErrorContext ctx, SimpleScope scope, int magic, SimpleValue mvalue) {
+		if ( magic == CAST_MAGIC ) return mvalue;
+		if ( magic != 0 ) return parseValueUnaryExp(ctx, scope, magic, mvalue);
 		if ( this.in.tok() == SMALL_OPEN ) {
 			this.in.consume();
 			SimpleType t = parseType(scope);
 			consumeToken(SMALL_CLOSE, "expected `) [VALUE]´ after `( [TYPE]´");
-			SimpleValue a = parseValueUnaryExp(ctx, scope);
+			SimpleValue a = parseValueUnaryExp(ctx, scope, 0, null);
 			return CastVal.create(a, t, ctx);
 		}
-		return parseValueUnaryExp(ctx, scope);
+		return parseValueUnaryExp(ctx, scope, 0, null);
 	}
 	
-	protected SimpleValue parseValueUnaryExp(ErrorContext ctx, SimpleScope scope) {
+	protected static final int UNARY_MAGIC = 13;
+	
+	protected SimpleValue parseValueUnaryExp(ErrorContext ctx, SimpleScope scope, int magic, SimpleValue mvalue) {
+		if ( magic == UNARY_MAGIC ) return mvalue; // if magic is set, just delegate
+		if ( magic != 0 ) return parseValuePostfixExp(ctx, scope, magic, mvalue);
 		UnaryOp op;
 		switch ( this.in.tok() ) {
 		case PLUS -> op = UnaryOp.PLUS;
@@ -278,14 +339,17 @@ public class SimpleExportFileParser {
 		default -> op = null;
 		}
 		if ( op == null ) {
-			return parseValuePostfixExp(ctx, scope);
+			return parseValuePostfixExp(ctx, scope, 0, null);
 		}
-		SimpleValue a = parseValuePostfixExp(ctx, scope);
+		SimpleValue a = parseValuePostfixExp(ctx, scope, 0, null);
 		return UnaryOpVal.create(op, a, ctx);
 	}
 	
-	protected SimpleValue parseValuePostfixExp(ErrorContext ctx, SimpleScope scope) {
-		SimpleValue a = parseValueDirectExp(ctx, scope);
+	protected static final int POSTFIX_MAGIC = 14;
+	
+	protected SimpleValue parseValuePostfixExp(ErrorContext ctx, SimpleScope scope, int magic, SimpleValue mvalue) {
+		if ( magic == POSTFIX_MAGIC ) return mvalue;
+		SimpleValue a = parseValueDirectExp(ctx, scope, magic, mvalue);
 		while ( true ) {
 			switch ( this.in.tok() ) {
 			case DIAMOND -> {
@@ -310,7 +374,10 @@ public class SimpleExportFileParser {
 		}
 	}
 	
-	protected SimpleValue parseValueDirectExp(ErrorContext ctx, SimpleScope scope) {
+	protected static final int DIRECT_MAGIC = 15;
+	
+	protected SimpleValue parseValueDirectExp(ErrorContext ctx, SimpleScope scope, int magic, SimpleValue mvalue) {
+		if ( magic == DIRECT_MAGIC ) return mvalue;
 		int t = this.in.consumeTok();
 		switch ( t ) {
 		case STRING -> {
@@ -519,11 +586,16 @@ public class SimpleExportFileParser {
 	
 	protected List<SimpleVariable> parseNamedTypeList(final int end, final int sep, final boolean sepBeforeEnd,
 		SimpleScope scope) {
+		return parseNamedTypeList(end, sep, sepBeforeEnd, scope, null);
+	}
+	
+	protected List<SimpleVariable> parseNamedTypeList(final int end, final int sep, final boolean sepBeforeEnd,
+		SimpleScope scope, List<SimpleVariable> add) {
 		if ( this.in.tok() == end ) {
 			this.in.consume();
 			return List.of();
 		}
-		List<SimpleVariable> members = new ArrayList<>();
+		List<SimpleVariable> members = add == null ? new ArrayList<>() : add;
 		SimpleType           type    = parseType(scope);
 		expectToken(NAME, "expected `[NAME]´ after `[TYPE]´");
 		String name = this.in.consumeDynTokSpecialText();
