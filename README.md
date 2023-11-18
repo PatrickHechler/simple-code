@@ -120,13 +120,13 @@ if marked with `const` there must be a constant initial value
     * `byte` : a signed 8-bit number
     * `ubyte` : an unsigned 8-bit number/character
     * `char` : implicit `typedef ubyte char;`
-    * `[NAME]` : a type defined with `typedef`
+    * `[NAME] ( : [NAME] )*` : a type defined with `typedef`
     * `struct (nopad)? { [NAMED_TYPE_LIST_SEMI_SEP] }` : a memory structure
         * marks:
             * `nopad`: do not use padding
                 * when using this some entries may not be aligned
     * `[FUNC_TYPE]` : a function address
-    * `fstuct ( [NAME] ( : [NAME] ) | [FUNC_TYPE0] )` : a function call structure
+    * `fstuct ( [NAME] ( : [NAME] )* | [FUNC_TYPE0] )` : a function call structure
     * `[TYPE] #` : a pointer to a value of TYPE
     * `[TYPE] \[ [VALUE]? \]` : an array of values of TYPE
 

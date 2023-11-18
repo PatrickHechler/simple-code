@@ -153,10 +153,29 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 			String               name = this.in.consumeDynTokSpecialText();
 			List<SimpleVariable> list = new ArrayList<>();
 			list.add(new SimpleVariable(type0, name, null, 0));
-			switch ( this.in.consumeTok() ) {
-				parseNamedTypeList(SMALL_CLOSE, COMMA, false, scope, list);
+			int t = this.in.consumeTok();
+			switch ( t ) {
+			case COMMA:
+				if ( parseNamedTypeList(SMALL_CLOSE, COMMA, false, scope, list).isEmpty() ) {
+					throw new CompileError(ctx, List.of("[TYPE]"),
+						"expected `[TYPE] [NAME] (, [TYPE] [NAME])* \\)´ after `[TYPE] [NAME] ,´");
+				}
+				//$FALL-THROUGH$
+			case SMALL_CLOSE:
+				break;
+			default:
+				throw new CompileError(ctx, List.of("[TYPE]", ")"), "expected `[TYPE] | \\)´ after `[TYPE] [NAME]´");
 			}
+			return FuncType.create(List.of(), list, FuncType.FLAG_FUNC_ADDRESS, ctx);
 		}
+		case NAME: {
+			ErrorContext ctx = this.in.ctx();
+			String name = this.in.consumeDynTokSpecialText();
+			Object typeOrDep = scope.nameTypeOrDepOrFuncOrNull(name, ctx);
+			SimpleValue valOrDep = scope.nameValueOrNull(name, ctx);
+			// TODO
+		}
+		// TODO
 		}
 	}
 	
