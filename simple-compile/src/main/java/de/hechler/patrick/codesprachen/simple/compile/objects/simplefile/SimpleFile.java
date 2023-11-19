@@ -161,7 +161,7 @@ public class SimpleFile extends SimpleDependency {
 		for (SimpleFunction sf : this.functions.values()) {
 			b.append("func ").append(sf.name()).append(' ').append(sf.type());
 			if ( sf.block() != null ) {
-				b.append(sf.block()).append('\n');
+				b.append(' ').append(sf.block()).append('\n');
 			} else {
 				b.append(";\n");
 			}

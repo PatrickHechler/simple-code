@@ -408,8 +408,10 @@ public class SimpleExportFileParser {
 			return a;
 		}
 		default -> {
-			this.in.ctx().setOffendingTokenCach(name(t)); // well it could be [ASM_BLOCK]
-			throw new CompileError(this.in.ctx(), List.of());
+			ErrorContext ctx = this.in.ctx();
+			ctx.setOffendingTokenCach(t == ASM_BLOCK ? ":::" + this.in.dynTokSpecialText() + ">>>" : name(t));
+			throw new CompileError(ctx,
+				List.of(name(STRING), name(CHARACTER), name(NUMBER), name(NAME), name(SMALL_OPEN)));
 		}
 		}
 	}

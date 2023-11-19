@@ -47,8 +47,18 @@ public class VarDeclCmd extends SimpleCommand {
 	}
 	
 	@Override
-	public void toString(StringBuilder append, StringBuilder indent) {
-		append.append(sv).append(';');
+	public void toString(StringBuilder append, @SuppressWarnings( "unused" ) StringBuilder indent) {
+		if ( ( sv.flags() & SimpleVariable.FLAG_CONSTANT ) != 0 ) {
+			append.append("const ");
+		}
+		if ( ( sv.flags() & SimpleVariable.FLAG_EXPORT ) != 0 ) {
+			append.append("exp ");
+		}
+		append.append(sv.type()).append(' ').append(sv.name());
+		if ( sv.initialValue() != null ) {
+			append.append(" <-- ").append(sv.initialValue());
+		}
+		append.append(';');
 	}
 	
 }

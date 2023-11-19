@@ -90,7 +90,7 @@ public class BlockCmd extends SimpleCommand {
 		append.append("{\n");
 		indent.append("    ");
 		for (SimpleCommand c : cmds) {
-			append.append(indent).append(c);
+			append.append(indent).append(c).append('\n');
 		}
 		indent.replace(indent.length() - 4, indent.length(), "");
 		append.append(indent).append('}');

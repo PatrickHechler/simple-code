@@ -149,22 +149,20 @@ if marked with `const` there must be a constant initial value
 
 * BLOCK
     * `{ ( [COMMAND] )* }`
-* CONSTANT_DECL
-    * `const [NAMED_TYPE] <-- [VALUE] ;`
 * VAR_DECL
-	* `var [NAMED_TYPE] ( <-- [VALUE] )? ;`
+	* `(const)? [NAMED_TYPE] ( <-- [VALUE] )? ;`
 * ASSIGN
     * `[VALUE] <-- [VALUE] ;`
 * FUNC_CALL
-    * `[VALUE] [FUNC_CALL_RESULT] [FUNC_CALL_ARGS] ;`
+    * `call [SHIFT_EXP] [FUNC_CALL_RESULT] [FUNC_CALL_ARGS] ;`
         * FUNC_CALL_RESULT
             * `( ( < ( [VALUE] ( , [VALUE] )* )? > ) <-- )?`
         * FUNC_CALL_ARGS
             * `\( ([VALUE] ( , [VALUE] )* )? \)`
 * FUNC_CALL_WITH_FUNCTION_STRUCTURE
-    * `call [VALUE] [VALUE] ;`
-    	* the first value is the function address
-    	* the second value is the function structure
+    * `call [SHIFT_EXP] [VALUE] ;`
+        * the first value is the function address
+        * the second value is the function structure
 * WHILE
     * `while \( [VALUE] \) [COMMAND]`
 * IF

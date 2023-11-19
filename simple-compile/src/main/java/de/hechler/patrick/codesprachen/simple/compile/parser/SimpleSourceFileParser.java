@@ -79,22 +79,41 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 	@Override
 	protected void parseFunction(SimpleFile sf) {
 		this.in.consume();
-		int flags = 0;
-		if ( this.in.tok() != NAME ) {
+		int flags = FuncType.FLAG_FUNC_ADDRESS;
+		String name;
+		if ( this.in.tok() == NAME ) {
+			name = this.in.consumeDynTokSpecialText();
+		} else if ( this.in.tok() == EXP ) {
+			flags |= FuncType.FLAG_EXPORT;
 			consumeToken(EXP, "expected `[NAME]´ or `exp [NAME]´ after `func´");
+			if ( this.in.tok() == INIT ) {
+				this.in.consume();
+				flags |= FuncType.FLAG_INIT;
+			} else if ( this.in.tok() == MAIN ) {
+				this.in.consume();
+				flags |= FuncType.FLAG_MAIN;
+			}
 			expectToken(NAME, "expected `[NAME]´ after `func exp´");
-			flags = FuncType.FLAG_EXPORT;
+			name = this.in.consumeDynTokSpecialText();
+		} else if ( this.in.tok() == INIT ) {
+			this.in.consume();
+			name = null;
+			flags |= FuncType.FLAG_INIT;
+		} else if ( this.in.tok() == MAIN ) {
+			this.in.consume();
+			name = null;
+			flags |= FuncType.FLAG_MAIN;
+		} else {
+			throw new CompileError(this.in.ctx(), List.of(name(NAME), name(EXP), name(INIT), name(MAIN)),
+				"expected `exp (main | init)? [NAME] | (main | init) [NAME]? | [NAME]´ after `func´");
 		}
-		String name = this.in.consumeDynTokSpecialText();
 		ErrorContext ctx = this.in.ctx();
 		SimpleType type = parseType(sf);
 		if ( !( type instanceof FuncType ftype ) || ( ftype.flags() & FuncType.FLAG_FUNC_ADDRESS ) == 0 ) {
 			ctx.setOffendingTokenCach(type.toString());
 			throw new CompileError(ctx, "the [TYPE] of a function MUST be a function address type: " + type);
 		}
-		if ( flags != 0 ) {
-			ftype = FuncType.create(ftype.resMembers(), ftype.argMembers(), flags, ctx);
-		}
+		ftype = FuncType.create(ftype.resMembers(), ftype.argMembers(), flags, ctx);
 		BlockCmd block = new BlockCmd(SimpleScope.newFuncScope(sf, ftype, ctx));
 		SimpleFunction func = new SimpleFunction(name, ftype, block);
 		sf.function(func, ctx);
@@ -120,8 +139,7 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 			parseCmdBlock(cmd);
 			yield cmd;
 		}
-		case CONST -> parseCmdVarDecl(scope, SimpleVariable.FLAG_CONSTANT);
-		case VAR -> parseCmdVarDecl(scope, 0);
+		case CONST -> parseCmdConstDecl(scope);
 		case CALL -> parseCmdCallFStruct(scope);
 		case WHILE -> parseCmdWhile(scope);
 		case IF -> parseCmdIf(scope);
@@ -200,43 +218,54 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 	}
 	
 	private SimpleCommand parseCmdDefault(SimpleScope scope) {
-		SimpleValue val0 = parseValue(scope);
-		List<SimpleValue> results = null;
-		int t = this.in.consumeTok();
-		switch ( t ) {
-		case LARROW: {
-			SimpleValue val1 = parseValue(scope);
-			consumeToken(SEMI, "expected `;´ after `[VALUE] <-- [VALUE]´");
-			return AssignCmd.create(scope, val0, val1, this.in.ctx());
-		}
-		case LT:
-			if ( this.in.tok() != GT ) {
-				results = parseCommaSepValues(scope);
+		Object obj = parseValueOrType(scope);
+		if ( obj instanceof SimpleValue val0 ) {
+			List<SimpleValue> results = null;
+			int t = this.in.consumeTok();
+			switch ( t ) {
+			case LARROW: {
+				SimpleValue val1 = parseValue(scope);
+				consumeToken(SEMI, "expected `;´ after `[VALUE] <-- [VALUE]´");
+				return AssignCmd.create(scope, val0, val1, this.in.ctx());
 			}
-			consumeToken(GT,
-				"expected `> <-- \\( ( [VALUE] ( , [VALUE] )* )? \\)´ after `call < ( [VALUE] ( , [VALUE] )* )?´");
-			consumeToken(LARROW, "expected `<-- \\( ( [VALUE] ( , [VALUE] )* )? \\)´ after `call [FUNC_CALL_RESULT]´");
-			consumeToken(SMALL_OPEN,
-				"expected `\\( ( [VALUE] ( , [VALUE] )* )? \\)´ after `call [FUNC_CALL_RESULT] <--´");
-			//$FALL-THROUGH$
-		case SMALL_OPEN:
-			List<SimpleValue> args = List.of();
-			if ( this.in.tok() != SMALL_CLOSE ) {
-				args = parseCommaSepValues(scope);
+			case LT:
+				if ( this.in.tok() != GT ) {
+					results = parseCommaSepValues(scope);
+				}
+				consumeToken(GT,
+					"expected `> <-- \\( ( [VALUE] ( , [VALUE] )* )? \\)´ after `call < ( [VALUE] ( , [VALUE] )* )?´");
+				consumeToken(LARROW,
+					"expected `<-- \\( ( [VALUE] ( , [VALUE] )* )? \\)´ after `call [FUNC_CALL_RESULT]´");
+				consumeToken(SMALL_OPEN,
+					"expected `\\( ( [VALUE] ( , [VALUE] )* )? \\)´ after `call [FUNC_CALL_RESULT] <--´");
+				//$FALL-THROUGH$
+			case SMALL_OPEN:
+				List<SimpleValue> args = List.of();
+				if ( this.in.tok() != SMALL_CLOSE ) {
+					args = parseCommaSepValues(scope);
+				}
+				consumeToken(SMALL_CLOSE,
+					"expected `\\)´ after `call ( [FUNC_CALL_RESULT] <-- )? \\( ( [VALUE] ( , [VALUE] )* )?´");
+				consumeToken(SEMI, "expected `;´ after `call [VALUE]  ( [FUNC_CALL_RESULT] <-- )? [FUNC_CALL_ARGS]´");
+				return FuncCallCmd.create(scope, val0, results, args, this.in.ctx());
+			default:
+				ErrorContext ctx = this.in.ctx();
+				ctx.setOffendingTokenCach(name(t));
+				throw new CompileError(ctx, List.of(name(LARROW), name(LT), name(SMALL_OPEN)),
+					"expected `<-- [VALUE] ; | ( < [NAMED_TYPE_LIST] > <-- )? \\( [NAMED_TYPE_LIST] \\) after the value "
+						+ val0);
 			}
-			consumeToken(SMALL_CLOSE,
-				"expected `\\)´ after `call ( [FUNC_CALL_RESULT] <-- )? \\( ( [VALUE] ( , [VALUE] )* )?´");
-			consumeToken(SEMI, "expected `;´ after `call [VALUE]  ( [FUNC_CALL_RESULT] <-- )? [FUNC_CALL_ARGS]´");
-			return FuncCallCmd.create(scope, val0, results, args, this.in.ctx());
-		default:
-			ErrorContext ctx = this.in.ctx();
-			ctx.setOffendingTokenCach(name(t));
-			throw new CompileError(ctx, List.of(name(LARROW), name(LT), name(SMALL_OPEN)));
 		}
+		SimpleType type = (SimpleType) obj;
+		return parseCmdVarDecl0(scope, 0, type);
 	}
 	
-	private SimpleCommand parseCmdVarDecl(SimpleScope scope, int flags) {
+	private SimpleCommand parseCmdConstDecl(SimpleScope scope) {
 		SimpleType type = parseType(scope);
+		return parseCmdVarDecl0(scope, SimpleVariable.FLAG_CONSTANT, type);
+	}
+	
+	private SimpleCommand parseCmdVarDecl0(SimpleScope scope, int flags, SimpleType type) {
 		expectToken(NAME, "expected `[NAME]´ after `( const | var ) [TYPE]´");
 		String name = this.in.consumeDynTokSpecialText();
 		SimpleValue initialVal = null;

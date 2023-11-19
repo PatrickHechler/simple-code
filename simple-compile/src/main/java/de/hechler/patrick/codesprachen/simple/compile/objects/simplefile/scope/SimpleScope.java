@@ -31,6 +31,8 @@ public interface SimpleScope {
 	SimpleValue nameValueOrNull(String name, ErrorContext ctx);
 	
 	default SimpleValue nameValueOrErr(String name, ErrorContext ctx) throws CompileError {
+		SimpleValue val = nameValueOrNull(name, ctx);
+		if (val != null) return val;
 		throw new CompileError(ctx, "nothing with the name '" + name + "' could be found");
 	}
 	
