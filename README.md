@@ -168,7 +168,7 @@ if marked with `const` there must be a constant initial value
 * IF
     * `if \( [VALUE] \) [COMMAND] ( else [COMMAND] )?`
 * ASSEMBLER
-    * `asm ( [STRING] <-- [VALUE] ( , [STRING] <-- [VALUE] )* )? [ASM_BLOCK] ( [VALUE] <-- [STRING] ,? | [STRING] <-- \? ( , [VALUE] <-- [STRING] ,? | [STRING] <-- \? )* )? ;`
+    * `asm ( [STRING] <-- [VALUE] ( , [STRING] <-- [VALUE] )* )? [ASM_BLOCK] ( [VALUE] <-- [STRING] | [STRING] <-- \? ( , [VALUE] <-- [STRING] | [STRING] <-- \? )* )? ;`
         * ASM_BLOCK
             * `::: ( [^>] | > [^>] | >> [^>] )* >>>`
         * each STRING represents a native register or address supported by the assembler

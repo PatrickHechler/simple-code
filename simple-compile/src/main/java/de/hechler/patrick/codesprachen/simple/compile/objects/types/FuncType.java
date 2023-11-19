@@ -124,12 +124,17 @@ public record FuncType(List<SimpleVariable> resMembers, List<SimpleVariable> arg
 		if ( ( this.flags & FLAG_NOPAD ) != 0 ) {
 			sb.append("nopad ");
 		}
+		toStringNoFlags(idention, sb);
+		return sb.toString();
+	}
+	
+	public void toStringNoFlags(String idention, StringBuilder sb) {
 		idention = idention.concat("    ");
 		sb.append('<');
 		append(sb, idention, this.resMembers);
 		sb.append("> <-- (");
 		append(sb, idention, this.argMembers);
-		return sb.append(')').toString();
+		sb.append(')');
 	}
 	
 	private static void append(StringBuilder sb, String idention, List<SimpleVariable> m) {

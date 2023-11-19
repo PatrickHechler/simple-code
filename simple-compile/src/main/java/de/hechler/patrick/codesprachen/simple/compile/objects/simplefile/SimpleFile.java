@@ -31,19 +31,19 @@ import de.hechler.patrick.codesprachen.simple.compile.objects.value.VariableVal;
 
 public class SimpleFile extends SimpleDependency {
 	
-	private Map<String, SimpleDependency> dependencies;
-	private Map<String, SimpleTypedef>    typedefs;
-	private Map<String, SimpleVariable>   variables;
-	private Map<String, SimpleFunction>   functions;
-	private SimpleFunction                main;
-	private SimpleFunction                init;
+	private Map<String,SimpleDependency> dependencies;
+	private Map<String,SimpleTypedef>    typedefs;
+	private Map<String,SimpleVariable>   variables;
+	private Map<String,SimpleFunction>   functions;
+	private SimpleFunction               main;
+	private SimpleFunction               init;
 	
 	public SimpleFile(String binaryTarget) {
 		super(binaryTarget);
 		this.dependencies = new LinkedHashMap<>();
-		this.typedefs     = new LinkedHashMap<>();
-		this.variables    = new LinkedHashMap<>();
-		this.functions    = new LinkedHashMap<>();
+		this.typedefs = new LinkedHashMap<>();
+		this.variables = new LinkedHashMap<>();
+		this.functions = new LinkedHashMap<>();
 		typedef(new SimpleTypedef("char", 0, NativeType.UBYTE), ErrorContext.NO_CONTEXT);
 	}
 	
@@ -65,7 +65,7 @@ public class SimpleFile extends SimpleDependency {
 	}
 	
 	@Override
-	public Object nameTypeOrDepOrFuncOrNull(String name, @SuppressWarnings("unused") ErrorContext ctx) {
+	public Object nameTypeOrDepOrFuncOrNull(String name, @SuppressWarnings( "unused" ) ErrorContext ctx) {
 		SimpleTypedef t = this.typedefs.get(name);
 		if ( t != null ) return t.type();
 		SimpleDependency d = this.dependencies.get(name);
@@ -132,7 +132,7 @@ public class SimpleFile extends SimpleDependency {
 	@Override
 	public String toString() {
 		StringBuilder b = new StringBuilder();
-		for (Entry<String, SimpleDependency> e : this.dependencies.entrySet()) {
+		for (Entry<String,SimpleDependency> e : this.dependencies.entrySet()) {
 			b.append("dep ").append(e.getKey()).append(" [PATH] \"").append(e.getValue().binaryTarget).append("\";\n");
 		}
 		for (SimpleTypedef t : this.typedefs.values()) {
@@ -159,7 +159,20 @@ public class SimpleFile extends SimpleDependency {
 			b.append(";\n");
 		}
 		for (SimpleFunction sf : this.functions.values()) {
-			b.append("func ").append(sf.name()).append(' ').append(sf.type());
+			b.append("func ");
+			if ( ( sf.type().flags() & FuncType.FLAG_EXPORT ) != 0 ) {
+				b.append("exp ");
+			}
+			if ( ( sf.type().flags() & FuncType.FLAG_MAIN ) != 0 ) {
+				b.append("main ");
+			}
+			if ( ( sf.type().flags() & FuncType.FLAG_INIT ) != 0 ) {
+				b.append("init ");
+			}
+			if ( sf.name() != null ) {
+				b.append(sf.name()).append(' ');
+			}
+			sf.type().toStringNoFlags("", b);
 			if ( sf.block() != null ) {
 				b.append(' ').append(sf.block()).append('\n');
 			} else {
