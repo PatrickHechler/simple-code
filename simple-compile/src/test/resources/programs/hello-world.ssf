@@ -16,14 +16,14 @@
 //along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 func puts <unum wrote, unum errno> <-- (char# string) {
-	wrote <-- 0;
-	errno <-- 1;
+    wrote <-- 0;
+    errno <-- 1;
 }
 
 // this function prints hello world and exits with 0 if the print was successful
 func main <ubyte exitnum> <-- (num argc, char## argv) {
-	unum wrote;
-	unum err;
-	puts <wrote, err> <-- ("hello world\n");
-	exitnum <-- errno != 0;
+    unum wrote;
+    unum err;
+    call puts <wrote, err> <-- ("hello world\n");
+    exitnum <-- errno != 0;
 }

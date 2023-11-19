@@ -13,9 +13,9 @@ class SimpleSourceFileParserChecker {
 	
 	@Check
 	void checkParser() {
-		InputStream            in  = SimpleSourceFileParser.class.getResourceAsStream("/programs/hello-world.ssf");
-		SimpleSourceFileParser sep = new SimpleSourceFileParser(in, "hello-world.ssf", null);
-		SimpleDependency       sf  = sep.parse("/bin");
+		InputStream in = SimpleSourceFileParser.class.getResourceAsStream("/programs/hello-world.ssf");
+		SimpleSourceFileParser ssp = new SimpleSourceFileParser(in, "hello-world.ssf", null);
+		SimpleDependency sf = ssp.parse("/bin");
 		assertEquals("""
 			typedef ubyte char;
 			func puts <unum wrote, unum errno> <-- (ubyte# string) {

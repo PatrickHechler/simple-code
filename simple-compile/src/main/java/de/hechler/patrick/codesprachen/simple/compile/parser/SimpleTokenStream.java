@@ -410,7 +410,7 @@ public class SimpleTokenStream {
 				if ( buf[i] == '\n' ) {
 					if ( i != r - 1 ) {
 						this.in.reset();
-						this.in.skipNBytes(i);
+						this.in.skipNBytes(i + 1);
 					}
 					this.charInLine = 0;
 					this.totalChar += i + 1;
@@ -447,7 +447,7 @@ public class SimpleTokenStream {
 					if ( buf[i] == '/' ) {
 						if ( i != r - 1 ) {
 							this.in.reset();
-							this.in.skipNBytes(i);
+							this.in.skipNBytes(i + 1);
 						}
 						this.totalChar += i + 1;
 						return;
@@ -680,13 +680,14 @@ public class SimpleTokenStream {
 		while ( true ) {
 			final int origBBufPos = bbuf.position();
 			this.in.mark(32 - origBBufPos);
-			int r = this.in.readNBytes(bytes, bbuf.position(), 32 - origBBufPos);
+			final int r = this.in.readNBytes(bytes, bbuf.position(), 32 - origBBufPos);
 			CoderResult cr = decoder.decode(bbuf, cbuf, true);
 			checkInvalid("string", "\"", sb, cr);
 			int sbi = 0;
+			final int clen = cbuf.position();
 			cbuf.position(0);
 			int i;
-			for (i = 0; i < 32; i++) {
+			for (i = 0; i < clen; i++) {
 				char c = chars[i];
 				switch ( c ) {
 				case '"' -> {
@@ -702,12 +703,14 @@ public class SimpleTokenStream {
 					this.tok = STRING;
 					return STRING;
 				}
-				case '\n',
-					'\r' -> throw new CompileError(this.file, this.line, this.charInLine, this.totalChar,
-						sb.insert(0, '"').append(chars, sbi, i - sbi).toString(), null,
-						"line seperator inside of a string");
+				case '\n', '\r' -> {
+					String tok = sb.insert(0, '"').append(chars, sbi, i - sbi).toString().replace("\n", "\\n")
+						.replace("\r", "\\r").replace("\t", "\\t").replace("\0", "\\0");
+					String msg = "line seperator inside of a string";
+					throw new CompileError(this.file, this.line, this.charInLine, this.totalChar, tok, null, msg);
+				}
 				case '\\' -> {
-					if ( i == 31 ) {
+					if ( i == clen - 1 ) {
 						if ( sbi == 0 ) {
 							sbi++;
 							sb.append(chars[0]);
@@ -719,7 +722,7 @@ public class SimpleTokenStream {
 						sb.append(chars, sbi, i - sbi);
 						switch ( chars[i + 1] ) {
 						case 'u' -> {
-							if ( i > 32 - 6 ) {
+							if ( i > clen - 6 ) {
 								System.arraycopy(chars, i, chars, 0, r - i);
 								cbuf.position(r - i);
 								sbi = r;
@@ -730,30 +733,29 @@ public class SimpleTokenStream {
 								val |= parseBSUHex(sb, chars[i + 4]) << 4;
 								val |= parseBSUHex(sb, chars[i + 5]);
 								sb.append((char) val);
-								i += 6;
-								sbi = i;
+								i += 5;
+								sbi = i + 1;
 							}
 						}
 						case '\\', '"' -> sbi = ++i;// simply include those two in the next append
-						
 						case '0' -> {
-							i += 2;
-							sbi = i;
+							i++;
+							sbi = i + 1;
 							sb.append('\0');
 						}
 						case 'n' -> {
-							i += 2;
-							sbi = i;
+							i++;
+							sbi = i + 1;
 							sb.append('\n');
 						}
 						case 'r' -> {
-							i += 2;
-							sbi = i;
+							i++;
+							sbi = i + 1;
 							sb.append('\r');
 						}
 						case 't' -> {
-							i += 2;
-							sbi = i;
+							i++;
+							sbi = i + 1;
 							sb.append('\t');
 						}
 						default -> throw new CompileError(this.file, this.line, this.charInLine, this.totalChar,

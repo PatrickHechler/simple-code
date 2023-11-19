@@ -310,6 +310,7 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 	}
 	
 	private SimpleCommand parseCmdCall(SimpleScope scope) {
+		this.in.consume();
 		SimpleValue func = super.parseValueShiftExp(scope, 0, null);
 		if ( this.in.tok() != LT && this.in.tok() != SMALL_OPEN ) {
 			SimpleValue fstuct = super.parseValue(scope);
@@ -337,11 +338,13 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 		return FuncCallCmd.create(scope, func, results, args, this.in.ctx());
 	}
 	
-	private List<SimpleValue> parseCommaSepValues(SimpleScope scope, boolean allowIgnoreValues) {
+	private List<SimpleValue> parseCommaSepValues(SimpleScope scope, boolean allowIgnoreValuesAndUseShiftExp) {
 		List<SimpleValue> values = new ArrayList<>();
 		while ( true ) {
-			if ( allowIgnoreValues && this.in.tok() == QUESTION ) values.add(null);
-			else values.add(parseValue(scope));
+			if ( allowIgnoreValuesAndUseShiftExp ) {
+				if ( this.in.tok() == QUESTION ) values.add(null);
+				else values.add(parseValueShiftExp(scope, 0, null));
+			} else values.add(parseValue(scope));
 			if ( this.in.tok() != COMMA ) return values;
 			this.in.consume();
 		}
