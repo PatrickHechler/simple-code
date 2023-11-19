@@ -50,15 +50,15 @@ import de.hechler.patrick.codesprachen.simple.compile.objects.value.UnaryOpVal.U
 
 public class SimpleExportFileParser {
 	
-	protected final SimpleTokenStream                            in;
-	protected final BiFunction<String, String, SimpleDependency> dep;
+	protected final SimpleTokenStream                          in;
+	protected final BiFunction<String,String,SimpleDependency> dep;
 	
-	public SimpleExportFileParser(InputStream in, String file, BiFunction<String, String, SimpleDependency> dep) {
+	public SimpleExportFileParser(InputStream in, String file, BiFunction<String,String,SimpleDependency> dep) {
 		this(new SimpleTokenStream(in, file), dep);
 	}
 	
-	public SimpleExportFileParser(SimpleTokenStream in, BiFunction<String, String, SimpleDependency> dep) {
-		this.in  = in;
+	public SimpleExportFileParser(SimpleTokenStream in, BiFunction<String,String,SimpleDependency> dep) {
+		this.in = in;
 		this.dep = dep;
 	}
 	
@@ -119,7 +119,7 @@ public class SimpleExportFileParser {
 		}
 		SimpleType type = parseType(scope);
 		expectToken(NAME, "expected `[NAME]´ after ´(const)? (exp)? [TYPE]´");
-		String      name         = this.in.consumeDynTokSpecialText();
+		String name = this.in.consumeDynTokSpecialText();
 		SimpleValue initialValue = null;
 		if ( this.in.tok() == LARROW ) {
 			this.in.consume();
@@ -131,103 +131,103 @@ public class SimpleExportFileParser {
 	}
 	
 	protected SimpleValue parseValue(SimpleScope scope) {
-		return parseValueCondExp(this.in.ctx().copy(), scope, 0, null);
+		return parseValueCondExp(scope, 0, null);
 	}
 	
 	protected SimpleValue parseValue(SimpleScope scope, int magic, SimpleValue mvalue) {
-		return parseValueCondExp(this.in.ctx().copy(), scope, magic, mvalue);
+		return parseValueCondExp(scope, magic, mvalue);
 	}
 	
 	protected static final int COND_MAGIC = 1;
 	
-	protected SimpleValue parseValueCondExp(ErrorContext ctx, SimpleScope scope, int magic, SimpleValue mvalue) {
+	protected SimpleValue parseValueCondExp(SimpleScope scope, int magic, SimpleValue mvalue) {
 		if ( magic == COND_MAGIC ) return mvalue;
-		SimpleValue a = parseValueLOrExp(ctx, scope, magic, mvalue);
+		SimpleValue a = parseValueLOrExp(scope, magic, mvalue);
 		if ( this.in.tok() == QUESTION ) {
 			this.in.consume();
 			SimpleValue b = parseValue(scope);
 			consumeToken(BOOL_NOT, "expected `! [COND_EXP]´ after `[LOR_EXP] ? [VALUE]´");
-			SimpleValue c = parseValueCondExp(ctx, scope, 0, null);
-			a = CondVal.create(a, b, c, ctx);
+			SimpleValue c = parseValueCondExp(scope, 0, null);
+			a = CondVal.create(a, b, c, this.in.ctx());
 		}
 		return a;
 	}
 	
 	protected static final int LOR_MAGIC = 2;
 	
-	protected SimpleValue parseValueLOrExp(ErrorContext ctx, SimpleScope scope, int magic, SimpleValue mvalue) {
+	protected SimpleValue parseValueLOrExp(SimpleScope scope, int magic, SimpleValue mvalue) {
 		if ( magic == LOR_MAGIC ) return mvalue;
-		SimpleValue a = parseValueLAndExp(ctx, scope, magic, mvalue);
+		SimpleValue a = parseValueLAndExp(scope, magic, mvalue);
 		while ( this.in.tok() == BOOL_OR ) {
 			this.in.consume();
-			SimpleValue b = parseValueLAndExp(ctx, scope, 0, null);
-			a = BinaryOpVal.create(a, BinaryOp.BOOL_OR, b, ctx);
+			SimpleValue b = parseValueLAndExp(scope, 0, null);
+			a = BinaryOpVal.create(a, BinaryOp.BOOL_OR, b, this.in.ctx());
 		}
 		return a;
 	}
 	
 	protected static final int LAND_MAGIC = 3;
 	
-	protected SimpleValue parseValueLAndExp(ErrorContext ctx, SimpleScope scope, int magic, SimpleValue mvalue) {
+	protected SimpleValue parseValueLAndExp(SimpleScope scope, int magic, SimpleValue mvalue) {
 		if ( magic == LAND_MAGIC ) return mvalue;
-		SimpleValue a = parseValueOrExp(ctx, scope, magic, mvalue);
+		SimpleValue a = parseValueOrExp(scope, magic, mvalue);
 		while ( this.in.tok() == BOOL_AND ) {
 			this.in.consume();
-			SimpleValue b = parseValueOrExp(ctx, scope, 0, null);
-			a = BinaryOpVal.create(a, BinaryOp.BOOL_AND, b, ctx);
+			SimpleValue b = parseValueOrExp(scope, 0, null);
+			a = BinaryOpVal.create(a, BinaryOp.BOOL_AND, b, this.in.ctx());
 		}
 		return a;
 	}
 	
 	protected static final int OR_MAGIC = 4;
 	
-	protected SimpleValue parseValueOrExp(ErrorContext ctx, SimpleScope scope, int magic, SimpleValue mvalue) {
+	protected SimpleValue parseValueOrExp(SimpleScope scope, int magic, SimpleValue mvalue) {
 		if ( magic == OR_MAGIC ) return mvalue;
-		SimpleValue a = parseValueXOrExp(ctx, scope, magic, mvalue);
+		SimpleValue a = parseValueXOrExp(scope, magic, mvalue);
 		while ( this.in.tok() == BIT_OR ) {
 			this.in.consume();
-			SimpleValue b = parseValueXOrExp(ctx, scope, 0, null);
-			a = BinaryOpVal.create(a, BinaryOp.BIT_OR, b, ctx);
+			SimpleValue b = parseValueXOrExp(scope, 0, null);
+			a = BinaryOpVal.create(a, BinaryOp.BIT_OR, b, this.in.ctx());
 		}
 		return a;
 	}
 	
 	protected static final int XOR_MAGIC = 5;
 	
-	protected SimpleValue parseValueXOrExp(ErrorContext ctx, SimpleScope scope, int magic, SimpleValue mvalue) {
+	protected SimpleValue parseValueXOrExp(SimpleScope scope, int magic, SimpleValue mvalue) {
 		if ( magic == XOR_MAGIC ) return mvalue;
-		SimpleValue a = parseValueAndExp(ctx, scope, magic, mvalue);
+		SimpleValue a = parseValueAndExp(scope, magic, mvalue);
 		while ( this.in.tok() == BIT_XOR ) {
 			this.in.consume();
-			SimpleValue b = parseValueAndExp(ctx, scope, 0, null);
-			a = BinaryOpVal.create(a, BinaryOp.BIT_XOR, b, ctx);
+			SimpleValue b = parseValueAndExp(scope, 0, null);
+			a = BinaryOpVal.create(a, BinaryOp.BIT_XOR, b, this.in.ctx());
 		}
 		return a;
 	}
 	
 	protected static final int AND_MAGIC = 6;
 	
-	protected SimpleValue parseValueAndExp(ErrorContext ctx, SimpleScope scope, int magic, SimpleValue mvalue) {
+	protected SimpleValue parseValueAndExp(SimpleScope scope, int magic, SimpleValue mvalue) {
 		if ( magic == AND_MAGIC ) return mvalue;
-		SimpleValue a = parseValueEqExp(ctx, scope, magic, mvalue);
+		SimpleValue a = parseValueEqExp(scope, magic, mvalue);
 		while ( this.in.tok() == BIT_AND ) {
 			this.in.consume();
-			SimpleValue b = parseValueEqExp(ctx, scope, 0, null);
-			a = BinaryOpVal.create(a, BinaryOp.BIT_AND, b, ctx);
+			SimpleValue b = parseValueEqExp(scope, 0, null);
+			a = BinaryOpVal.create(a, BinaryOp.BIT_AND, b, this.in.ctx());
 		}
 		return a;
 	}
 	
 	protected static final int EQ_MAGIC = 7;
 	
-	protected SimpleValue parseValueEqExp(ErrorContext ctx, SimpleScope scope, int magic, SimpleValue mvalue) {
+	protected SimpleValue parseValueEqExp(SimpleScope scope, int magic, SimpleValue mvalue) {
 		if ( magic == EQ_MAGIC ) return mvalue;
-		SimpleValue a = parseValueRelExp(ctx, scope, magic, mvalue);
-		int         t = this.in.tok();
+		SimpleValue a = parseValueRelExp(scope, magic, mvalue);
+		int t = this.in.tok();
 		while ( t == EQ || t == NOT_EQ ) {
 			this.in.consume();
-			SimpleValue b = parseValueRelExp(ctx, scope, 0, null);
-			a = BinaryOpVal.create(a, t == EQ ? BinaryOp.CMP_EQ : BinaryOp.CMP_NEQ, b, ctx);
+			SimpleValue b = parseValueRelExp(scope, 0, null);
+			a = BinaryOpVal.create(a, t == EQ ? BinaryOp.CMP_EQ : BinaryOp.CMP_NEQ, b, this.in.ctx());
 			t = this.in.tok();
 		}
 		return a;
@@ -235,20 +235,20 @@ public class SimpleExportFileParser {
 	
 	protected static final int REL_MAGIC = 8;
 	
-	protected SimpleValue parseValueRelExp(ErrorContext ctx, SimpleScope scope, int magic, SimpleValue mvalue) {
+	protected SimpleValue parseValueRelExp(SimpleScope scope, int magic, SimpleValue mvalue) {
 		if ( magic == REL_MAGIC ) return mvalue;
-		SimpleValue a = parseValueShiftExp(ctx, scope, magic, mvalue);
-		int         t = this.in.tok();
+		SimpleValue a = parseValueShiftExp(scope, magic, mvalue);
+		int t = this.in.tok();
 		while ( t == GT || t == GE || t == LE || t == LT ) {
 			this.in.consume();
-			SimpleValue b = parseValueShiftExp(ctx, scope, 0, null);
+			SimpleValue b = parseValueShiftExp(scope, 0, null);
 			a = BinaryOpVal.create(a, switch ( t ) {
-				case GT -> BinaryOp.CMP_GT;
-				case GE -> BinaryOp.CMP_GE;
-				case LE -> BinaryOp.CMP_LE;
-				case LT -> BinaryOp.CMP_LT;
-				default -> throw new AssertionError();
-				}, b, ctx);
+			case GT -> BinaryOp.CMP_GT;
+			case GE -> BinaryOp.CMP_GE;
+			case LE -> BinaryOp.CMP_LE;
+			case LT -> BinaryOp.CMP_LT;
+			default -> throw new AssertionError();
+			}, b, this.in.ctx());
 			t = this.in.tok();
 		}
 		return a;
@@ -256,19 +256,19 @@ public class SimpleExportFileParser {
 	
 	protected static final int SHIFT_MAGIC = 9;
 	
-	protected SimpleValue parseValueShiftExp(ErrorContext ctx, SimpleScope scope, int magic, SimpleValue mvalue) {
+	protected SimpleValue parseValueShiftExp(SimpleScope scope, int magic, SimpleValue mvalue) {
 		if ( magic == SHIFT_MAGIC ) return mvalue;
-		SimpleValue a = parseValueAddExp(ctx, scope, magic, mvalue);
-		int         t = this.in.tok();
+		SimpleValue a = parseValueAddExp(scope, magic, mvalue);
+		int t = this.in.tok();
 		while ( t == SHIFT_LEFT || t == SHIFT_RIGTH_LOG || t == SHIFT_RIGTH_ARI ) {
 			this.in.consume();
-			SimpleValue b = parseValueAddExp(ctx, scope, 0, null);
+			SimpleValue b = parseValueAddExp(scope, 0, null);
 			a = BinaryOpVal.create(a, switch ( t ) {
-				case SHIFT_LEFT -> BinaryOp.SHIFT_LEFT;
-				case SHIFT_RIGTH_ARI -> BinaryOp.SHIFT_ARITMETIC_RIGTH;
-				case SHIFT_RIGTH_LOG -> BinaryOp.SHIFT_LOGIC_RIGTH;
-				default -> throw new AssertionError();
-				}, b, ctx);
+			case SHIFT_LEFT -> BinaryOp.SHIFT_LEFT;
+			case SHIFT_RIGTH_ARI -> BinaryOp.SHIFT_ARITMETIC_RIGTH;
+			case SHIFT_RIGTH_LOG -> BinaryOp.SHIFT_LOGIC_RIGTH;
+			default -> throw new AssertionError();
+			}, b, this.in.ctx());
 			t = this.in.tok();
 		}
 		return a;
@@ -276,14 +276,14 @@ public class SimpleExportFileParser {
 	
 	protected static final int ADD_MAGIC = 10;
 	
-	protected SimpleValue parseValueAddExp(ErrorContext ctx, SimpleScope scope, int magic, SimpleValue mvalue) {
+	protected SimpleValue parseValueAddExp(SimpleScope scope, int magic, SimpleValue mvalue) {
 		if ( magic == ADD_MAGIC ) return mvalue;
-		SimpleValue a = parseValueMulExp(ctx, scope, magic, mvalue);
-		int         t = this.in.tok();
+		SimpleValue a = parseValueMulExp(scope, magic, mvalue);
+		int t = this.in.tok();
 		while ( t == PLUS || t == MINUS ) {
 			this.in.consume();
-			SimpleValue b = parseValueMulExp(ctx, scope, 0, null);
-			a = BinaryOpVal.create(a, t == PLUS ? BinaryOp.MATH_ADD : BinaryOp.MATH_SUB, b, ctx);
+			SimpleValue b = parseValueMulExp(scope, 0, null);
+			a = BinaryOpVal.create(a, t == PLUS ? BinaryOp.MATH_ADD : BinaryOp.MATH_SUB, b, this.in.ctx());
 			t = this.in.tok();
 		}
 		return a;
@@ -291,19 +291,19 @@ public class SimpleExportFileParser {
 	
 	protected static final int MUL_MAGIC = 11;
 	
-	protected SimpleValue parseValueMulExp(ErrorContext ctx, SimpleScope scope, int magic, SimpleValue mvalue) {
+	protected SimpleValue parseValueMulExp(SimpleScope scope, int magic, SimpleValue mvalue) {
 		if ( magic == MUL_MAGIC ) return mvalue;
-		SimpleValue a = parseValueCastExp(ctx, scope, magic, mvalue);
-		int         t = this.in.tok();
+		SimpleValue a = parseValueCastExp(scope, magic, mvalue);
+		int t = this.in.tok();
 		while ( t == STAR || t == DIV || t == MOD ) {
 			this.in.consume();
-			SimpleValue b = parseValueCastExp(ctx, scope, 0, null);
+			SimpleValue b = parseValueCastExp(scope, 0, null);
 			a = BinaryOpVal.create(a, switch ( t ) {
-				case STAR -> BinaryOp.MATH_MUL;
-				case DIV -> BinaryOp.MATH_DIV;
-				case MOD -> BinaryOp.MATH_MOD;
-				default -> throw new AssertionError();
-				}, b, ctx);
+			case STAR -> BinaryOp.MATH_MUL;
+			case DIV -> BinaryOp.MATH_DIV;
+			case MOD -> BinaryOp.MATH_MOD;
+			default -> throw new AssertionError();
+			}, b, this.in.ctx());
 			t = this.in.tok();
 		}
 		return a;
@@ -311,24 +311,24 @@ public class SimpleExportFileParser {
 	
 	protected static final int CAST_MAGIC = 12;
 	
-	protected SimpleValue parseValueCastExp(ErrorContext ctx, SimpleScope scope, int magic, SimpleValue mvalue) {
+	protected SimpleValue parseValueCastExp(SimpleScope scope, int magic, SimpleValue mvalue) {
 		if ( magic == CAST_MAGIC ) return mvalue;
-		if ( magic != 0 ) return parseValueUnaryExp(ctx, scope, magic, mvalue);
+		if ( magic != 0 ) return parseValueUnaryExp(scope, magic, mvalue);
 		if ( this.in.tok() == SMALL_OPEN ) {
 			this.in.consume();
 			SimpleType t = parseType(scope);
 			consumeToken(SMALL_CLOSE, "expected `) [VALUE]´ after `( [TYPE]´");
-			SimpleValue a = parseValueUnaryExp(ctx, scope, 0, null);
-			return CastVal.create(a, t, ctx);
+			SimpleValue a = parseValueUnaryExp(scope, 0, null);
+			return CastVal.create(a, t, this.in.ctx());
 		}
-		return parseValueUnaryExp(ctx, scope, 0, null);
+		return parseValueUnaryExp(scope, 0, null);
 	}
 	
 	protected static final int UNARY_MAGIC = 13;
 	
-	protected SimpleValue parseValueUnaryExp(ErrorContext ctx, SimpleScope scope, int magic, SimpleValue mvalue) {
+	protected SimpleValue parseValueUnaryExp(SimpleScope scope, int magic, SimpleValue mvalue) {
 		if ( magic == UNARY_MAGIC ) return mvalue; // if magic is set, just delegate
-		if ( magic != 0 ) return parseValuePostfixExp(ctx, scope, magic, mvalue);
+		if ( magic != 0 ) return parseValuePostfixExp(scope, magic, mvalue);
 		UnaryOp op;
 		switch ( this.in.tok() ) {
 		case PLUS -> op = UnaryOp.PLUS;
@@ -339,35 +339,35 @@ public class SimpleExportFileParser {
 		default -> op = null;
 		}
 		if ( op == null ) {
-			return parseValuePostfixExp(ctx, scope, 0, null);
+			return parseValuePostfixExp(scope, 0, null);
 		}
-		SimpleValue a = parseValuePostfixExp(ctx, scope, 0, null);
-		return UnaryOpVal.create(op, a, ctx);
+		SimpleValue a = parseValuePostfixExp(scope, 0, null);
+		return UnaryOpVal.create(op, a, this.in.ctx());
 	}
 	
 	protected static final int POSTFIX_MAGIC = 14;
 	
-	protected SimpleValue parseValuePostfixExp(ErrorContext ctx, SimpleScope scope, int magic, SimpleValue mvalue) {
+	protected SimpleValue parseValuePostfixExp(SimpleScope scope, int magic, SimpleValue mvalue) {
 		if ( magic == POSTFIX_MAGIC ) return mvalue;
-		SimpleValue a = parseValueDirectExp(ctx, scope, magic, mvalue);
+		SimpleValue a = parseValueDirectExp(scope, magic, mvalue);
 		while ( true ) {
 			switch ( this.in.tok() ) {
 			case DIAMOND -> {
 				this.in.consume();
-				a = UnaryOpVal.create(UnaryOp.DEREF_PNTR, a, ctx);
+				a = UnaryOpVal.create(UnaryOp.DEREF_PNTR, a, this.in.ctx());
 			}
 			case ARR_OPEN -> {
 				this.in.consume();
 				SimpleValue b = parseValue(scope);
 				consumeToken(ARR_CLOSE, "expected `\\]´ after `\\[ [VALUE]´");
-				a = BinaryOpVal.create(a, BinaryOp.ARR_PNTR_INDEX, b, ctx);
+				a = BinaryOpVal.create(a, BinaryOp.ARR_PNTR_INDEX, b, this.in.ctx());
 			}
 			case COLON -> {
 				this.in.consume();
 				expectToken(NAME, "expected `[NAME]´ after `:´");
-				String  name = this.in.consumeDynTokSpecialText();
-				NameVal b    = new NameVal(name);
-				a = BinaryOpVal.create(a, BinaryOp.DEREF_BY_NAME, b, ctx);
+				String name = this.in.consumeDynTokSpecialText();
+				NameVal b = new NameVal(name);
+				a = BinaryOpVal.create(a, BinaryOp.DEREF_BY_NAME, b, this.in.ctx());
 			}
 			default -> { return a; }
 			}
@@ -376,31 +376,31 @@ public class SimpleExportFileParser {
 	
 	protected static final int DIRECT_MAGIC = 15;
 	
-	protected SimpleValue parseValueDirectExp(ErrorContext ctx, SimpleScope scope, int magic, SimpleValue mvalue) {
+	protected SimpleValue parseValueDirectExp(SimpleScope scope, int magic, SimpleValue mvalue) {
 		if ( magic == DIRECT_MAGIC ) return mvalue;
 		int t = this.in.consumeTok();
 		switch ( t ) {
 		case STRING -> {
 			String str = this.in.dynTokSpecialText();
 			if ( this.in.tok() != STRING ) {
-				return DataVal.createString(str, ctx);
+				return DataVal.createString(str, this.in.ctx());
 			}
 			StringBuilder sb = new StringBuilder(str);
 			do {
 				str = this.in.consumeDynTokSpecialText();
 				sb.append(str);
 			} while ( this.in.tok() == STRING );
-			return DataVal.createString(sb, ctx);
+			return DataVal.createString(sb, this.in.ctx());
 		}
 		case CHARACTER -> {
 			char value = this.in.dynTokSpecialText().charAt(0);
-			return ScalarNumericVal.create(NativeType.UBYTE, value, ctx);
+			return ScalarNumericVal.create(NativeType.UBYTE, value, this.in.ctx());
 		}
 		case NUMBER -> {
-			return parseNumber(ctx);
+			return parseNumber(this.in.ctx());
 		}
 		case NAME -> {
-			return scope.nameValueOrErr(this.in.dynTokSpecialText(), ctx);
+			return scope.nameValueOrErr(this.in.dynTokSpecialText(), this.in.ctx());
 		}
 		case SMALL_OPEN -> {
 			SimpleValue a = parseValue(scope);
@@ -408,17 +408,17 @@ public class SimpleExportFileParser {
 			return a;
 		}
 		default -> {
-			ctx.setOffendingTokenCach(name(t)); // well it could be [ASM_BLOCK]
-			throw new CompileError(ctx, List.of());
+			this.in.ctx().setOffendingTokenCach(name(t)); // well it could be [ASM_BLOCK]
+			throw new CompileError(this.in.ctx(), List.of());
 		}
 		}
 	}
 	
 	private SimpleValue parseNumber(ErrorContext ctx) throws AssertionError {
-		String  value = this.in.dynTokSpecialText();
-		boolean sign  = false;
-		int     off   = 4;
-		int     sys;
+		String value = this.in.dynTokSpecialText();
+		boolean sign = false;
+		int off = 4;
+		int sys;
 		switch ( value.charAt(0) ) {
 		case 'H' -> sys = 16;
 		case 'D' -> sys = 10;
@@ -436,8 +436,8 @@ public class SimpleExportFileParser {
 		}
 		case '-' -> {
 			sign = true;
-			sys  = 10;
-			off  = 1;
+			sys = 10;
+			off = 1;
 		}
 		default -> {
 			sys = 10;
@@ -445,7 +445,7 @@ public class SimpleExportFileParser {
 		}
 		}
 		int bits = 64;
-		int len  = value.length() - 1;
+		int len = value.length() - 1;
 		switch ( value.charAt(len) ) {
 		case 'B', 'b' -> {
 			if ( sys < 12 ) bits = 8;
@@ -503,7 +503,7 @@ public class SimpleExportFileParser {
 	
 	protected SimpleType parseType(SimpleScope scope) {
 		ErrorContext ctx = this.in.ctx();
-		SimpleType   type;
+		SimpleType type;
 		switch ( this.in.consumeTok() ) {
 		case NUM -> type = NativeType.NUM;
 		case UNUM -> type = NativeType.UNUM;
@@ -553,18 +553,23 @@ public class SimpleExportFileParser {
 		return parseTypeNamedType(ctx, scope, SimpleType.class);
 	}
 	
-	private <T> T parseTypeNamedType(ErrorContext ctx, SimpleScope scope, Class<T> cls) {
+	private < T > T parseTypeNamedType(ErrorContext ctx, SimpleScope scope, Class<T> cls) {
 		while ( true ) {
 			Object obj = scope.nameTypeOrDepOrFuncOrNull(this.in.dynTokSpecialText(), ctx);
 			if ( cls.isInstance(obj) ) return cls.cast(obj);
 			if ( !( obj instanceof SimpleDependency nscope ) ) {
+				String simpleName = cls.getSimpleName().startsWith("Simple")
+					? cls.getSimpleName().substring("Simple".length())
+					: cls.getSimpleName();
 				if ( obj == null ) {
-					throw new CompileError(this.in.ctx(), "expected the `[NAME]´ to be the [NAME] of a "
-						+ cls.getSimpleName() + " or a dependency, but there is nothing with the given name");
+					throw new CompileError(this.in.ctx(), "expected the `[NAME]´ to be the [NAME] of a " + simpleName
+						+ " or a dependency, but there is nothing with the given name");
 				}
-				throw new CompileError(this.in.ctx(),
-					"expected the `[NAME]´ to be the [NAME] of a " + cls.getSimpleName()
-						+ " or a dependency, but it is " + obj.getClass().getSimpleName() + " : " + obj);
+				String objSimpleName = obj.getClass().getSimpleName().startsWith("Simple")
+					? obj.getClass().getSimpleName().substring("Simple".length())
+					: obj.getClass().getSimpleName();
+				throw new CompileError(this.in.ctx(), "expected the `[NAME]´ to be the [NAME] of a " + simpleName
+					+ " or a dependency, but it is " + objSimpleName + " : " + obj);
 			}
 			scope = nscope;
 			consumeToken(COLON, "expected `:[NAME]´ after a dependency `[NAME]´");
@@ -596,7 +601,7 @@ public class SimpleExportFileParser {
 			return List.of();
 		}
 		List<SimpleVariable> members = add == null ? new ArrayList<>() : add;
-		SimpleType           type    = parseType(scope);
+		SimpleType type = parseType(scope);
 		expectToken(NAME, "expected `[NAME]´ after `[TYPE]´");
 		String name = this.in.consumeDynTokSpecialText();
 		members.add(new SimpleVariable(type, name, null, 0));
@@ -609,13 +614,13 @@ public class SimpleExportFileParser {
 						ctx.setOffendingTokenCach(name(t));
 					}
 					List<String> list;
-					String       msg;
+					String msg;
 					if ( sepBeforeEnd ) {
 						list = List.of(name(sep));
-						msg  = "expected `" + name(sep) + "´ after `[NAMED_TYPE]´";
+						msg = "expected `" + name(sep) + "´ after `[NAMED_TYPE]´";
 					} else {
 						list = List.of(name(sep), name(end));
-						msg  = "expected to end the [NAMED_TYPE_LIST] with `" + name(end)
+						msg = "expected to end the [NAMED_TYPE_LIST] with `" + name(end)
 							+ "´ or seperate two named types with `" + name(sep) + "´";
 					}
 					throw new CompileError(ctx, list, msg);
@@ -643,7 +648,7 @@ public class SimpleExportFileParser {
 	}
 	
 	protected SimpleType parseTypeFuncType0(int t, ErrorContext ctx, SimpleScope scope) {
-		int                  flags   = FuncType.FLAG_FUNC_ADDRESS;
+		int flags = FuncType.FLAG_FUNC_ADDRESS;
 		List<SimpleVariable> results = List.of();
 		switch ( t ) {
 		case NOPAD:
@@ -692,9 +697,9 @@ public class SimpleExportFileParser {
 			expectToken(NAME, "expected `[NAME]´ after `func exp´");
 			flags = FuncType.FLAG_EXPORT;
 		}
-		String       name = this.in.consumeDynTokSpecialText();
-		ErrorContext ctx  = this.in.ctx();
-		SimpleType   type = parseType(sf);
+		String name = this.in.consumeDynTokSpecialText();
+		ErrorContext ctx = this.in.ctx();
+		SimpleType type = parseType(sf);
 		if ( !( type instanceof FuncType ftype ) || ( ftype.flags() & FuncType.FLAG_FUNC_ADDRESS ) == 0 ) {
 			ctx.setOffendingTokenCach(type.toString());
 			throw new CompileError(ctx, "the [TYPE] of a function MUST be a function address type: " + type);

@@ -137,14 +137,22 @@ public record BinaryOpVal(SimpleValue a, BinaryOp op, SimpleValue b, ErrorContex
 	public SimpleType type() {
 		if ( this.op.type == BinaryOpType.CMP ) return NativeType.UBYTE;
 		if ( this.op.type == BinaryOpType.ARR_PNTR_INDEX ) {
-			if ( this.a.type() instanceof PointerType pt ) {
-				return pt.target();
-			}
-			if ( this.a.type() instanceof ArrayType at ) {
-				return at.target();
-			}
-			throw new AssertionError(
+			return switch ( this.a.type() ) {
+			case PointerType pt -> pt.target();
+			case ArrayType at -> at.target();
+			default -> throw new AssertionError(
 				"binary operator array/pointer index, but the first operants type is no array/pointer: " + this);
+			};
+		}
+		if ( this.op.type == BinaryOpType.DEREF_BY_NAME ) {
+			String name = ( (NameVal) this.b ).name();
+			return switch ( this.a.type() ) {
+			case StructType st -> st.member(name, ctx).type();
+			case FuncType ft when ( ft.flags() & FuncType.FLAG_FUNC_ADDRESS ) == 0 ->
+				ft.member(name, ctx, false).type();
+			default -> throw new AssertionError(
+				"binary operator deref by name, but the first operants type is no (function) structure: " + this);
+			};
 		}
 		return this.a.type();
 	}
@@ -152,7 +160,7 @@ public record BinaryOpVal(SimpleValue a, BinaryOp op, SimpleValue b, ErrorContex
 	@Override
 	public void checkAssignable(SimpleType type, ErrorContext ctx) throws CompileError {
 		final SimpleType at = this.a.type();
-		SimpleType       target;
+		SimpleType target;
 		if ( this.op == BinaryOp.DEREF_BY_NAME ) {
 			String name = ( (NameVal) this.b ).name();
 			if ( at instanceof StructType st ) {
@@ -235,12 +243,12 @@ public record BinaryOpVal(SimpleValue a, BinaryOp op, SimpleValue b, ErrorContex
 		case CMP_LE -> "(" + this.a + " <= " + this.b + ")";
 		case CMP_LT -> "(" + this.a + " < " + this.b + ")";
 		case CMP_NEQ -> "(" + this.a + " != " + this.b + ")";
-		case CMP_NAN_EQ -> "( !(" + this.a + " == " + this.b + ") )";
-		case CMP_NAN_GE -> "( !(" + this.a + " >= " + this.b + ") )";
-		case CMP_NAN_GT -> "( !(" + this.a + " > " + this.b + ") )";
-		case CMP_NAN_LE -> "( !(" + this.a + " <= " + this.b + ") )";
-		case CMP_NAN_LT -> "( !(" + this.a + " < " + this.b + ") )";
-		case CMP_NAN_NEQ -> "( !(" + this.a + " != " + this.b + ") )";
+		case CMP_NAN_EQ -> "( !(" + this.a + " != " + this.b + ") )";
+		case CMP_NAN_GE -> "( !(" + this.a + " < " + this.b + ") )";
+		case CMP_NAN_GT -> "( !(" + this.a + " <= " + this.b + ") )";
+		case CMP_NAN_LE -> "( !(" + this.a + " > " + this.b + ") )";
+		case CMP_NAN_LT -> "( !(" + this.a + " >= " + this.b + ") )";
+		case CMP_NAN_NEQ -> "( !(" + this.a + " == " + this.b + ") )";
 		case MATH_ADD -> "(" + this.a + " + " + this.b + ")";
 		case MATH_SUB -> "(" + this.a + " - " + this.b + ")";
 		case MATH_MUL -> "(" + this.a + " * " + this.b + ")";
@@ -308,6 +316,19 @@ public record BinaryOpVal(SimpleValue a, BinaryOp op, SimpleValue b, ErrorContex
 			return fallbackSimplify(sa, sb);
 		}
 		SimpleValue val = switch ( this.op ) {
+		case DEREF_BY_NAME -> {
+			String name = ( (NameVal) sb ).name();
+			long offset = switch ( this.a.type() ) {
+			case StructType st -> st.offset(name);
+			case FuncType t -> t.offset(name);
+			default -> throw new AssertionError(this);
+			};
+			yield switch ( sa ) {
+			case DataVal d when d.deref() -> new DataVal(d, offset, true, type(), this.ctx);
+			case ScalarNumericVal n -> ScalarNumericVal.create(type(), n.value() + offset, this.ctx);
+			default -> null;
+			};
+		}
 		case ARR_PNTR_INDEX -> {
 			if ( sa instanceof DataVal d && sb instanceof ScalarNumericVal n ) {
 				yield new DataVal(d, n.value() * type().size(), true, type(), this.ctx);
@@ -327,7 +348,7 @@ public record BinaryOpVal(SimpleValue a, BinaryOp op, SimpleValue b, ErrorContex
 			if ( sa instanceof ScalarNumericVal na && sb instanceof ScalarNumericVal nb ) {
 				yield ScalarNumericVal.createAllowTruncate(type(), na.value() & nb.value(), this.ctx);
 			}
-			long s    = type().size();
+			long s = type().size();
 			long mask = s == 8L ? -1L : 1L << ( s << 3 );
 			if ( sa instanceof ScalarNumericVal na && na.value() == mask ) {
 				yield ScalarNumericVal.createAllowTruncate(type(), 0L, this.ctx);
@@ -360,27 +381,177 @@ public record BinaryOpVal(SimpleValue a, BinaryOp op, SimpleValue b, ErrorContex
 			}
 			yield null;
 		}
-		case CMP_EQ -> null;
-		case CMP_GE -> null;
-		case CMP_GT -> null;
-		case CMP_LE -> null;
-		case CMP_LT -> null;
-		case CMP_NEQ -> null;
-		case CMP_NAN_EQ -> null;
-		case CMP_NAN_GE -> null;
-		case CMP_NAN_GT -> null;
-		case CMP_NAN_LE -> null;
-		case CMP_NAN_LT -> null;
-		case CMP_NAN_NEQ -> null;
-		case DEREF_BY_NAME -> null;
-		case MATH_ADD -> null;
-		case MATH_DIV -> null;
-		case MATH_MOD -> null;
-		case MATH_MUL -> null;
-		case MATH_SUB -> null;
-		case SHIFT_ARITMETIC_RIGTH -> null;
-		case SHIFT_LEFT -> null;
-		case SHIFT_LOGIC_RIGTH -> null;
+		case CMP_EQ -> {
+			if ( sa instanceof ScalarNumericVal na && sb instanceof ScalarNumericVal nb ) {
+				yield ScalarNumericVal.createAllowTruncate(type(), na.value() == nb.value() ? 1L : 0L, this.ctx);
+			}
+			if ( sa instanceof FPNumericVal na && sb instanceof FPNumericVal nb ) {
+				yield ScalarNumericVal.createAllowTruncate(type(), na.value() == nb.value() ? 1L : 0L, this.ctx);
+			}
+			yield null;
+		}
+		case CMP_GE -> {
+			if ( sa instanceof ScalarNumericVal na && sb instanceof ScalarNumericVal nb ) {
+				yield ScalarNumericVal.createAllowTruncate(type(), na.value() >= nb.value() ? 1L : 0L, this.ctx);
+			}
+			if ( sa instanceof FPNumericVal na && sb instanceof FPNumericVal nb ) {
+				yield ScalarNumericVal.createAllowTruncate(type(), na.value() >= nb.value() ? 1L : 0L, this.ctx);
+			}
+			yield null;
+		}
+		case CMP_GT -> {
+			if ( sa instanceof ScalarNumericVal na && sb instanceof ScalarNumericVal nb ) {
+				yield ScalarNumericVal.createAllowTruncate(type(), na.value() > nb.value() ? 1L : 0L, this.ctx);
+			}
+			if ( sa instanceof FPNumericVal na && sb instanceof FPNumericVal nb ) {
+				yield ScalarNumericVal.createAllowTruncate(type(), na.value() > nb.value() ? 1L : 0L, this.ctx);
+			}
+			yield null;
+		}
+		case CMP_LE -> {
+			if ( sa instanceof ScalarNumericVal na && sb instanceof ScalarNumericVal nb ) {
+				yield ScalarNumericVal.createAllowTruncate(type(), na.value() <= nb.value() ? 1L : 0L, this.ctx);
+			}
+			if ( sa instanceof FPNumericVal na && sb instanceof FPNumericVal nb ) {
+				yield ScalarNumericVal.createAllowTruncate(type(), na.value() <= nb.value() ? 1L : 0L, this.ctx);
+			}
+			yield null;
+		}
+		case CMP_LT -> {
+			if ( sa instanceof ScalarNumericVal na && sb instanceof ScalarNumericVal nb ) {
+				yield ScalarNumericVal.createAllowTruncate(type(), na.value() < nb.value() ? 1L : 0L, this.ctx);
+			}
+			if ( sa instanceof FPNumericVal na && sb instanceof FPNumericVal nb ) {
+				yield ScalarNumericVal.createAllowTruncate(type(), na.value() < nb.value() ? 1L : 0L, this.ctx);
+			}
+			yield null;
+		}
+		case CMP_NEQ -> {
+			if ( sa instanceof ScalarNumericVal na && sb instanceof ScalarNumericVal nb ) {
+				yield ScalarNumericVal.createAllowTruncate(type(), na.value() != nb.value() ? 1L : 0L, this.ctx);
+			}
+			if ( sa instanceof FPNumericVal na && sb instanceof FPNumericVal nb ) {
+				yield ScalarNumericVal.createAllowTruncate(type(), na.value() != nb.value() ? 1L : 0L, this.ctx);
+			}
+			yield null;
+		}
+		case CMP_NAN_EQ -> {
+			if ( sa instanceof ScalarNumericVal na && sb instanceof ScalarNumericVal nb ) {
+				yield ScalarNumericVal.createAllowTruncate(type(), !( na.value() != nb.value() ) ? 1L : 0L, this.ctx);
+			}
+			if ( sa instanceof FPNumericVal na && sb instanceof FPNumericVal nb ) {
+				yield ScalarNumericVal.createAllowTruncate(type(), !( na.value() != nb.value() ) ? 1L : 0L, this.ctx);
+			}
+			yield null;
+		}
+		case CMP_NAN_GE -> {
+			if ( sa instanceof ScalarNumericVal na && sb instanceof ScalarNumericVal nb ) {
+				yield ScalarNumericVal.createAllowTruncate(type(), !( na.value() < nb.value() ) ? 1L : 0L, this.ctx);
+			}
+			if ( sa instanceof FPNumericVal na && sb instanceof FPNumericVal nb ) {
+				yield ScalarNumericVal.createAllowTruncate(type(), !( na.value() < nb.value() ) ? 1L : 0L, this.ctx);
+			}
+			yield null;
+		}
+		case CMP_NAN_GT -> {
+			if ( sa instanceof ScalarNumericVal na && sb instanceof ScalarNumericVal nb ) {
+				yield ScalarNumericVal.createAllowTruncate(type(), !( na.value() <= nb.value() ) ? 1L : 0L, this.ctx);
+			}
+			if ( sa instanceof FPNumericVal na && sb instanceof FPNumericVal nb ) {
+				yield ScalarNumericVal.createAllowTruncate(type(), !( na.value() <= nb.value() ) ? 1L : 0L, this.ctx);
+			}
+			yield null;
+		}
+		case CMP_NAN_LE -> {
+			if ( sa instanceof ScalarNumericVal na && sb instanceof ScalarNumericVal nb ) {
+				yield ScalarNumericVal.createAllowTruncate(type(), !( na.value() > nb.value() ) ? 1L : 0L, this.ctx);
+			}
+			if ( sa instanceof FPNumericVal na && sb instanceof FPNumericVal nb ) {
+				yield ScalarNumericVal.createAllowTruncate(type(), !( na.value() > nb.value() ) ? 1L : 0L, this.ctx);
+			}
+			yield null;
+		}
+		case CMP_NAN_LT -> {
+			if ( sa instanceof ScalarNumericVal na && sb instanceof ScalarNumericVal nb ) {
+				yield ScalarNumericVal.createAllowTruncate(type(), !( na.value() >= nb.value() ) ? 1L : 0L, this.ctx);
+			}
+			if ( sa instanceof FPNumericVal na && sb instanceof FPNumericVal nb ) {
+				yield ScalarNumericVal.createAllowTruncate(type(), !( na.value() >= nb.value() ) ? 1L : 0L, this.ctx);
+			}
+			yield null;
+		}
+		case CMP_NAN_NEQ -> {
+			if ( sa instanceof ScalarNumericVal na && sb instanceof ScalarNumericVal nb ) {
+				yield ScalarNumericVal.createAllowTruncate(type(), !( na.value() == nb.value() ) ? 1L : 0L, this.ctx);
+			}
+			if ( sa instanceof FPNumericVal na && sb instanceof FPNumericVal nb ) {
+				yield ScalarNumericVal.createAllowTruncate(type(), !( na.value() == nb.value() ) ? 1L : 0L, this.ctx);
+			}
+			yield null;
+		}
+		case MATH_ADD -> {
+			if ( sa instanceof ScalarNumericVal na && sb instanceof ScalarNumericVal nb ) {
+				yield ScalarNumericVal.createAllowTruncate(type(), na.value() + nb.value(), this.ctx);
+			}
+			if ( sa instanceof FPNumericVal na && sb instanceof FPNumericVal nb ) {
+				yield FPNumericVal.create(na.type(), na.value() + nb.value(), this.ctx);
+			}
+			yield null;
+		}
+		case MATH_DIV -> {
+			if ( sa instanceof ScalarNumericVal na && sb instanceof ScalarNumericVal nb ) {
+				yield ScalarNumericVal.createAllowTruncate(type(), na.value() / nb.value(), this.ctx);
+			}
+			if ( sa instanceof FPNumericVal na && sb instanceof FPNumericVal nb ) {
+				yield FPNumericVal.create(na.type(), na.value() / nb.value(), this.ctx);
+			}
+			yield null;
+		}
+		case MATH_MOD -> {
+			if ( sa instanceof ScalarNumericVal na && sb instanceof ScalarNumericVal nb ) {
+				yield ScalarNumericVal.createAllowTruncate(type(), na.value() % nb.value(), this.ctx);
+			}
+			if ( sa instanceof FPNumericVal na && sb instanceof FPNumericVal nb ) {
+				yield FPNumericVal.create(na.type(), na.value() % nb.value(), this.ctx);
+			}
+			yield null;
+		}
+		case MATH_MUL -> {
+			if ( sa instanceof ScalarNumericVal na && sb instanceof ScalarNumericVal nb ) {
+				yield ScalarNumericVal.createAllowTruncate(type(), na.value() * nb.value(), this.ctx);
+			}
+			if ( sa instanceof FPNumericVal na && sb instanceof FPNumericVal nb ) {
+				yield FPNumericVal.create(na.type(), na.value() * nb.value(), this.ctx);
+			}
+			yield null;
+		}
+		case MATH_SUB -> {
+			if ( sa instanceof ScalarNumericVal na && sb instanceof ScalarNumericVal nb ) {
+				yield ScalarNumericVal.createAllowTruncate(type(), na.value() - nb.value(), this.ctx);
+			}
+			if ( sa instanceof FPNumericVal na && sb instanceof FPNumericVal nb ) {
+				yield FPNumericVal.create(na.type(), na.value() - nb.value(), this.ctx);
+			}
+			yield null;
+		}
+		case SHIFT_LEFT -> {
+			if ( sa instanceof ScalarNumericVal na && sb instanceof ScalarNumericVal nb ) {
+				yield ScalarNumericVal.createAllowTruncate(type(), na.value() << nb.value(), this.ctx);
+			}
+			yield null;
+		}
+		case SHIFT_ARITMETIC_RIGTH -> {
+			if ( sa instanceof ScalarNumericVal na && sb instanceof ScalarNumericVal nb ) {
+				yield ScalarNumericVal.createAllowTruncate(type(), na.value() >> nb.value(), this.ctx);
+			}
+			yield null;
+		}
+		case SHIFT_LOGIC_RIGTH -> {
+			if ( sa instanceof ScalarNumericVal na && sb instanceof ScalarNumericVal nb ) {
+				yield ScalarNumericVal.createAllowTruncate(type(), na.value() >>> nb.value(), this.ctx);
+			}
+			yield null;
+		}
 		};
 		if ( val != null ) return val;
 		return fallbackSimplify(sa, sb);

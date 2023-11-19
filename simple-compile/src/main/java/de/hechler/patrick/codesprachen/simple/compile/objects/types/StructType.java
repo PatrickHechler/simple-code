@@ -58,11 +58,11 @@ public record StructType(List<SimpleVariable> members, int flags) implements Sim
 	
 	static long size(List<SimpleVariable> members, int flags) {
 		if ( members.isEmpty() ) return 0L;
-		long mySize     = members.get(0).type().size();
-		int  totalAlign = members.get(0).type().align();
+		long mySize = members.get(0).type().size();
+		int totalAlign = members.get(0).type().align();
 		for (int i = 1, s = members.size(); i < s; i++) {
-			SimpleType t     = members.get(i).type();
-			long       tsize = t.size();
+			SimpleType t = members.get(i).type();
+			long tsize = t.size();
 			if ( ( flags & FLAG_NOPAD ) == 0 ) {
 				int talign = t.align();
 				if ( talign > totalAlign ) {
@@ -151,8 +151,8 @@ public record StructType(List<SimpleVariable> members, int flags) implements Sim
 	
 	@Override
 	public int hashCode() {
-		final int prime  = 31;
-		int       result = 1;
+		final int prime = 31;
+		int result = 1;
 		result = prime * result + this.flags;
 		return hashCode(result, this.members);
 	}
@@ -198,6 +198,24 @@ public record StructType(List<SimpleVariable> members, int flags) implements Sim
 		}
 		throw new CompileError(ctx,
 			"the structure has no member with the given name! name: " + name + " " + toStringSingleLine());
+	}
+	
+	public long offset(String name) {
+		long off = 0L;
+		for (SimpleVariable sv : this.members) {
+			if ( ( flags & FLAG_NOPAD ) == 0 ) {
+				int alignment = sv.type().align();
+				int missAlign = (int) ( off % alignment );
+				if ( missAlign != 0 ) {
+					off += alignment - missAlign;
+				}
+			}
+			if ( name.equals(sv.name()) ) {
+				return off;
+			}
+			off += sv.type().size();
+		}
+		throw new AssertionError("could not find the member with name '" + name + "'");
 	}
 	
 }

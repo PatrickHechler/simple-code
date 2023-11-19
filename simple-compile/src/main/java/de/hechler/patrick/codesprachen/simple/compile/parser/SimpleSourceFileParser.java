@@ -30,12 +30,12 @@ import de.hechler.patrick.codesprachen.simple.compile.objects.value.SimpleValue;
 
 public class SimpleSourceFileParser extends SimpleExportFileParser {
 	
-	public SimpleSourceFileParser(InputStream in, String file, BiFunction<String, String, SimpleDependency> dep) {
+	public SimpleSourceFileParser(InputStream in, String file, BiFunction<String,String,SimpleDependency> dep) {
 		super(in, file, dep);
 		
 	}
 	
-	public SimpleSourceFileParser(SimpleTokenStream in, BiFunction<String, String, SimpleDependency> dep) {
+	public SimpleSourceFileParser(SimpleTokenStream in, BiFunction<String,String,SimpleDependency> dep) {
 		super(in, dep);
 	}
 	
@@ -44,7 +44,7 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 	}
 	
 	@Override
-	@SuppressWarnings("unused")
+	@SuppressWarnings( "unused" )
 	public SimpleDependency parse(String runtimePath, boolean isMeDep) {
 		throw new UnsupportedOperationException("parse(String,boolean)");
 	}
@@ -85,9 +85,9 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 			expectToken(NAME, "expected `[NAME]´ after `func exp´");
 			flags = FuncType.FLAG_EXPORT;
 		}
-		String       name = this.in.consumeDynTokSpecialText();
-		ErrorContext ctx  = this.in.ctx();
-		SimpleType   type = parseType(sf);
+		String name = this.in.consumeDynTokSpecialText();
+		ErrorContext ctx = this.in.ctx();
+		SimpleType type = parseType(sf);
 		if ( !( type instanceof FuncType ftype ) || ( ftype.flags() & FuncType.FLAG_FUNC_ADDRESS ) == 0 ) {
 			ctx.setOffendingTokenCach(type.toString());
 			throw new CompileError(ctx, "the [TYPE] of a function MUST be a function address type: " + type);
@@ -95,8 +95,8 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 		if ( flags != 0 ) {
 			ftype = FuncType.create(ftype.resMembers(), ftype.argMembers(), flags, ctx);
 		}
-		BlockCmd       block = new BlockCmd(SimpleScope.newFuncScope(sf, ftype, ctx));
-		SimpleFunction func  = new SimpleFunction(name, ftype, block);
+		BlockCmd block = new BlockCmd(SimpleScope.newFuncScope(sf, ftype, ctx));
+		SimpleFunction func = new SimpleFunction(name, ftype, block);
 		sf.function(func, ctx);
 		parseCmdBlock(block);
 	}
@@ -130,8 +130,6 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 		};
 	}
 	
-	protected record ValueOrType(SimpleValue value, SimpleType type) {}
-	
 	protected Object parseValueOrType(SimpleScope scope) {
 		switch ( this.in.tok() ) {
 		case NUM, UNUM, FPNUM, FPDWORD, DWORD, UDWORD, WORD, UWORD, BYTE, UBYTE, STRUCT, FSTRUCT, FUNC, NOPAD, LT:
@@ -139,50 +137,72 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 		case STRING, CHARACTER, NUMBER, PLUS, MINUS, BIT_AND, BIT_NOT, BOOL_AND:
 			return parseValue(scope);
 		case SMALL_OPEN: {
-			ErrorContext ctx = this.in.ctx();
 			this.in.consume();
 			if ( this.in.tok() == SMALL_CLOSE ) {
-				return FuncType.create(List.of(), List.of(), FuncType.FLAG_FUNC_ADDRESS, ctx);
+				return FuncType.create(List.of(), List.of(), FuncType.FLAG_FUNC_ADDRESS, this.in.ctx());
 			}
 			SimpleType type0 = parseType(scope);
 			if ( this.in.tok() != NAME ) {
-				SimpleValue unaryVal = parseValueUnaryExp(ctx, scope, 0, null);
-				SimpleValue castVal  = CastVal.create(unaryVal, type0, ctx);
+				SimpleValue unaryVal = parseValueUnaryExp(scope, 0, null);
+				SimpleValue castVal = CastVal.create(unaryVal, type0, this.in.ctx());
 				return parseValue(scope, CAST_MAGIC, castVal);
 			}
-			String               name = this.in.consumeDynTokSpecialText();
+			String name = this.in.consumeDynTokSpecialText();
 			List<SimpleVariable> list = new ArrayList<>();
 			list.add(new SimpleVariable(type0, name, null, 0));
 			int t = this.in.consumeTok();
 			switch ( t ) {
 			case COMMA:
 				if ( parseNamedTypeList(SMALL_CLOSE, COMMA, false, scope, list).isEmpty() ) {
-					throw new CompileError(ctx, List.of("[TYPE]"),
+					throw new CompileError(this.in.ctx(), List.of("[TYPE]"),
 						"expected `[TYPE] [NAME] (, [TYPE] [NAME])* \\)´ after `[TYPE] [NAME] ,´");
 				}
 				//$FALL-THROUGH$
 			case SMALL_CLOSE:
 				break;
 			default:
-				throw new CompileError(ctx, List.of("[TYPE]", ")"), "expected `[TYPE] | \\)´ after `[TYPE] [NAME]´");
+				throw new CompileError(this.in.ctx(), List.of("[TYPE]", ")"),
+					"expected `[TYPE] | \\)´ after `[TYPE] [NAME]´");
 			}
-			return FuncType.create(List.of(), list, FuncType.FLAG_FUNC_ADDRESS, ctx);
+			return FuncType.create(List.of(), list, FuncType.FLAG_FUNC_ADDRESS, this.in.ctx());
 		}
 		case NAME: {
-			ErrorContext ctx = this.in.ctx();
-			String name = this.in.consumeDynTokSpecialText();
-			Object typeOrDep = scope.nameTypeOrDepOrFuncOrNull(name, ctx);
-			SimpleValue valOrDep = scope.nameValueOrNull(name, ctx);
-			// TODO
+			while ( true ) {
+				String name = this.in.consumeDynTokSpecialText();
+				Object typeOrDep = scope.nameTypeOrDepOrFuncOrNull(name, this.in.ctx());
+				switch ( typeOrDep ) {
+				case SimpleDependency dep -> {
+					scope = dep;
+					consumeToken(COLON, "expected `: [NAME]´ after the `[NAME]´ of a dependency");
+					expectToken(NAME, "expected `[NAME]´ after `[NAME] :´ where the [NAME] is of a dependency");
+					continue;
+				}
+				case SimpleType type -> {
+					return type;
+				}
+				case null, default -> {
+					SimpleValue value = scope.nameValueOrErr(name, this.in.ctx());
+					// Technically this is no direct expression after the first iteration
+					// but the start (or complete) post-fix expression
+					return parseValue(scope, DIRECT_MAGIC, value);
+				}
+				}
+			}
 		}
-		// TODO
+		default:
+			throw new CompileError(this.in.ctx(),
+				List.of(name(NUM), name(UNUM), name(FPNUM), name(FPDWORD), name(DWORD), name(UDWORD), name(WORD),
+					name(UWORD), name(BYTE), name(UBYTE), name(STRUCT), name(FSTRUCT), name(FUNC), name(NOPAD),
+					name(LT), name(STRING), name(CHARACTER), name(NUMBER), name(PLUS), name(MINUS), name(BIT_AND),
+					name(BIT_NOT), name(BOOL_AND), name(SMALL_OPEN), name(NAME)),
+				"expected a `[TYPE]´ or a `[VALUE]´");
 		}
 	}
 	
 	private SimpleCommand parseCmdDefault(SimpleScope scope) {
-		SimpleValue       val0    = parseValue(scope);
+		SimpleValue val0 = parseValue(scope);
 		List<SimpleValue> results = null;
-		int               t       = this.in.consumeTok();
+		int t = this.in.consumeTok();
 		switch ( t ) {
 		case LARROW: {
 			SimpleValue val1 = parseValue(scope);
@@ -218,7 +238,7 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 	private SimpleCommand parseCmdVarDecl(SimpleScope scope, int flags) {
 		SimpleType type = parseType(scope);
 		expectToken(NAME, "expected `[NAME]´ after `( const | var ) [TYPE]´");
-		String      name       = this.in.consumeDynTokSpecialText();
+		String name = this.in.consumeDynTokSpecialText();
 		SimpleValue initialVal = null;
 		if ( flags != 0 ) { // the Constant flag is the only one permitted in this context
 			assert flags == SimpleVariable.FLAG_CONSTANT;
@@ -249,8 +269,8 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 		}
 		expectToken(ASM_BLOCK,
 			"expected `[ASM_BLOCK]´ after `asm ( [STRING] <-- [VALUE] ( , [STRING] <-- [VALUE] )* )?´");
-		String                 asmBlock = this.in.consumeDynTokSpecialText();
-		List<AsmCmd.AsmResult> results  = null;
+		String asmBlock = this.in.consumeDynTokSpecialText();
+		List<AsmCmd.AsmResult> results = null;
 		if ( this.in.tok() != SEMI ) {
 			results = new ArrayList<>();
 			while ( true ) {
@@ -273,7 +293,7 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 		consumeToken(SMALL_OPEN, "expected `(´ after `if´");
 		SimpleValue cond = parseValue(scope);
 		consumeToken(SMALL_CLOSE, "expected `)´ after `if ( [VALUE]´");
-		SimpleCommand cmd     = parseCommand(scope);
+		SimpleCommand cmd = parseCommand(scope);
 		SimpleCommand elseCmd = null;
 		if ( this.in.tok() == ELSE ) {
 			this.in.consume();
@@ -292,7 +312,7 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 	}
 	
 	private SimpleCommand parseCmdCallFStruct(SimpleScope scope) {
-		SimpleValue func   = super.parseValue(scope);
+		SimpleValue func = super.parseValue(scope);
 		SimpleValue fstuct = super.parseValue(scope);
 		consumeToken(SEMI, "expected `;´ after `call [VALUE] [VALUE]´");
 		return StructFuncCallCmd.create(scope, func, fstuct, this.in.ctx());

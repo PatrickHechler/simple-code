@@ -150,8 +150,8 @@ public record FuncType(List<SimpleVariable> resMembers, List<SimpleVariable> arg
 	
 	@Override
 	public int hashCode() {
-		final int prime  = 31;
-		int       result = 1;
+		final int prime = 31;
+		int result = 1;
 		result = prime * result + this.flags;
 		result = StructType.hashCode(result, this.argMembers);
 		result = StructType.hashCode(result, this.resMembers);
@@ -191,6 +191,41 @@ public record FuncType(List<SimpleVariable> resMembers, List<SimpleVariable> arg
 		}
 		throw new CompileError(ctx,
 			"the structure has no member with the given name! name: " + name + " " + toStringSingleLine());
+	}
+	
+	public long offset(String name) {
+		if ( ( this.flags & FLAG_FUNC_ADDRESS ) != 0 ) {
+			throw new AssertionError("offset() called on a function address is no structure!");
+		}
+		long off = 0L;
+		for (SimpleVariable sv : this.argMembers) {
+			if ( ( flags & FLAG_NOPAD ) == 0 ) {
+				int alignment = sv.type().align();
+				int missAlign = (int) ( off % alignment );
+				if ( missAlign != 0 ) {
+					off += alignment - missAlign;
+				}
+			}
+			if ( name.equals(sv.name()) ) {
+				return off;
+			}
+			off += sv.type().size();
+		}
+		off = 0L;
+		for (SimpleVariable sv : this.resMembers) {
+			if ( ( flags & FLAG_NOPAD ) == 0 ) {
+				int alignment = sv.type().align();
+				int missAlign = (int) ( off % alignment );
+				if ( missAlign != 0 ) {
+					off += alignment - missAlign;
+				}
+			}
+			if ( name.equals(sv.name()) ) {
+				return off;
+			}
+			off += sv.type().size();
+		}
+		throw new AssertionError("could not find the member with name '" + name + "'");
 	}
 	
 	public void checkHasMember(String name, ErrorContext ctx, boolean allowFuncAddr) {
