@@ -47,6 +47,7 @@ public class BlockCmd extends SimpleCommand {
 	}
 	
 	@Override
+	@SuppressWarnings("unused")
 	public SimpleValue directNameValueOrNull(String name, ErrorContext ctx) {
 		return null;
 	}
@@ -77,6 +78,7 @@ public class BlockCmd extends SimpleCommand {
 	}
 	
 	@Override
+	@SuppressWarnings("unused")
 	public SimpleValue nameValueOrNull(String name, ErrorContext ctx) {
 		throw new AssertionError("nameValue(String,ErrCtx) called on BlockCmd (there should be [BLOCK]:[NAME])!");
 	}
@@ -90,7 +92,9 @@ public class BlockCmd extends SimpleCommand {
 		append.append("{\n");
 		indent.append("    ");
 		for (SimpleCommand c : cmds) {
-			append.append(indent).append(c).append('\n');
+			append.append(indent);
+			c.toString(append, indent);
+			append.append('\n');
 		}
 		indent.replace(indent.length() - 4, indent.length(), "");
 		append.append(indent).append('}');

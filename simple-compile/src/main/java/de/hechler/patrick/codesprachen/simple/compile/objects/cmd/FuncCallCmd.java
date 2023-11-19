@@ -68,23 +68,24 @@ public class FuncCallCmd extends SimpleCommand {
 	}
 	
 	@Override
-	public SimpleValue directNameValueOrNull(String name, ErrorContext ctx) {
+	public SimpleValue directNameValueOrNull(@SuppressWarnings("unused") String name,
+		@SuppressWarnings("unused") ErrorContext ctx) {
 		return null;
 	}
 	
 	@Override
-	public void toString(StringBuilder append, StringBuilder indent) {
+	public void toString(StringBuilder append, @SuppressWarnings("unused") StringBuilder indent) {
 		append.append(this.func).append(" <");
 		append(append, this.results);
 		append.append("> <-- (");
-		append(append, this.results);
+		append(append, this.arguments);
 		append.append(");");
 	}
 	
 	private static void append(StringBuilder append, List<SimpleValue> list) {
 		if ( list.isEmpty() ) return;
 		append.append(list.get(0));
-		for (int i = 0, s = list.size(); i < s; i++) {
+		for (int i = 1, s = list.size(); i < s; i++) {
 			append.append(", ").append(list.get(i));
 		}
 	}

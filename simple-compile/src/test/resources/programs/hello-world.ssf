@@ -21,9 +21,9 @@ func puts <unum wrote, unum errno> <-- (char# string) {
 }
 
 // this function prints hello world and exits with 0 if the print was successful
-func main <ubyte exitnum> <-- (num argc, char## argv) {
+func main <ubyte exitnum> <-- (unum argc, char## argv) {
     unum wrote;
     unum err;
     call puts <wrote, err> <-- ("hello world\n");
-    exitnum <-- errno != 0;
+    exitnum <-- err != 0;
 }

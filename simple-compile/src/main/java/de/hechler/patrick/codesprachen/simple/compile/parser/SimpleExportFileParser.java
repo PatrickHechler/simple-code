@@ -336,10 +336,7 @@ public class SimpleExportFileParser {
 		case BIT_AND -> op = UnaryOp.ADDRESS_OF;
 		case BIT_NOT -> op = UnaryOp.BIT_NOT;
 		case BOOL_NOT -> op = UnaryOp.BOOL_NOT;
-		default -> op = null;
-		}
-		if ( op == null ) {
-			return parseValuePostfixExp(scope, 0, null);
+		default -> { return parseValuePostfixExp(scope, 0, null); }
 		}
 		SimpleValue a = parseValuePostfixExp(scope, 0, null);
 		return UnaryOpVal.create(op, a, this.in.ctx());

@@ -65,7 +65,7 @@ public class SimpleFile extends SimpleDependency {
 	}
 	
 	@Override
-	public Object nameTypeOrDepOrFuncOrNull(String name, @SuppressWarnings( "unused" ) ErrorContext ctx) {
+	public Object nameTypeOrDepOrFuncOrNull(String name, @SuppressWarnings("unused") ErrorContext ctx) {
 		SimpleTypedef t = this.typedefs.get(name);
 		if ( t != null ) return t.type();
 		SimpleDependency d = this.dependencies.get(name);
@@ -96,15 +96,27 @@ public class SimpleFile extends SimpleDependency {
 		int flags = func.type().flags();
 		if ( ( flags & FuncType.FLAG_INIT ) != 0 ) {
 			if ( this.init != null ) {
+				ctx.setOffendingTokenCach("");
 				throw new CompileError(ctx,
 					"there is already a function marked with init: " + this.init + " second init: " + func);
+			}
+			if ( !func.type().equalsIgnoreNonStructuralFlags(FuncType.INIT_TYPE) ) {
+				ctx.setOffendingTokenCach("");
+				throw new CompileError(ctx, "a function marked with `init´ must be of type: " + FuncType.INIT_TYPE
+					+ " but the function has the type: " + func.type());
 			}
 			this.init = func;
 		}
 		if ( ( flags & FuncType.FLAG_MAIN ) != 0 ) {
 			if ( this.main != null ) {
+				ctx.setOffendingTokenCach("");
 				throw new CompileError(ctx,
 					"there is already a function marked with main: " + this.main + " second main: " + func);
+			}
+			if ( !func.type().equalsIgnoreNonStructuralFlags(FuncType.MAIN_TYPE) ) {
+				ctx.setOffendingTokenCach("");
+				throw new CompileError(ctx, "a function marked with `main´ must be of type: " + FuncType.MAIN_TYPE
+					+ " but the function has the type: " + func.type());
 			}
 			this.main = func;
 		}
@@ -158,6 +170,7 @@ public class SimpleFile extends SimpleDependency {
 			}
 			b.append(";\n");
 		}
+		StringBuilder indent = new StringBuilder();
 		for (SimpleFunction sf : this.functions.values()) {
 			b.append("func ");
 			if ( ( sf.type().flags() & FuncType.FLAG_EXPORT ) != 0 ) {
@@ -174,7 +187,9 @@ public class SimpleFile extends SimpleDependency {
 			}
 			sf.type().toStringNoFlags("", b);
 			if ( sf.block() != null ) {
-				b.append(' ').append(sf.block()).append('\n');
+				b.append(' ');
+				sf.block().toString(b, indent);
+				b.append('\n');
 			} else {
 				b.append(";\n");
 			}

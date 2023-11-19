@@ -70,7 +70,7 @@ public class CompileError extends RuntimeException {
 		if ( additionalMessage != null && !additionalMessage.isEmpty() ) {
 			b.append(": ").append(additionalMessage);
 		}
-		if ( offendingToken != null ) {
+		if ( offendingToken != null && !offendingToken.isEmpty() ) {
 			b.append(": got '").append(offendingToken).append('\'');
 			if ( expectedTokens != null && !expectedTokens.isEmpty() ) {
 				b.append(',');

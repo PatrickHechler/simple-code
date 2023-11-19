@@ -176,10 +176,11 @@ public record StructType(List<SimpleVariable> members, int flags) implements Sim
 	}
 	
 	static boolean equals(List<SimpleVariable> mm, List<SimpleVariable> om) {
+		if (mm == om) return true;
 		int s = mm.size();
 		if ( s != om.size() ) return false;
 		for (int i = s; --i >= 0;) {
-			if ( mm.get(i).type().equals(om.get(i).type()) ) {
+			if ( !mm.get(i).type().equals(om.get(i).type()) ) {
 				return false;
 			}
 		}

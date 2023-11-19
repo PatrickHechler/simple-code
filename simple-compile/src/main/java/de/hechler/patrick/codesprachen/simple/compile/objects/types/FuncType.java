@@ -42,13 +42,15 @@ public record FuncType(List<SimpleVariable> resMembers, List<SimpleVariable> arg
 		}
 	}
 	
-	public static final FuncType MAIN_TYPE = create(List.of(//
-		new SimpleVariable(NativeType.UNUM, "argc", null, 0), //
-		new SimpleVariable(PointerType.create(PointerType.create(NativeType.UBYTE, NO_CONTEXT), NO_CONTEXT), "argv",
-			null, 0)//
-	), List.of(new SimpleVariable(NativeType.UBYTE, "exitnum", null, 0)), FLAG_MAIN, NO_CONTEXT);
-	
-	public static final FuncType INIT_TYPE = create(List.of(), List.of(), FLAG_INIT, NO_CONTEXT);
+	public static final FuncType MAIN_TYPE = create(List.of(new SimpleVariable(NativeType.UBYTE, "exitnum", null, 0)),
+		List.of(//
+			new SimpleVariable(NativeType.UNUM, "argc", null, 0), //
+			new SimpleVariable( //
+				PointerType.create(PointerType.create(NativeType.UBYTE, NO_CONTEXT), NO_CONTEXT), //
+				"argv", null, 0)//
+		), FLAG_MAIN | FLAG_FUNC_ADDRESS, NO_CONTEXT);
+		
+	public static final FuncType INIT_TYPE = create(List.of(), List.of(), FLAG_INIT | FLAG_FUNC_ADDRESS, NO_CONTEXT);
 	
 	public static FuncType create(List<SimpleVariable> resMembers, List<SimpleVariable> argMembers, int flags,
 		ErrorContext ctx) {
@@ -249,7 +251,6 @@ public record FuncType(List<SimpleVariable> resMembers, List<SimpleVariable> arg
 	}
 	
 	public boolean isInvokableBy(Object obj) {
-		if ( this == obj ) return true;
 		if ( obj == null ) return false;
 		if ( getClass() != obj.getClass() ) return false;
 		FuncType other = (FuncType) obj;
