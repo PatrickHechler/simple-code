@@ -156,7 +156,7 @@ if marked with `const` there must be a constant initial value
 * FUNC_CALL
     * `call [SHIFT_EXP] [FUNC_CALL_RESULT] [FUNC_CALL_ARGS] ;`
         * FUNC_CALL_RESULT
-            * `( ( < ( [VALUE] ( , [VALUE] )* )? > ) <-- )?`
+            * `( ( < ( ( [VALUE] | \? ) ( , ( [VALUE] | \? ) )* )? > ) <-- )?`
         * FUNC_CALL_ARGS
             * `\( ([VALUE] ( , [VALUE] )* )? \)`
 * FUNC_CALL_WITH_FUNCTION_STRUCTURE

@@ -140,7 +140,7 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 			yield cmd;
 		}
 		case CONST -> parseCmdConstDecl(scope);
-		case CALL -> parseCmdCallFStruct(scope);
+		case CALL -> parseCmdCall(scope);
 		case WHILE -> parseCmdWhile(scope);
 		case IF -> parseCmdIf(scope);
 		case ASM -> parseCmdAsm(scope);
@@ -220,41 +220,10 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 	private SimpleCommand parseCmdDefault(SimpleScope scope) {
 		Object obj = parseValueOrType(scope);
 		if ( obj instanceof SimpleValue val0 ) {
-			List<SimpleValue> results = null;
-			int t = this.in.consumeTok();
-			switch ( t ) {
-			case LARROW: {
-				SimpleValue val1 = parseValue(scope);
-				consumeToken(SEMI, "expected `;´ after `[VALUE] <-- [VALUE]´");
-				return AssignCmd.create(scope, val0, val1, this.in.ctx());
-			}
-			case LT:
-				if ( this.in.tok() != GT ) {
-					results = parseCommaSepValues(scope);
-				}
-				consumeToken(GT,
-					"expected `> <-- \\( ( [VALUE] ( , [VALUE] )* )? \\)´ after `call < ( [VALUE] ( , [VALUE] )* )?´");
-				consumeToken(LARROW,
-					"expected `<-- \\( ( [VALUE] ( , [VALUE] )* )? \\)´ after `call [FUNC_CALL_RESULT]´");
-				consumeToken(SMALL_OPEN,
-					"expected `\\( ( [VALUE] ( , [VALUE] )* )? \\)´ after `call [FUNC_CALL_RESULT] <--´");
-				//$FALL-THROUGH$
-			case SMALL_OPEN:
-				List<SimpleValue> args = List.of();
-				if ( this.in.tok() != SMALL_CLOSE ) {
-					args = parseCommaSepValues(scope);
-				}
-				consumeToken(SMALL_CLOSE,
-					"expected `\\)´ after `call ( [FUNC_CALL_RESULT] <-- )? \\( ( [VALUE] ( , [VALUE] )* )?´");
-				consumeToken(SEMI, "expected `;´ after `call [VALUE]  ( [FUNC_CALL_RESULT] <-- )? [FUNC_CALL_ARGS]´");
-				return FuncCallCmd.create(scope, val0, results, args, this.in.ctx());
-			default:
-				ErrorContext ctx = this.in.ctx();
-				ctx.setOffendingTokenCach(name(t));
-				throw new CompileError(ctx, List.of(name(LARROW), name(LT), name(SMALL_OPEN)),
-					"expected `<-- [VALUE] ; | ( < [NAMED_TYPE_LIST] > <-- )? \\( [NAMED_TYPE_LIST] \\) after the value "
-						+ val0);
-			}
+			consumeToken(LARROW, "expected `<-- [VALUE] ;´ after `[VALUE]´");
+			SimpleValue val1 = parseValue(scope);
+			consumeToken(SEMI, "expected `;´ after `[VALUE] <-- [VALUE]´");
+			return AssignCmd.create(scope, val0, val1, this.in.ctx());
 		}
 		SimpleType type = (SimpleType) obj;
 		return parseCmdVarDecl0(scope, 0, type);
@@ -340,17 +309,39 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 		return WhileCmd.create(scope, cond, cmd, this.in.ctx());
 	}
 	
-	private SimpleCommand parseCmdCallFStruct(SimpleScope scope) {
-		SimpleValue func = super.parseValue(scope);
-		SimpleValue fstuct = super.parseValue(scope);
-		consumeToken(SEMI, "expected `;´ after `call [VALUE] [VALUE]´");
-		return StructFuncCallCmd.create(scope, func, fstuct, this.in.ctx());
+	private SimpleCommand parseCmdCall(SimpleScope scope) {
+		SimpleValue func = super.parseValueShiftExp(scope, 0, null);
+		if ( this.in.tok() != LT && this.in.tok() != SMALL_OPEN ) {
+			SimpleValue fstuct = super.parseValue(scope);
+			consumeToken(SEMI, "expected `;´ after `call [VALUE] [VALUE]´");
+			return StructFuncCallCmd.create(scope, func, fstuct, this.in.ctx());
+		}
+		List<SimpleValue> results = List.of();
+		if ( this.in.consumeTok() == LT ) {
+			if ( this.in.tok() != GT ) {
+				results = parseCommaSepValues(scope, true);
+			}
+			consumeToken(GT,
+				"expected `> <-- \\( ( [VALUE] ( , [VALUE] )* )? \\)´ after `call < ( [VALUE] ( , [VALUE] )* )?´");
+			consumeToken(LARROW, "expected `<-- \\( ( [VALUE] ( , [VALUE] )* )? \\)´ after `call [FUNC_CALL_RESULT]´");
+			consumeToken(SMALL_OPEN,
+				"expected `\\( ( [VALUE] ( , [VALUE] )* )? \\)´ after `call [FUNC_CALL_RESULT] <--´");
+		}
+		List<SimpleValue> args = List.of();
+		if ( this.in.tok() != SMALL_CLOSE ) {
+			args = parseCommaSepValues(scope, false);
+		}
+		consumeToken(SMALL_CLOSE,
+			"expected `\\)´ after `call ( [FUNC_CALL_RESULT] <-- )? \\( ( [VALUE] ( , [VALUE] )* )?´");
+		consumeToken(SEMI, "expected `;´ after `call [VALUE]  ( [FUNC_CALL_RESULT] <-- )? [FUNC_CALL_ARGS]´");
+		return FuncCallCmd.create(scope, func, results, args, this.in.ctx());
 	}
 	
-	private List<SimpleValue> parseCommaSepValues(SimpleScope scope) {
+	private List<SimpleValue> parseCommaSepValues(SimpleScope scope, boolean allowIgnoreValues) {
 		List<SimpleValue> values = new ArrayList<>();
 		while ( true ) {
-			values.add(parseValue(scope));
+			if ( allowIgnoreValues && this.in.tok() == QUESTION ) values.add(null);
+			else values.add(parseValue(scope));
 			if ( this.in.tok() != COMMA ) return values;
 			this.in.consume();
 		}
