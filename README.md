@@ -156,7 +156,9 @@ if marked with `const` there must be a constant initial value
 * FUNC_CALL
     * `call [SHIFT_EXP] [FUNC_CALL_RESULT] [FUNC_CALL_ARGS] ;`
         * FUNC_CALL_RESULT
-            * `( ( < ( ( [VALUE] | \? ) ( , ( [VALUE] | \? ) )* )? > ) <-- )?`
+            * `( ( < ( [IGNOREABLE_VALUE] ( , [IGNOREABLE_VALUE] )* )? > ) <-- )?`
+            * IGNOREABLE_VALUE
+                * `[VALUE] | \?`
         * FUNC_CALL_ARGS
             * `\( ([VALUE] ( , [VALUE] )* )? \)`
 * FUNC_CALL_WITH_FUNCTION_STRUCTURE
@@ -168,9 +170,15 @@ if marked with `const` there must be a constant initial value
 * IF
     * `if \( [VALUE] \) [COMMAND] ( else [COMMAND] )?`
 * ASSEMBLER
-    * `asm ( [STRING] <-- [VALUE] ( , [STRING] <-- [VALUE] )* )? [ASM_BLOCK] ( [VALUE] <-- [STRING] | [STRING] <-- \? ( , [VALUE] <-- [STRING] | [STRING] <-- \? )* )? ;`
+    * `asm [ASM_PARAMS] [ASM_BLOCK] [ASM_RESULTS] ;`
+        * ASM_PARAMS
+            * `( [STRING] <-- [VALUE] ( , [STRING] <-- [VALUE] )* )?`
         * ASM_BLOCK
             * `::: ( [^>] | > [^>] | >> [^>] )* >>>`
+        * ASM_RESULTS
+            * `( [SINGLE_ASM_RESULT] ( , [SINGLE_ASM_RESULT] )* )?`
+            * SINGLE_ASM_RESULT
+                * `[VALUE] <-- [STRING] | [STRING] <-- \?`
         * each STRING represents a native register or address supported by the assembler
         * the `[STRING] <-- [VALUE]` pairs represent the arguments to be passed to the asm code
         * the `[POSTFIX_EXP] <-- [STRING]` pairs represent the results of the asm code
