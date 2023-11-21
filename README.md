@@ -272,11 +272,23 @@ comments are treated like whitespace, they are allowed everywhere exept in the m
 
 ## std
 
-some functions, variables, constants and structures are predefined
+* some symbols are already defined by the compiler
+* these are from the automatically imported dependency `std`
+* the `std` dependency may be a compile time only dependency.
+    * the `std:sys´ dependency **must** be a compile time only dependency.
+* if `std` has dependencies, which are not used the binary must not rely on these dependencies
+    * the only exception is the `std:sys´ dependency
 
-these are from the automatically imported dependency `std`
+### std:sys
 
-the `std` dependency must be a compile time only dependency, `std` is **not** allowed to also be a runtime dependency.
+this dependency interacts as a low level interface    
+this dependency may define additional symbols not mentioned here
+
+* `func pagesize <unum result> <-- ();`
+    * returns the size of a memory page
+* `func pageshift <unum result> <-- ();`
+    * returns the shift of a memory page
+    * the page shift is defined as the bit count of `pagesize:result - 1` (or `pagesize:result = 1 << pageshift:result`)
 
 ### functions
 

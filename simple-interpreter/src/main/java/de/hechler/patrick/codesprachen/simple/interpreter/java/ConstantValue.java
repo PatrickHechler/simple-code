@@ -7,10 +7,13 @@ import de.hechler.patrick.codesprachen.simple.parser.objects.types.SimpleType;
 public sealed interface ConstantValue {
 	
 	SimpleType type();
-	
+
 	record DataValue(SimpleType type, long address) implements ConstantValue {}
-	
+
 	record ScalarValue(SimpleType type, long value) implements ConstantValue {
+		
+		public static ScalarValue ONE = new ScalarValue(NativeType.UBYTE, 1L);
+		public static ScalarValue ZERO = new ScalarValue(NativeType.UBYTE, 0L);
 		
 		public ScalarValue(SimpleType type, long value) {
 			this.type = type;
@@ -29,20 +32,22 @@ public sealed interface ConstantValue {
 		
 	}
 	
-	record FP64Value(double value) implements ConstantValue {
+	record FPValue(SimpleType type, double value) implements ConstantValue {
 		
-		@Override
-		public SimpleType type() {
-			return NativeType.FPNUM;
+		public FPValue(SimpleType type, double value) {
+			if ( type == NativeType.FPNUM ) {
+				this.type = type;
+				this.value = value;
+				return;
+			}
+			if ( type == NativeType.FPDWORD ) {
+				this.type = type;
+				this.value = (float) value;
+				return;
+			}
+			throw new IllegalArgumentException("illegal type: " + type);
 		}
 		
-	}
-	
-	record FP32Value(float value) implements ConstantValue {
-		@Override
-		public SimpleType type() {
-			return NativeType.FPDWORD;
-		}
 	}
 	
 }
