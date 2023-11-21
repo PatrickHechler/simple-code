@@ -29,12 +29,14 @@ simple-code is a simple programming language.
 * to use a exprted symbol from a dependency use `dependency_name` `:` `import_name`
 * if instead of a dependency name `<ME>` is used:
     * no runtime path is allowed to be specified
-    * the STRING is always interpreted as a simple-export-file
     * the exported symbols can directly be used
+    * it is be possible to define multiple (posssible different) `<ME>` dependencies, as long as these rules are satisfied
     * if at the end of the parsing process there are symbols in the simple-export-file which are not declared in the translation unit the compilation fails
     * if a symbol is declared and a incompatible symbol with the same name can be found in the simple-export-file the compilation fails
         * only the compatibility (and existence) of the symbols is checked, they are not forced to be exported by these rules
         * incompatible means (here): different, but the names and the markings, except for `nopad` are ignored
+            * note that the value is also compared if the symbol is a variable marked with `const`
+            * for example `const num MAX_BUF_LEN <-- 128;` is incompatible to `const num MAX_BUF_LEN <-- 256;`
             * for example `add <num result> <-- (num number_a, num number_b)` is compatible to `exp add <num res> <-- (num a, num b)`, but incompatible to `add <unum result> <-- (unum numberA, unum numberB)`
             * for example `typedef struct { num a; } num_wrapper;` is incompatible to `typedef struct nopad { num a; } num_wrapper;`
 
@@ -68,7 +70,7 @@ a function is a block of commands used to do something for example convert the a
 `func (exp)? [NAME] [TYPE] ;`
 
 * like `[function]`, but there are no `main`/`init` marks allowed and the `[BLOCK]` is replaced by a `;`
-    * `(exp)?` replaces `[FUNC_MARKS_AND_NAME]`, because it allows anonymus functions when marked with `main`/`init`
+    * `[FUNC_MARKS_AND_NAME]` is replaced by `(exp)? [NAME]` replaces, because it allows anonymus functions when marked with `main`/`init`
 
 ### variable
 
@@ -77,7 +79,7 @@ a function is a block of commands used to do something for example convert the a
 a variable can be used by all functions if declared in a file    
 if declared in a code block it can be used by the commands in the block after the declaration    
 if a non constant initial value is assigned and not declared in a code block the initilizing will be done at the start of the `init` function in the order of declaration    
-if a constant initial value is assigned and not declared in a code block the initilizing will be done at compile time    
+if a constant initial value is assigned and not declared in a code block the initilizing may (but does not need to) be done at compile time    
 if marked with `const` there must be a constant initial value    
 * marks:
     * `const`: the variable can not be modified after initialisation

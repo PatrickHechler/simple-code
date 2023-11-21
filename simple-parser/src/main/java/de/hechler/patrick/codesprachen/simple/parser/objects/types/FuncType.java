@@ -206,7 +206,7 @@ public record FuncType(List<SimpleVariable> resMembers, List<SimpleVariable> arg
 		}
 		long off = 0L;
 		for (SimpleVariable sv : this.argMembers) {
-			if ( ( flags & FLAG_NOPAD ) == 0 ) {
+			if ( ( this.flags & FLAG_NOPAD ) == 0 ) {
 				int alignment = sv.type().align();
 				int missAlign = (int) ( off % alignment );
 				if ( missAlign != 0 ) {
@@ -220,7 +220,7 @@ public record FuncType(List<SimpleVariable> resMembers, List<SimpleVariable> arg
 		}
 		off = 0L;
 		for (SimpleVariable sv : this.resMembers) {
-			if ( ( flags & FLAG_NOPAD ) == 0 ) {
+			if ( ( this.flags & FLAG_NOPAD ) == 0 ) {
 				int alignment = sv.type().align();
 				int missAlign = (int) ( off % alignment );
 				if ( missAlign != 0 ) {

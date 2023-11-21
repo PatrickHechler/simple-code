@@ -16,6 +16,8 @@
 //along with this program.  If not, see <https://www.gnu.org/licenses/>.
 package de.hechler.patrick.codesprachen.simple.parser.objects.simplefile;
 
+import java.util.Collection;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -31,12 +33,12 @@ import de.hechler.patrick.codesprachen.simple.parser.objects.value.VariableVal;
 
 public class SimpleFile extends SimpleDependency {
 	
-	private Map<String,SimpleDependency> dependencies;
-	private Map<String,SimpleTypedef>    typedefs;
-	private Map<String,SimpleVariable>   variables;
-	private Map<String,SimpleFunction>   functions;
-	private SimpleFunction               main;
-	private SimpleFunction               init;
+	private Map<String, SimpleDependency> dependencies;
+	private Map<String, SimpleTypedef>    typedefs;
+	private Map<String, SimpleVariable>   variables;
+	private Map<String, SimpleFunction>   functions;
+	private SimpleFunction                main;
+	private SimpleFunction                init;
 	
 	public SimpleFile(String binaryTarget) {
 		super(binaryTarget);
@@ -76,6 +78,10 @@ public class SimpleFile extends SimpleDependency {
 	}
 	
 	public void dependency(SimpleDependency dep, String name, ErrorContext ctx) {
+		if ( name == null ) {
+			// FIXME
+			throw new UnsupportedOperationException("<ME> dependency");
+		}
 		checkDuplicateName(name, ctx);
 		this.dependencies.put(name, dep);
 	}
@@ -153,6 +159,10 @@ public class SimpleFile extends SimpleDependency {
 		return this.variables.get(name);
 	}
 	
+	public Collection<SimpleVariable> allVariables() {
+		return Collections.unmodifiableCollection(this.variables.values());
+	}
+	
 	public SimpleFunction function(String name) {
 		return this.functions.get(name);
 	}
@@ -168,7 +178,7 @@ public class SimpleFile extends SimpleDependency {
 	@Override
 	public String toString() {
 		StringBuilder b = new StringBuilder();
-		for (Entry<String,SimpleDependency> e : this.dependencies.entrySet()) {
+		for (Entry<String, SimpleDependency> e : this.dependencies.entrySet()) {
 			b.append("dep ").append(e.getKey()).append(" [PATH] \"").append(e.getValue().binaryTarget).append("\";\n");
 		}
 		for (SimpleTypedef t : this.typedefs.values()) {

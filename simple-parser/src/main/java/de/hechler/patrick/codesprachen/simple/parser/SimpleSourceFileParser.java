@@ -75,12 +75,12 @@ import de.hechler.patrick.codesprachen.simple.parser.objects.value.SimpleValue;
 
 public class SimpleSourceFileParser extends SimpleExportFileParser {
 	
-	public SimpleSourceFileParser(InputStream in, String file, BiFunction<String,String,SimpleDependency> dep) {
+	public SimpleSourceFileParser(InputStream in, String file, BiFunction<String, String, SimpleDependency> dep) {
 		super(in, file, dep);
 		
 	}
 	
-	public SimpleSourceFileParser(SimpleTokenStream in, BiFunction<String,String,SimpleDependency> dep) {
+	public SimpleSourceFileParser(SimpleTokenStream in, BiFunction<String, String, SimpleDependency> dep) {
 		super(in, dep);
 	}
 	
@@ -112,7 +112,7 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 		String name;
 		if ( this.in.tok() == ME ) {
 			this.in.consume();
-			name = "<ME>";
+			name = null;
 		} else {
 			expectToken(NAME, "expected to get `[NAME] [STRING] ;´ after `dep´");
 			name = this.in.consumeDynTokSpecialText();
