@@ -12,6 +12,15 @@ public class JavaStdLib extends JavaDependency {
 	
 	/**
 	 * <ol>
+	 * <li>end address of first large page
+	 * <ol>
+	 * <li>large data block</li>
+	 * <li>large data block</li>
+	 * <li>table entries (like on normal pages, but with a larger page size)</li>
+	 * <li>end address of the next large page</li>
+	 * <li>start address of this large page</li>
+	 * </ol>
+	 * </li>
 	 * <li>allocated blocks</li>
 	 * <li>allocation table
 	 * <ol>
@@ -33,14 +42,17 @@ public class JavaStdLib extends JavaDependency {
 		super(null);
 		this.si = si;
 		final MemoryManager mem = this.si.memManager();
-		final long bs = blockSize(mem);
+		final long          bs  = mem.pageSize();
+		if ( bs < 32L ) {
+			throw new IllegalArgumentException("page size too small");
+		}
 		final int ws = offSize(bs);
 		this.firstPage = mem.allocate(bs, 0L, 0);
-		final long blockEndOff = bs - 8L;
+		final long blockEndOff   = bs - 8L;
 		final long blockStartOff = blockEndOff - ws;
-		final long blockEndAddr = this.firstPage + blockEndOff;
+		final long blockEndAddr  = this.firstPage + blockEndOff;
 		btSetOffset(mem, blockEndAddr - ws, ws, blockStartOff);
-//		btSetOffset(mem, blockEndAddr - ( ws << 1 ), ws, 0); // the entire block is filled with zero after allocation
+		btSetOffset(mem, blockEndAddr - ( ws << 1 ), ws, 8L);
 	}
 	
 	public long alloc(final long len, final long align) {
@@ -50,205 +62,210 @@ public class JavaStdLib extends JavaDependency {
 		if ( align <= 0L ) {
 			throw new IllegalArgumentException("align <= 0: " + align);
 		}
-		if ( align == 1L ) {
-			return alloc(len);
-		}
 		final long alignM1 = align - 1L;
 		if ( ( align & ( alignM1 ) ) != 0L ) {
 			throw new IllegalArgumentException("align is no power of two: " + align);
 		}
-		final MemoryManager mem = this.si.memManager();
-		final long bs = blockSize(mem);
-		final int ws = offSize(bs);
-		if ( bs - 8L - ws <= len ) {
-			if ( align > 8 || align > mem.pageSize() ) {
-				// TODO
-			}
-			long addr = mem.allocate(len + 8L, 0L, MemoryManager.FLAG_CUSTOM);
-			mem.set64(addr, len);
-			return addr + 8L;
+		final MemoryManager mem      = this.si.memManager();
+		final long          pageSize = mem.pageSize();
+		final int           offSize  = offSize(pageSize);
+		if ( pageSize - 8L - offSize <= len ) {
+			return largeAlloc(len, align);
 		}
 		long blockAddr = this.firstPage;
 		while ( true ) {
-			final long tableEndAddr = blockAddr + bs - 8L;
-			final long tableStartOffset = btGetOffset(mem, tableEndAddr - ws, ws);
-			final long tableStartAddr = blockAddr + tableStartOffset;
+			final long tableEndAddr     = blockAddr + pageSize - 8L;
+			final long tableStartOffset = btGetOffset(mem, tableEndAddr - offSize, offSize);
+			final long tableStartAddr   = blockAddr + tableStartOffset;
 			if ( tableEndAddr != tableStartAddr ) {
-				long lastEntryEnd = btGetOffset(mem, tableEndAddr - ( ws << 1 ), ws);
-				if ( tableStartOffset - lastEntryEnd < ws ) {
-					blockAddr = nextPage(mem, bs, ws, blockAddr, tableEndAddr);
+				long lastEntryEnd = btGetOffset(mem, tableEndAddr - ( offSize << 1 ), offSize);
+				if ( tableStartOffset - lastEntryEnd < offSize ) {
+					blockAddr = nextPage(mem, pageSize, offSize, blockAddr);
 					continue;
 				}
 			}
-			long addr = tableEndAddr - ws;
-			while ( true ) {
-				long startAddr = blockAddr + btGetOffset(mem, addr, ws);
-				addr -= ws;
-				long prevEndAddr;
-				if ( addr < tableStartAddr ) {
-					prevEndAddr = blockAddr;
-				} else {
-					prevEndAddr = btGetOffset(mem, addr, ws);
-				}
-				if ( ( prevEndAddr & alignM1 ) != 0 ) {
-					prevEndAddr = ( prevEndAddr & ~alignM1 ) + align;
-				}
-				long free = startAddr - prevEndAddr;
-				if ( free >= len ) {
-					long nextHalfFree = ( free - len ) >>> 1;
-					long resultAddr = ( prevEndAddr + nextHalfFree ) & ~alignM1;
-					mem.move(tableStartAddr, tableStartOffset - ( ws << 1 ), addr - tableStartAddr);
-					addr -= ws;
-					btSetOffset(mem, addr, ws, resultAddr - blockAddr + len);
-					addr -= ws;
-					btSetOffset(mem, addr, ws, resultAddr - blockAddr);
-					btSetOffset(mem, tableEndAddr - ws, ws, tableStartAddr - ws);
-					return resultAddr;
-				}
-				if ( addr < tableStartAddr ) {
-					break;
-				}
-				addr -= ws;
-			}
-			if ( align > mem.pageSize() ) {
-				blockAddr = nextPage(mem, bs, ws, blockAddr, tableEndAddr, align);
-			} else {
-				blockAddr = nextPage(mem, bs, ws, blockAddr, tableEndAddr);
-			}
+			long resultAddress =
+				allocInPage(len, align, mem, blockAddr, offSize, tableEndAddr, tableStartOffset, tableStartAddr);
+			if ( resultAddress != 0L ) return resultAddress;
+			blockAddr = nextPage(mem, pageSize, offSize, blockAddr);
 		}
 	}
 	
-	public long alloc(final long len) {
-		if ( len <= 0L ) {
-			throw new IllegalArgumentException("len <= 0: " + len);
+	private long largeAlloc(final long len, final long align) {
+		final MemoryManager mem      = this.si.memManager();
+		long                blockEnd = mem.get64(this.firstPage);
+		if ( blockEnd == 0L ) {
+			final long nextPageSize = largePageSize(len);
+			final int  nextOffSize  = offSize(nextPageSize);
+			blockEnd = createNextPage(mem, nextPageSize, nextOffSize);
 		}
-		final MemoryManager mem = this.si.memManager();
-		final long bs = blockSize(mem);
-		final int ws = offSize(bs);
-		if ( bs - 8L - ws <= len ) {
-			long addr = mem.allocate(len + 8L, 0L, MemoryManager.FLAG_CUSTOM);
-			mem.set64(addr, len + 8L);
-			return addr + 8L;
-		}
-		long blockAddr = this.firstPage;
 		while ( true ) {
-			final long tableEndAddr = blockAddr + bs - 8L;
-			final long tableStartOffset = btGetOffset(mem, tableEndAddr - ws, ws);
-			final long tableStartAddr = blockAddr + tableStartOffset;
+			final long pageAddr         = mem.get64(blockEnd - 8L);
+			final long pageSize         = blockEnd - pageAddr;
+			final int  offSize          = offSize(pageSize);
+			final long tableEndAddr     = pageAddr + pageSize - 16L;
+			final long tableStartOffset = btGetOffset(mem, tableEndAddr - offSize, offSize);
+			final long tableStartAddr   = pageAddr + tableStartOffset;
 			if ( tableEndAddr != tableStartAddr ) {
-				long lastEntryEnd = btGetOffset(mem, tableEndAddr - ( ws << 1 ), ws);
-				if ( tableStartOffset - lastEntryEnd < ws ) {
-					blockAddr = nextPage(mem, bs, ws, blockAddr, tableEndAddr);
+				long lastEntryEnd = btGetOffset(mem, tableEndAddr - ( offSize << 1 ), offSize);
+				if ( tableStartOffset - lastEntryEnd < offSize ) {
+					final long nextPageSize = largePageSize(len);
+					final int  nextOffSize  = offSize(nextPageSize);
+					blockEnd = nextPage(mem, nextPageSize, nextOffSize, pageAddr);
 					continue;
 				}
 			}
-			long addr = tableEndAddr - ws;
-			while ( true ) {
-				long startOff = btGetOffset(mem, addr, ws);
-				addr -= ws;
-				long prevEndOff;
-				if ( addr < tableStartAddr ) {
-					prevEndOff = 0;
-				} else {
-					prevEndOff = btGetOffset(mem, addr, ws);
-				}
-				long free = startOff - prevEndOff;
-				if ( free >= len ) {
-					long nextHalfFree = ( free - len ) >>> 1;
-					long resultOffset = prevEndOff + nextHalfFree;
-					mem.move(tableStartAddr, tableStartOffset - ( ws << 1 ), addr - tableStartAddr);
-					addr -= ws;
-					btSetOffset(mem, addr, ws, resultOffset + len);
-					addr -= ws;
-					btSetOffset(mem, addr, ws, resultOffset);
-					btSetOffset(mem, tableEndAddr - ws, ws, tableStartAddr - ws);
-					return blockAddr + resultOffset;
-				}
-				if ( addr < tableStartAddr ) {
-					break;
-				}
-				addr -= ws;
-			}
-			blockAddr = nextPage(mem, bs, ws, blockAddr, tableEndAddr);
+			long resultAddress =
+				allocInPage(len, align, mem, pageAddr, offSize, tableEndAddr, tableStartOffset, tableStartAddr);
+			if ( resultAddress != 0L ) return resultAddress;
+			blockEnd = nextPage(mem, pageSize, offSize, pageAddr);
 		}
 	}
 	
-	private long nextPage(final MemoryManager mem, final long bs, final int ws, long blockAddr,
-		final long tableEndAddr) {
-		long next = mem.get64(tableEndAddr);
-		if ( next == 0 ) {
-			next = mem.allocate(bs, 0L, 0);
-			final long nextEndOff = bs - 8L;
-			final long nextStartOff = nextEndOff - ws;
-			final long nextEndAddr = blockAddr + nextEndOff;
-			btSetOffset(mem, nextEndAddr - ws, ws, nextStartOff);
+	private static long largePageSize(final long len) {
+		final long nextPageSize = Long.highestOneBit(len) << 1L;
+		if ( nextPageSize < 0L ) {
+			throw new IllegalArgumentException("len >= 2^62: " + len);
 		}
-		return next;
+		return nextPageSize;
 	}
 	
-	// force alignment of more than page align, when a new page is allocated
-	private long nextPage(final MemoryManager mem, final long bs, final int ws, long blockAddr, final long tableEndAddr,
-		final long align) {
-		assert mem.pageSize() < align && mem.pageSize() <= bs;
-		long next = mem.get64(tableEndAddr);
-		if ( next == 0 ) {
-			next = mem.allocate(align + bs, 0L, 0);
-			final long alignM1 = align - 1L;
-			if ( ( next & alignM1 ) == 0 ) {
-				mem.free(next + bs, align);
+	private static long allocInPage(final long len, final long align, final MemoryManager mem, long pageAddr,
+		final int offSize, final long tableEndAddr, final long tableStartOffset, final long tableStartAddr) {
+		final long alignM1 = align - 1L;
+		long       addr    = tableEndAddr - offSize;
+		while ( true ) {
+			long startAddr = pageAddr + btGetOffset(mem, addr, offSize);
+			addr -= offSize;
+			long prevEndAddr;
+			if ( addr < tableStartAddr ) {
+				prevEndAddr = pageAddr;
 			} else {
-				long oldNext = next;
-				next = ( next & alignM1 ) + align;
-				mem.free(oldNext, next - oldNext);
-				long nextEnd = next + bs;
-				long freeEnd = oldNext + align + bs;
-				long freeLen = freeEnd - nextEnd;
-				if ( freeLen != 0 ) {
-					mem.free(nextEnd, freeLen);
-				}
+				prevEndAddr = btGetOffset(mem, addr, offSize);
 			}
-			final long nextEndOff = bs - 8L;
-			final long nextStartOff = nextEndOff - ws;
-			final long nextEndAddr = blockAddr + nextEndOff;
-			btSetOffset(mem, nextEndAddr - ws, ws, nextStartOff);
+			if ( ( prevEndAddr & alignM1 ) != 0 ) {
+				prevEndAddr = ( prevEndAddr & ~alignM1 ) + align;
+			}
+			long free = startAddr - prevEndAddr;
+			if ( free >= len ) {
+				long nextHalfFree = ( free - len ) >>> 1;
+				long resultAddr   = ( prevEndAddr + nextHalfFree ) & ~alignM1;
+				mem.move(tableStartAddr, tableStartOffset - ( offSize << 1 ), addr - tableStartAddr);
+				addr -= offSize;
+				btSetOffset(mem, addr, offSize, resultAddr - pageAddr + len);
+				addr -= offSize;
+				btSetOffset(mem, addr, offSize, resultAddr - pageAddr);
+				btSetOffset(mem, tableEndAddr - offSize, offSize, tableStartAddr - offSize);
+				return resultAddr;
+			}
+			if ( addr < tableStartAddr ) {
+				break;
+			}
+			addr -= offSize;
 		}
-		return next;
+		return 0L;
+	}
+	
+	private static long nextPage(final MemoryManager mem, final long pageSize, final int offSize, long pageAddr) {
+		long next = mem.get64(pageAddr + pageSize - 8L);
+		if ( next != 0L ) return next;
+		return createNextPage(mem, pageSize, offSize);
+	}
+	
+	private static long createNextPage(final MemoryManager mem, final long pageSize, final int offSize) {
+		final long result;
+		final long nextEndOff;
+		if ( pageSize != mem.pageSize() ) {
+			long pageAddr = mem.allocate(pageSize, 0L, MemoryManager.FLAG_CUSTOM);
+			result = pageAddr + pageSize;
+			mem.set64(result - 8L, pageAddr);
+			nextEndOff = pageSize - 16L;
+		} else {
+			result     = mem.allocate(pageSize, 0L, 0);
+			nextEndOff = pageSize - 8L;
+		}
+		final long nextStartOff  = nextEndOff - offSize;
+		final long nextStartAddr = result + nextStartOff;
+		btSetOffset(mem, nextStartAddr, offSize, nextStartOff);
+		return result;
 	}
 	
 	public void free(long addr) {
-		final MemoryManager mem = this.si.memManager();
-		final long bs = blockSize(mem);
-		final int ws = offSize(bs);
-		final long blockAddr = addr & ~bs;
-		if ( blockAddr == addr - 8L && ( mem.flags(blockAddr) & MemoryManager.FLAG_CUSTOM ) != 0 ) {
-			long len = mem.get64(blockAddr);
-			mem.free(blockAddr, len);
+		final MemoryManager mem      = this.si.memManager();
+		final long          pageSize = mem.pageSize();
+		final long          pageAddr = addr & ~pageSize;
+		if ( ( mem.flags(pageAddr) & MemoryManager.FLAG_CUSTOM ) != 0 ) {
+			freeLarge(addr);
 			return;
-		} else if ( ( mem.flags(blockAddr) & MemoryManager.FLAG_CUSTOM ) != 0 ) {
-			// TODO
 		}
-		// TODO
+		final int offSize = offSize(pageSize);
+		freeImpl(mem, addr, pageAddr, pageAddr + pageSize - 8L - offSize, offSize);
 	}
 	
-	private static long btGetOffset(MemoryManager mem, long startAddr, int ws) {
-		return switch ( ws ) {
-		case 1 -> mem.get8(startAddr);
-		case 2 -> mem.get16(startAddr);
-		case 4 -> mem.get32(startAddr);
-		default -> mem.get64(startAddr);
-		};
+	private void freeLarge(long addr) {
+		final MemoryManager mem     = this.si.memManager();
+		long                pageEnd = mem.get64(this.firstPage);
+		while ( pageEnd != 0L ) {
+			long pageStart = mem.get64(pageEnd - 8L);
+			if ( addr >= pageStart && addr < pageEnd ) {
+				int offSize = offSize(pageEnd - pageStart);
+				freeImpl(mem, addr, pageStart, pageEnd - 16L - offSize, offSize);
+				return;
+			}
+		}
+		throw new IllegalStateException("no allocated memory block starts at 0x" + Long.toHexString(addr));
 	}
 	
-	private static void btSetOffset(MemoryManager mem, long startAddr, int ws, long val) {
-		switch ( ws ) {
-		case 1 -> mem.set8(startAddr, (int) val);
-		case 2 -> mem.set16(startAddr, (int) val);
-		case 4 -> mem.set32(startAddr, (int) val);
-		default -> mem.set64(startAddr, val);
-		};
+	private static void freeImpl(MemoryManager mem, final long freeAddr, final long pageAddr,
+		final long tableEndStartAddr, final int offSize) {
+		final long tableStartAddr = pageAddr + btGetOffset(mem, tableEndStartAddr, offSize);
+		final int  dOffSize       = offSize << 1;
+		final long mask           = ~( dOffSize - 1 );
+		long       low            = 0; // the address may not be aligned for the mask
+		long       high           = tableEndStartAddr - tableStartAddr;
+		if ( ( high & mask ) != high ) {
+			throw new IllegalStateException("corrupt allocation table");
+		}
+		final long freeOff = freeAddr - pageAddr;
+		while ( low <= high ) {
+			final long mid = ( ( low + high ) >>> 1 ) & mask;
+			final long val = btGetOffset(mem, tableStartAddr + mid, offSize);
+			if ( val < freeOff ) {
+				low = mid + dOffSize;
+			} else if ( val > freeOff ) {
+				high = mid - dOffSize;
+			} else {
+				mem.move(tableStartAddr, tableStartAddr + dOffSize, mid);
+				btSetOffset(mem, tableEndStartAddr - offSize, dOffSize, tableStartAddr - pageAddr + offSize);
+				return;
+			}
+		}
+		throw new IllegalStateException("no allocated memory block starts at 0x" + Long.toHexString(freeAddr));
 	}
 	
-	private int offSize(long blockSize) {
+	private static long btGetOffset(MemoryManager mem, long addr, int offSize) {
+		switch ( offSize ) {
+		case 1:
+			return mem.get8(addr);
+		case 2:
+			return mem.get16(addr);
+		case 4:
+			return mem.get32(addr);
+		default:
+			return mem.get64(addr);
+		}
+	}
+	
+	private static void btSetOffset(MemoryManager mem, long addr, int offSize, long val) {
+		switch ( offSize ) {
+		case 1 -> mem.set8(addr, (int) val);
+		case 2 -> mem.set16(addr, (int) val);
+		case 4 -> mem.set32(addr, (int) val);
+		default -> mem.set64(addr, val);
+		}
+	}
+	
+	private static int offSize(long blockSize) {
 		if ( blockSize <= ( 1L << 16 ) ) {
 			if ( blockSize <= ( 1L << 8 ) ) {
 				return 1;
@@ -261,22 +278,16 @@ public class JavaStdLib extends JavaDependency {
 		return 8;
 	}
 	
-	private static long blockSize(MemoryManager mem) {
-		long ps = mem.pageSize();
-		if ( ps >= 256 ) return ps;
-		return 256;
-	}
-	
 	public static long allocArgs(SimpleInterpreter si, String[] args) {
-		JavaStdLib jsl = (JavaStdLib) si.stdlib();
-		MemoryManager mem = si.memManager();
-		long len = ( args.length + 1L ) << 3;
-		long addr = jsl.alloc(len);
-		long a = addr;
+		JavaStdLib    jsl  = (JavaStdLib) si.stdlib();
+		MemoryManager mem  = si.memManager();
+		long          len  = ( args.length + 1L ) << 3;
+		long          addr = jsl.alloc(len, 1L);
+		long          a    = addr;
 		for (int i = 0; i < args.length; i++, a += 8) {
-			byte[] bytes = args[i].getBytes(StandardCharsets.UTF_8);
-			ByteBuffer buf = ByteBuffer.wrap(bytes);
-			long argAdr = jsl.alloc(bytes.length + 1L);
+			byte[]     bytes  = args[i].getBytes(StandardCharsets.UTF_8);
+			ByteBuffer buf    = ByteBuffer.wrap(bytes);
+			long       argAdr = jsl.alloc(bytes.length + 1L, 1L);
 			mem.set(argAdr, buf);
 			mem.set8(argAdr + bytes.length, 0);
 		}

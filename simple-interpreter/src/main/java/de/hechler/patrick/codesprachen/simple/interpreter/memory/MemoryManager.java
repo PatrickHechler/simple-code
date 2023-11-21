@@ -37,10 +37,6 @@ public interface MemoryManager extends AutoCloseable {
 	
 	void free(long page, long minSize);
 	
-	long _fsAllocateMap(long minSize, long requestedAddress, int flags);
-	
-	void _fsFreeMap(long page, long minSize);
-	
 	// information about page
 	
 	int flags(long address);

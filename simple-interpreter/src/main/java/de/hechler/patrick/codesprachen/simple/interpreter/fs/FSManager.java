@@ -14,11 +14,6 @@ public interface FSManager extends Closeable {
 	
 	LoadFileResult loadFile(String path, long address, int flags) throws IOException;
 	
-	// the flag LOAD_FLAG_READ_ONLY is implied here
-	long mapROFile(String path, long offset, long length, long address, int flags) throws IOException;
-	
-	void unloadMap(long address);
-	
 	record LoadFileResult(long address, long fileSize) {}
 	
 }

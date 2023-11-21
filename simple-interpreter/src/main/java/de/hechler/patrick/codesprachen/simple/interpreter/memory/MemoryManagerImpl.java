@@ -4,6 +4,8 @@ import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Objects;
@@ -21,14 +23,12 @@ public class MemoryManagerImpl implements MemoryManager {
 	private static final ValueLayout.OfInt   MA_INT32;
 	private static final ValueLayout.OfShort MA_INT16;
 	
-	private static final int FLAG_INTERN_FS_MAP = FLAG_MUST_REQUEST;
-	
 	static {
 		if ( ByteOrder.nativeOrder() == ByteOrder.LITTLE_ENDIAN ) {
 			INT64 = ValueLayout.JAVA_LONG;
 			INT32 = ValueLayout.JAVA_INT;
 			INT16 = ValueLayout.JAVA_SHORT;
-			INT8 = ValueLayout.JAVA_BYTE;
+			INT8  = ValueLayout.JAVA_BYTE;
 			
 			MA_INT64 = ValueLayout.JAVA_LONG_UNALIGNED;
 			MA_INT32 = ValueLayout.JAVA_INT_UNALIGNED;
@@ -37,7 +37,7 @@ public class MemoryManagerImpl implements MemoryManager {
 			INT64 = ValueLayout.JAVA_LONG.withOrder(ByteOrder.LITTLE_ENDIAN);
 			INT32 = ValueLayout.JAVA_INT.withOrder(ByteOrder.LITTLE_ENDIAN);
 			INT16 = ValueLayout.JAVA_SHORT.withOrder(ByteOrder.LITTLE_ENDIAN);
-			INT8 = ValueLayout.JAVA_BYTE.withOrder(ByteOrder.LITTLE_ENDIAN);
+			INT8  = ValueLayout.JAVA_BYTE.withOrder(ByteOrder.LITTLE_ENDIAN);
 			
 			MA_INT64 = ValueLayout.JAVA_LONG_UNALIGNED.withOrder(ByteOrder.LITTLE_ENDIAN);
 			MA_INT32 = ValueLayout.JAVA_INT_UNALIGNED.withOrder(ByteOrder.LITTLE_ENDIAN);
@@ -83,27 +83,49 @@ public class MemoryManagerImpl implements MemoryManager {
 				+ pageSize + " totalMemory: " + totalMem);
 		}
 		this.pageShift = pageShift;
-		this.rnd = Objects.requireNonNull(rnd, "random");
-		this.arena = Arena.ofConfined();
-		this.pages = new Page[16];
+		this.rnd       = Objects.requireNonNull(rnd, "random");
+		this.arena     = Arena.ofConfined();
+		this.pages     = new Page[16];
+	}
+	
+	public static void main(String[] args) {
+		System.out.println(clacDefPageShift());
 	}
 	
 	private static int clacDefPageShift() {
 		try {
-			Field tu = sun.misc.Unsafe.class.getDeclaredField("theUnsafe");
-			tu.setAccessible(true);
-			Object obj = tu.get(null);
-			if ( obj instanceof sun.misc.Unsafe u ) {
-				int ps = u.pageSize();
-				if ( ps != 0 && ( ps - 1 & ps ) == 0 ) {
-					return Integer.bitCount(ps - 1);
-				}
-			}
-		} catch ( @SuppressWarnings("unused") NoSuchFieldException | SecurityException | IllegalArgumentException
-			| IllegalAccessException e ) {
+			int ps = getNativePageSize("theInternalUnsafe");
+			System.err.println("try with theInternalUnsafe: " + ps);
+			if ( ps != 0 ) return ps;
+		} catch (@SuppressWarnings("unused") ClassNotFoundException | NoSuchMethodException | NoSuchFieldException
+			| SecurityException | IllegalArgumentException | IllegalAccessException | InvocationTargetException e) {
+			System.err.println("can not get the native page size, use 1024");
+		}
+		try {
+			int ps = getNativePageSize("theUnsafe");
+			System.err.println("try with theUnsafe: " + ps);
+			if ( ps != 0 ) return ps;
+		} catch (@SuppressWarnings("unused") ClassNotFoundException | NoSuchMethodException | NoSuchFieldException
+			| SecurityException | IllegalArgumentException | IllegalAccessException | InvocationTargetException e) {
 			System.err.println("can not get the native page size, use 1024");
 		}
 		return 10;
+	}
+	
+	private static int getNativePageSize(String name) throws NoSuchFieldException, IllegalAccessException,
+		NoSuchMethodException, SecurityException, ClassNotFoundException, InvocationTargetException {
+		Field tu = Class.forName("sun.misc.Unsafe").getDeclaredField(name);
+		tu.setAccessible(true); // NOSONAR
+		Object obj      = tu.get(null);
+		Method pageSize = obj.getClass().getDeclaredMethod("pageSize");
+		if ( pageSize.getReturnType() == Integer.TYPE ) {
+			int ps   = ( (Integer) pageSize.invoke(obj) ).intValue();
+			int psM1 = ps - 1;
+			if ( ps != 0 && ( psM1 & ps ) == 0 ) {
+				return Integer.bitCount(psM1);
+			}
+		}
+		return 0;
 	}
 	
 	@Override
@@ -122,23 +144,15 @@ public class MemoryManagerImpl implements MemoryManager {
 		return allocImpl(minSize, requestedAddress, flags).address;
 	}
 	
-	@Override
-	public long _fsAllocateMap(long minSize, long requestedAddress, int flags) {
-		assert ( flags & ~( ALL_FLAGS | FLAG_GROW_DOWN ) ) == 0
-			: "invalid flags value: 0x" + Integer.toHexString(flags);
-		assert minSize > 0 : "minSize is zero or negative: " + minSize;
-		return allocImpl(minSize, requestedAddress, flags | FLAG_INTERN_FS_MAP).address;
-	}
-	
-	private Page allocImpl(long minSize, long requestedAddress, int flags) {
-		long pageSize = 1L << this.pageShift;
+	private Page allocImpl(long minSize, long requestedAddress, int flags) { // NOSONAR
+		long pageSize     = 1L << this.pageShift;
 		long maxPageIndex = pageSize - 1L;
-		long allocCount = minSize >>> pageSize;
+		long allocCount   = minSize >>> pageSize;
 		if ( ( minSize & maxPageIndex ) != 0 ) {
 			allocCount++;
 		}
-		Object[] ps = this.pages;
-		int psLen = ps.length;
+		Object[] ps    = this.pages;
+		int      psLen = ps.length;
 		if ( allocCount > psLen - ( psLen >>> 2 ) - this.allocatedPages ) {
 			if ( ps.length == MAX_ARR_SIZE ) {
 				System.err.println("[WARN]: well you allocated really many pages");
@@ -162,20 +176,20 @@ public class MemoryManagerImpl implements MemoryManager {
 		}
 		ListEntry f = this.free;
 		if ( f == null ) {
-			f = new ListEntry();
-			f.page = new Page(this.arena.allocate(pageSize, pageSize));
+			f         = new ListEntry();
+			f.page    = new Page(this.arena.allocate(pageSize, pageSize));
 			this.free = f;// later cleared
 		}
-		loop: for (long remain = allocCount; --remain >= 0; f = f.next) {
+		loop: for (long remain = allocCount; --remain >= 0; f = f.next) {// NOSONAR
 			if ( f.next == null ) {
 				while ( true ) {
-					ListEntry n = new ListEntry();
+					ListEntry     n   = new ListEntry();
 					MemorySegment seg = this.arena.allocate(pageSize, pageSize);
 					seg.fill((byte) 0); // the javadoc does not specify the content
 					n.page = new Page(seg);
 					f.next = n;
-					f = n;
-					if ( --remain < 0 ) {
+					f      = n;
+					if ( --remain < 0 ) {// NOSONAR // the inner loop replaces the outer loop, if the if lets it
 						break loop;
 					}
 				}
@@ -185,7 +199,7 @@ public class MemoryManagerImpl implements MemoryManager {
 		f = this.free;
 		if ( ( flags & FLAG_MUST_REQUEST ) == 0 ) {
 			if ( requestedAddress == 0 ) {
-				requestedAddress = rnd.nextLong() & ~maxPageIndex;
+				requestedAddress = this.rnd.nextLong() & ~maxPageIndex;
 				if ( requestedAddress == 0 ) {
 					requestedAddress = pageSize;
 				}
@@ -197,7 +211,8 @@ public class MemoryManagerImpl implements MemoryManager {
 					}
 				}
 			}
-			tryRequestedAddress: while ( true ) {
+			// if you manage to allocate 2^64 - 2*pageSize this really is an endless loop
+			tryRequestedAddress: while ( true ) { // NOSONAR
 				if ( requestedAddress <= 0L && requestedAddress + minSize >= 0L ) {
 					requestedAddress = pageSize;
 				}
@@ -205,7 +220,7 @@ public class MemoryManagerImpl implements MemoryManager {
 				for (long remain = allocCount, addr = requestedAddress; --remain >= 0; f = f.next, addr += pageSize) {
 					Page p = f.page;
 					p.address = addr;
-					p.flags = flags;
+					p.flags   = flags;
 					if ( !putIfAbsent(ps, p) ) {
 						for (ListEntry sf = this.free; sf != f; sf = sf.next) {
 							remove0(ps, sf.page);
@@ -227,7 +242,7 @@ public class MemoryManagerImpl implements MemoryManager {
 			for (long remain = allocCount, addr = requestedAddress; --remain >= 0; f = f.next, addr += pageSize) {
 				Page p = f.page;
 				p.address = addr;
-				p.flags = flags;
+				p.flags   = flags;
 				if ( !putIfAbsent(ps, p) ) {
 					for (ListEntry sf = this.free; sf != f; sf = sf.next) {
 						remove0(ps, sf.page);
@@ -242,10 +257,10 @@ public class MemoryManagerImpl implements MemoryManager {
 	}
 	
 	private Page get(final long addr) {
-		final Object[] ps = this.pages;
-		final int len = ps.length;
-		final int hash = (int) ( addr >>> ( 64 - len ) );
-		Object o = ps[hash];
+		final Object[] ps   = this.pages;
+		final int      len  = ps.length;
+		final int      hash = (int) ( addr >>> ( 64 - len ) );
+		Object         o    = ps[hash];
 		if ( o == null ) {
 			if ( len + this.pageShift >= 64 ) {
 				Page p = get(addr + ( 1L << this.pageShift ));
@@ -253,9 +268,8 @@ public class MemoryManagerImpl implements MemoryManager {
 					throw new IllegalArgumentException(noPageMsg(addr));
 				}
 				return allocImpl(1L, addr, p.flags | FLAG_MUST_REQUEST);
-			} else {
-				throw new IllegalArgumentException(noPageMsg(addr));
 			}
+			throw new IllegalArgumentException(noPageMsg(addr));
 		}
 		ListEntry old = (ListEntry) o;
 		while ( true ) {
@@ -300,12 +314,13 @@ public class MemoryManagerImpl implements MemoryManager {
 	}
 	
 	private static boolean putIfAbsent(Object[] ps, Page p) {
-		final int len = ps.length;
+		final int  len  = ps.length;
 		final long addr = p.address;
-		final int hash = (int) ( addr >>> len ) - ( len - 1 );
-		Object o = ps[hash];
+		final int  hash = (int) ( addr >>> len ) - ( len - 1 );
+		Object     o    = ps[hash];
 		if ( o == null ) {
 			ps[hash] = p;
+			return true;
 		}
 		ListEntry old = (ListEntry) o;
 		while ( true ) {
@@ -316,22 +331,22 @@ public class MemoryManagerImpl implements MemoryManager {
 			if ( old == null ) break;
 		}
 		ListEntry e = new ListEntry();
-		e.page = p;
-		e.next = (ListEntry) o;
+		e.page   = p;
+		e.next   = (ListEntry) o;
 		ps[hash] = e;
 		return true;
 	}
 	
 	private static void put0(Object[] ps, Page p) {
-		final int len = ps.length;
+		final int len  = ps.length;
 		final int hash = (int) ( p.address >>> len ) - ( len - 1 );
-		Object o = ps[hash];
+		Object    o    = ps[hash];
 		if ( o == null ) {
 			ps[hash] = p;
 		}
 		ListEntry e = new ListEntry();
-		e.page = p;
-		e.next = (ListEntry) o;
+		e.page   = p;
+		e.next   = (ListEntry) o;
 		ps[hash] = e;
 	}
 	
@@ -344,32 +359,18 @@ public class MemoryManagerImpl implements MemoryManager {
 		if ( minSize <= 0 ) {
 			throw new IllegalArgumentException("minSize <= 0");
 		}
-		freeImpl(addr, minSize, false);
-	}
-	
-	@Override
-	public void _fsFreeMap(long addr, long minSize) {
-		final long pageSize = 1L << this.pageShift;
-		assert ( addr & ( pageSize - 1 ) ) == 0L : "the given address is not page aligned";
-		assert minSize > 0;
-		freeImpl(addr, minSize, true);
-	}
-	
-	private void freeImpl(long addr, long minSize, boolean isFSMap) {
-		final long pageSize = 1L << this.pageShift;
 		long count = count(minSize, pageSize);
 		for (; --count >= 0; addr += pageSize) {
-			Object[] ps = this.pages;
-			final int len = ps.length;
+			Object[]  ps   = this.pages;
+			final int len  = ps.length;
 			final int hash = (int) ( addr >>> len ) - ( len - 1 );
-			Object o = ps[hash];
+			Object    o    = ps[hash];
 			if ( o instanceof Page p ) {
 				if ( p.address == addr ) {
-					checkFlags(minSize, isFSMap, pageSize, count, p);
 					ps[hash] = null;
 					ListEntry e = new ListEntry();
-					e.page = p;
-					e.next = this.free;
+					e.page    = p;
+					e.next    = this.free;
 					this.free = e;
 				} else {
 					throw new IllegalArgumentException("the address is not allocated!");
@@ -379,7 +380,6 @@ public class MemoryManagerImpl implements MemoryManager {
 			}
 			ListEntry e = (ListEntry) o;
 			if ( e.page.address == addr ) {
-				checkFlags(minSize, isFSMap, pageSize, count, e.page);
 				e = e.next;
 				if ( e.next == null ) {
 					ps[hash] = e.page;
@@ -390,9 +390,8 @@ public class MemoryManagerImpl implements MemoryManager {
 			}
 			for (ListEntry n = e.next;; e = n) {
 				if ( n.page.address == addr ) {
-					checkFlags(minSize, isFSMap, pageSize, count, n.page);
-					e.next = n.next;
-					n.next = this.free;
+					e.next    = n.next;
+					n.next    = this.free;
 					this.free = n;
 					break;
 				}
@@ -400,43 +399,14 @@ public class MemoryManagerImpl implements MemoryManager {
 		}
 	}
 	
-	private void checkFlags(long minSize, boolean isFSMap, final long pageSize, long count, Page p) {
-		if ( isFSMap ) {
-			if ( ( p.flags & FLAG_INTERN_FS_MAP ) == 0 ) {
-				freeFailRealloc(count, count(minSize, pageSize), isFSMap, p.address);
-			}
-		} else {
-			if ( ( p.flags & FLAG_INTERN_FS_MAP ) != 0 ) {
-				freeFailRealloc(count, count(minSize, pageSize), isFSMap, p.address);
-			}
-		}
-	}
-	
-	private void freeFailRealloc(long remainCount, long totalCount, boolean isFSMap, long pageAddr) {
-		long allocCount = totalCount - remainCount;
-		ListEntry f = this.free;
-		Object[] ps = this.pages;
-		while ( --allocCount > 0 ) {
-			put0(ps, f.page);
-			f = f.next;
-		}
-		this.free = f;
-		if ( isFSMap ) {
-			throw new IllegalArgumentException(
-				"fsFreeMap called, but the page 0x" + Long.toHexString(pageAddr) + " is not marked as fs page");
-		}
-		throw new IllegalArgumentException(
-			"free called, but the page 0x" + Long.toHexString(pageAddr) + " is marked as fs page");
-	}
-	
 	private long count(long minSize, final long pageSize) {
 		return ( minSize & ( pageSize - 1 ) ) != 0L ? ( minSize >> this.pageShift ) + 1 : minSize >> this.pageShift;
 	}
 	
 	private static void remove0(Object[] ps, Page p) {
-		final int len = ps.length;
+		final int len  = ps.length;
 		final int hash = (int) ( p.address >>> len ) - ( len - 1 );
-		Object o = ps[hash];
+		Object    o    = ps[hash];
 		if ( o instanceof Page ) {
 			ps[hash] = null;
 		}
@@ -460,7 +430,7 @@ public class MemoryManagerImpl implements MemoryManager {
 	
 	@Override
 	public int flags(long address) {
-		return get(address).flags & ~FLAG_INTERN_FS_MAP;
+		return get(address).flags;
 	}
 	
 	private static void set(final long pageSize, MemorySegment page, MemorySegment next, long off, int val) {
@@ -474,26 +444,25 @@ public class MemoryManagerImpl implements MemoryManager {
 	private static int get(final long pageSize, MemorySegment page, MemorySegment next, long off) {
 		if ( off >= pageSize ) {
 			return 0xFF & next.get(INT8, off - pageSize);
-		} else {
-			return 0xFF & page.get(INT8, off);
 		}
+		return 0xFF & page.get(INT8, off);
 	}
 	
 	@Override
 	public void _privilegedSetRO(long address, ByteBuffer buf) {
-		final long pageSize = 1L << this.pageShift;
-		final long pageSizeM1 = pageSize - 1;
-		final long pageAddr = address & pageSizeM1;
-		final int remain = buf.remaining();
-		final long endAddr = address + remain;
+		final long pageSize    = 1L << this.pageShift;
+		final long pageSizeM1  = pageSize - 1;
+		final long pageAddr    = address & pageSizeM1;
+		final int  remain      = buf.remaining();
+		final long endAddr     = address + remain;
 		final long endPageAddr = endAddr & pageSizeM1;
-		final long offset = address & ~pageSizeM1;
-		Page page = get(pageAddr);
+		final long offset      = address & ~pageSizeM1;
+		Page       page        = get(pageAddr);
 		assert ( page.flags & FLAG_READ_ONLY ) != 0;
 		MemorySegment pageSeg = page.seg;
 		if ( endPageAddr == pageAddr ) {
 			MemorySegment seg = MemorySegment.ofBuffer(buf);
-			int pos = buf.position();
+			int           pos = buf.position();
 			MemorySegment.copy(seg, INT8, pos, pageSeg, INT8, offset, remain);
 			buf.position(pos + remain);
 			return;
@@ -509,15 +478,15 @@ public class MemoryManagerImpl implements MemoryManager {
 		if ( len <= 0 ) {
 			throw new IllegalArgumentException("len <= 0: " + len);
 		}
-		assert ( bVal & 0xFF ) != bVal;
-		final long pageSize = 1L << this.pageShift;
-		final long pageSizeM1 = pageSize - 1;
-		final long pageAddr = address & pageSizeM1;
-		final long endAddr = address + len;
-		final long endPageAddr = endAddr & pageSizeM1;
-		final long offset = address & ~pageSizeM1;
-		MemorySegment page = getWWA(pageAddr).seg;
-		final byte val = (byte) bVal;
+		assert ( bVal & 0xFF ) != bVal; // NOSONAR
+		final long    pageSize    = 1L << this.pageShift;
+		final long    pageSizeM1  = pageSize - 1;
+		final long    pageAddr    = address & pageSizeM1;
+		final long    endAddr     = address + len;
+		final long    endPageAddr = endAddr & pageSizeM1;
+		final long    offset      = address & ~pageSizeM1;
+		MemorySegment page        = getWWA(pageAddr).seg;
+		final byte    val         = (byte) bVal;
 		if ( endPageAddr == pageAddr ) {
 			if ( len == pageSize ) { // offset == 0 is implied by that together with the one page check
 				page.fill(val);
@@ -539,7 +508,7 @@ public class MemoryManagerImpl implements MemoryManager {
 			page.fill(val);
 		}
 		page = getWWA(endPageAddr).seg;
-		len = ( len - offset ) & pageSizeM1;
+		len  = ( len - offset ) & pageSizeM1;
 		if ( len == 0 ) {
 			page.fill(val);
 		} else {
@@ -550,17 +519,17 @@ public class MemoryManagerImpl implements MemoryManager {
 	
 	@Override
 	public void set(long address, ByteBuffer buf) {
-		final long pageSize = 1L << this.pageShift;
-		final long pageSizeM1 = pageSize - 1;
-		final long pageAddr = address & pageSizeM1;
-		final int remain = buf.remaining();
-		final long endAddr = address + remain;
-		final long endPageAddr = endAddr & pageSizeM1;
-		final long offset = address & ~pageSizeM1;
-		MemorySegment page = getWWA(pageAddr).seg;
+		final long    pageSize    = 1L << this.pageShift;
+		final long    pageSizeM1  = pageSize - 1;
+		final long    pageAddr    = address & pageSizeM1;
+		final int     remain      = buf.remaining();
+		final long    endAddr     = address + remain;
+		final long    endPageAddr = endAddr & pageSizeM1;
+		final long    offset      = address & ~pageSizeM1;
+		MemorySegment page        = getWWA(pageAddr).seg;
 		if ( endPageAddr == pageAddr ) {
 			MemorySegment seg = MemorySegment.ofBuffer(buf);
-			int pos = buf.position();
+			int           pos = buf.position();
 			MemorySegment.copy(seg, INT8, pos, page, INT8, offset, remain);
 			buf.position(pos + remain);
 			return;
@@ -574,7 +543,7 @@ public class MemoryManagerImpl implements MemoryManager {
 	private void setImpl(ByteBuffer buf, final long pageSize, final long pageSizeM1, final long pageAddr,
 		final int remain, final long endPageAddr, final long offset, MemorySegment page) {
 		MemorySegment seg = MemorySegment.ofBuffer(buf);
-		int pos = buf.position();
+		int           pos = buf.position();
 		MemorySegment.copy(seg, INT8, pos, page, INT8, offset, pageSize);
 		pos += pageSize - offset;
 		for (long a = pageAddr + pageSize; a < endPageAddr; a += pageSize) {
@@ -590,17 +559,17 @@ public class MemoryManagerImpl implements MemoryManager {
 	
 	@Override
 	public void set64(long address, long value) {
-		final long pageSize = 1L << this.pageShift;
-		final long pageSizeM1 = pageSize - 1;
-		final long pageAddr = address & pageSizeM1;
-		final long offset = address & ~pageSizeM1;
-		MemorySegment page = getWWA(pageAddr).seg;
+		final long    pageSize   = 1L << this.pageShift;
+		final long    pageSizeM1 = pageSize - 1;
+		final long    pageAddr   = address & pageSizeM1;
+		final long    offset     = address & ~pageSizeM1;
+		MemorySegment page       = getWWA(pageAddr).seg;
 		if ( ( offset & 7 ) == 0 ) {
 			page.set(INT64, offset, (short) value);
 		} else if ( offset + 7 >= pageSize ) {
 			MemorySegment next = getWWA(pageAddr + pageSize).seg;
 			page.set(INT8, offset, (byte) value);
-			int low = (int) value;
+			int low  = (int) value;
 			int high = (int) ( value >>> 32 );
 			set(pageSize, page, next, offset + 1, low >>> 8);
 			set(pageSize, page, next, offset + 2, low >>> 16);
@@ -616,11 +585,11 @@ public class MemoryManagerImpl implements MemoryManager {
 	
 	@Override
 	public void set32(long address, int value) {
-		final long pageSize = 1L << this.pageShift;
-		final long pageSizeM1 = pageSize - 1;
-		final long pageAddr = address & pageSizeM1;
-		final long offset = address & ~pageSizeM1;
-		MemorySegment page = getWWA(pageAddr).seg;
+		final long    pageSize   = 1L << this.pageShift;
+		final long    pageSizeM1 = pageSize - 1;
+		final long    pageAddr   = address & pageSizeM1;
+		final long    offset     = address & ~pageSizeM1;
+		MemorySegment page       = getWWA(pageAddr).seg;
 		if ( ( offset & 3 ) == 0 ) {
 			page.set(INT32, offset, value);
 		} else if ( offset + 3 >= pageSize ) {
@@ -636,10 +605,11 @@ public class MemoryManagerImpl implements MemoryManager {
 	
 	@Override
 	public void set16(long address, int value) {
-		final long pageSizeM1 = ( 1L << this.pageShift ) - 1;
-		final long pageAddr = address & pageSizeM1;
-		final long offset = address & ~pageSizeM1;
-		MemorySegment page = getWWA(pageAddr).seg;
+		assert ( value & 0xFFFF ) != value; // NOSONAR
+		final long    pageSizeM1 = ( 1L << this.pageShift ) - 1;
+		final long    pageAddr   = address & pageSizeM1;
+		final long    offset     = address & ~pageSizeM1;
+		MemorySegment page       = getWWA(pageAddr).seg;
 		if ( ( offset & 1 ) == 0 ) {
 			page.set(INT16, offset, (short) value);
 		} else if ( offset == pageSizeM1 ) {
@@ -653,26 +623,27 @@ public class MemoryManagerImpl implements MemoryManager {
 	
 	@Override
 	public void set8(long address, int value) {
-		final long pageSizeM1 = ( 1L << pageShift ) - 1;
-		final long pageAddr = address & pageSizeM1;
-		final long offset = address & ~pageSizeM1;
-		MemorySegment page = getWWA(pageAddr).seg;
+		assert ( value & 0xFF ) != value; // NOSONAR
+		final long    pageSizeM1 = ( 1L << this.pageShift ) - 1;
+		final long    pageAddr   = address & pageSizeM1;
+		final long    offset     = address & ~pageSizeM1;
+		MemorySegment page       = getWWA(pageAddr).seg;
 		page.set(INT8, offset, (byte) value);
 	}
 	
 	@Override
 	public void get(long address, ByteBuffer buf) {
-		final long pageSize = 1L << this.pageShift;
-		final long pageSizeM1 = pageSize - 1;
-		final long pageAddr = address & pageSizeM1;
-		final int remain = buf.remaining();
-		final long endAddr = address + remain;
-		final long endPageAddr = endAddr & pageSizeM1;
-		final long offset = address & ~pageSizeM1;
-		MemorySegment page = get(pageAddr).seg;
+		final long    pageSize    = 1L << this.pageShift;
+		final long    pageSizeM1  = pageSize - 1;
+		final long    pageAddr    = address & pageSizeM1;
+		final int     remain      = buf.remaining();
+		final long    endAddr     = address + remain;
+		final long    endPageAddr = endAddr & pageSizeM1;
+		final long    offset      = address & ~pageSizeM1;
+		MemorySegment page        = get(pageAddr).seg;
 		if ( endPageAddr == pageAddr ) {
 			MemorySegment seg = MemorySegment.ofBuffer(buf);
-			int pos = buf.position();
+			int           pos = buf.position();
 			MemorySegment.copy(page, INT8, offset, seg, INT8, pos, remain);
 			buf.position(pos + remain);
 			return;
@@ -681,7 +652,7 @@ public class MemoryManagerImpl implements MemoryManager {
 			get(a);
 		}
 		MemorySegment seg = MemorySegment.ofBuffer(buf);
-		int pos = buf.position();
+		int           pos = buf.position();
 		MemorySegment.copy(page, INT8, offset, seg, INT8, pos, pageSize);
 		pos += pageSize - offset;
 		for (long a = pageAddr + pageSize; a < endPageAddr; a += pageSize) {
@@ -697,16 +668,16 @@ public class MemoryManagerImpl implements MemoryManager {
 	
 	@Override
 	public long get64(long address) {
-		final long pageSize = 1L << this.pageShift;
-		final long pageSizeM1 = pageSize - 1;
-		final long pageAddr = address & pageSizeM1;
-		final long offset = address & ~pageSizeM1;
-		MemorySegment page = get(pageAddr).seg;
+		final long    pageSize   = 1L << this.pageShift;
+		final long    pageSizeM1 = pageSize - 1;
+		final long    pageAddr   = address & pageSizeM1;
+		final long    offset     = address & ~pageSizeM1;
+		MemorySegment page       = get(pageAddr).seg;
 		if ( ( offset & 1 ) == 0 ) {
 			return page.get(INT64, offset);
 		} else if ( offset + 3 >= pageSize ) {
-			MemorySegment next = get(pageAddr + pageSize).seg;
-			long value = 0xFFL & page.get(INT8, offset);
+			MemorySegment next  = get(pageAddr + pageSize).seg;
+			long          value = 0xFFL & page.get(INT8, offset);
 			value |= ( (long) get(pageSize, page, next, offset + 1) ) << 8;
 			value |= ( (long) get(pageSize, page, next, offset + 2) ) << 16;
 			value |= ( (long) get(pageSize, page, next, offset + 3) ) << 24;
@@ -722,16 +693,16 @@ public class MemoryManagerImpl implements MemoryManager {
 	
 	@Override
 	public int get32(long address) {
-		final long pageSize = 1L << this.pageShift;
-		final long pageSizeM1 = pageSize - 1;
-		final long pageAddr = address & pageSizeM1;
-		final long offset = address & ~pageSizeM1;
-		MemorySegment page = get(pageAddr).seg;
+		final long    pageSize   = 1L << this.pageShift;
+		final long    pageSizeM1 = pageSize - 1;
+		final long    pageAddr   = address & pageSizeM1;
+		final long    offset     = address & ~pageSizeM1;
+		MemorySegment page       = get(pageAddr).seg;
 		if ( ( offset & 1 ) == 0 ) {
 			return page.get(INT32, offset);
 		} else if ( offset + 3 >= pageSize ) {
-			MemorySegment next = get(pageAddr + pageSize).seg;
-			int value = 0xFF & page.get(INT8, offset);
+			MemorySegment next  = get(pageAddr + pageSize).seg;
+			int           value = 0xFF & page.get(INT8, offset);
 			value |= get(pageSize, page, next, offset + 1) << 8;
 			value |= get(pageSize, page, next, offset + 2) << 16;
 			value |= get(pageSize, page, next, offset + 3) << 24;
@@ -743,15 +714,15 @@ public class MemoryManagerImpl implements MemoryManager {
 	
 	@Override
 	public int get16(long address) {
-		final long pageSizeM1 = ( 1L << this.pageShift ) - 1;
-		final long pageAddr = address & pageSizeM1;
-		final long offset = address & ~pageSizeM1;
-		MemorySegment page = get(pageAddr).seg;
+		final long    pageSizeM1 = ( 1L << this.pageShift ) - 1;
+		final long    pageAddr   = address & pageSizeM1;
+		final long    offset     = address & ~pageSizeM1;
+		MemorySegment page       = get(pageAddr).seg;
 		if ( ( offset & 1 ) == 0 ) {
 			return 0xFFFF & page.get(INT16, offset);
 		} else if ( offset == pageSizeM1 ) {
-			MemorySegment next = get(pageAddr + ( 1L << this.pageShift )).seg;
-			int value = 0xFF & page.get(INT8, offset);
+			MemorySegment next  = get(pageAddr + ( 1L << this.pageShift )).seg;
+			int           value = 0xFF & page.get(INT8, offset);
 			value |= ( 0xFF & next.get(INT8, 0) ) << 8;
 			return value;
 		} else {
@@ -761,10 +732,10 @@ public class MemoryManagerImpl implements MemoryManager {
 	
 	@Override
 	public int get8(long address) {
-		final long pageSizeM1 = ( 1L << pageShift ) - 1;
-		final long pageAddr = address & pageSizeM1;
-		final long offset = address & ~pageSizeM1;
-		MemorySegment page = get(pageAddr).seg;
+		final long    pageSizeM1 = ( 1L << this.pageShift ) - 1;
+		final long    pageAddr   = address & pageSizeM1;
+		final long    offset     = address & ~pageSizeM1;
+		MemorySegment page       = get(pageAddr).seg;
 		return 0xFF & page.get(INT8, offset);
 	}
 	
@@ -774,14 +745,14 @@ public class MemoryManagerImpl implements MemoryManager {
 			if ( len == 0 ) return;
 			throw new IllegalArgumentException("len < 0");
 		}
-		final long pageSize = 1L << this.pageShift;
-		final long pageSizeM1 = pageSize - 1;
-		long sPageAddr = src & pageSizeM1;
-		long sOffset = dst & ~pageSizeM1;
-		long dPageAddr = dst & pageSizeM1;
-		long dOffset = dst & ~pageSizeM1;
-		MemorySegment sSeg = get(sPageAddr).seg;
-		MemorySegment dSeg = getWWA(dPageAddr).seg;
+		final long    pageSize   = 1L << this.pageShift;
+		final long    pageSizeM1 = pageSize - 1;
+		long          sPageAddr  = src & pageSizeM1;
+		long          sOffset    = dst & ~pageSizeM1;
+		long          dPageAddr  = dst & pageSizeM1;
+		long          dOffset    = dst & ~pageSizeM1;
+		MemorySegment sSeg       = get(sPageAddr).seg;
+		MemorySegment dSeg       = getWWA(dPageAddr).seg;
 		for (long s = sPageAddr + pageSize, d = dPageAddr + pageSize; s <= src + len; s += pageSize, d += pageSize) {
 			get(s);
 			getWWA(d);
@@ -791,31 +762,31 @@ public class MemoryManagerImpl implements MemoryManager {
 				long cpy = pageSize - sOffset;
 				if ( cpy > len ) cpy = len;
 				MemorySegment.copy(sSeg, INT8, sOffset, dSeg, INT8, dOffset, cpy);
-				sOffset = 0;
+				sOffset    = 0;
 				sPageAddr += pageSize;
-				sSeg = get(sPageAddr).seg;
-				dOffset += cpy;
-				len -= cpy;
+				sSeg       = get(sPageAddr).seg;
+				dOffset   += cpy;
+				len       -= cpy;
 			} else if ( sOffset < dOffset ) {
 				long cpy = pageSize - dOffset;
 				if ( cpy > len ) cpy = len;
 				MemorySegment.copy(sSeg, INT8, sOffset, dSeg, INT8, dOffset, cpy);
-				dOffset = 0;
+				dOffset    = 0;
 				dPageAddr += pageSize;
-				dSeg = getWWA(dPageAddr).seg;
-				sOffset += cpy;
-				len -= cpy;
+				dSeg       = getWWA(dPageAddr).seg;
+				sOffset   += cpy;
+				len       -= cpy;
 			} else {
 				long cpy = pageSize - dOffset;
 				if ( cpy > len ) cpy = len;
 				MemorySegment.copy(sSeg, INT8, sOffset, dSeg, INT8, dOffset, cpy);
-				sOffset = 0;
-				dOffset = 0;
+				sOffset    = 0;
+				dOffset    = 0;
 				sPageAddr += pageSize;
 				dPageAddr += pageSize;
-				sSeg = get(sPageAddr).seg;
-				dSeg = getWWA(dPageAddr).seg;
-				len -= cpy;
+				sSeg       = get(sPageAddr).seg;
+				dSeg       = getWWA(dPageAddr).seg;
+				len       -= cpy;
 			}
 		}
 	}
@@ -833,14 +804,14 @@ public class MemoryManagerImpl implements MemoryManager {
 		}
 		src += len;
 		dst += len;
-		final long pageSize = 1L << this.pageShift;
-		final long pageSizeM1 = pageSize - 1;
-		long sPageAddr = src & pageSizeM1;
-		long sOffset = dst & ~pageSizeM1;
-		long dPageAddr = dst & pageSizeM1;
-		long dOffset = dst & ~pageSizeM1;
-		MemorySegment sSeg = get(sPageAddr).seg;
-		MemorySegment dSeg = getWWA(dPageAddr).seg;
+		final long    pageSize   = 1L << this.pageShift;
+		final long    pageSizeM1 = pageSize - 1;
+		long          sPageAddr  = src & pageSizeM1;
+		long          sOffset    = dst & ~pageSizeM1;
+		long          dPageAddr  = dst & pageSizeM1;
+		long          dOffset    = dst & ~pageSizeM1;
+		MemorySegment sSeg       = get(sPageAddr).seg;
+		MemorySegment dSeg       = getWWA(dPageAddr).seg;
 		for (long s = sPageAddr - pageSize, d = dPageAddr - pageSize; s >= src - len; s -= pageSize, d -= pageSize) {
 			get(s);
 			getWWA(d);
@@ -850,31 +821,31 @@ public class MemoryManagerImpl implements MemoryManager {
 				long cpy = sOffset;
 				if ( cpy > len ) cpy = len;
 				MemorySegment.copy(sSeg, INT8, sOffset, dSeg, INT8, dOffset, cpy);
-				sOffset = 0;
+				sOffset    = 0;
 				sPageAddr -= pageSize;
-				sSeg = get(sPageAddr).seg;
-				dOffset -= cpy;
-				len -= cpy;
+				sSeg       = get(sPageAddr).seg;
+				dOffset   -= cpy;
+				len       -= cpy;
 			} else if ( sOffset > dOffset ) {
 				long cpy = dOffset;
 				if ( cpy > len ) cpy = len;
 				MemorySegment.copy(sSeg, INT8, sOffset, dSeg, INT8, dOffset, cpy);
-				dOffset = 0;
+				dOffset    = 0;
 				dPageAddr -= pageSize;
-				dSeg = getWWA(dPageAddr).seg;
-				sOffset -= cpy;
-				len -= cpy;
+				dSeg       = getWWA(dPageAddr).seg;
+				sOffset   -= cpy;
+				len       -= cpy;
 			} else {
 				long cpy = dOffset;
 				if ( cpy > len ) cpy = len;
 				MemorySegment.copy(sSeg, INT8, sOffset, dSeg, INT8, dOffset, cpy);
-				sOffset = 0;
-				dOffset = 0;
+				sOffset    = 0;
+				dOffset    = 0;
 				sPageAddr -= pageSize;
 				dPageAddr -= pageSize;
-				sSeg = get(sPageAddr).seg;
-				dSeg = getWWA(dPageAddr).seg;
-				len -= cpy;
+				sSeg       = get(sPageAddr).seg;
+				dSeg       = getWWA(dPageAddr).seg;
+				len       -= cpy;
 			}
 		}
 	}
