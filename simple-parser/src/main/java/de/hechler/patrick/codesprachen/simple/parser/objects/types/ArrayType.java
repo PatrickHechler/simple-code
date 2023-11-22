@@ -23,12 +23,12 @@ import de.hechler.patrick.codesprachen.simple.parser.error.ErrorContext;
 import de.hechler.patrick.codesprachen.simple.parser.objects.value.ScalarNumericVal;
 import de.hechler.patrick.codesprachen.simple.parser.objects.value.SimpleValue;
 
-public record ArrayType(SimpleType target, long length) implements SimpleType {
+public record ArrayType(SimpleType target, long elementCount) implements SimpleType {
 	
 	public ArrayType {
 		Objects.requireNonNull(target, "array target");
-		if ( length < -1L ) {
-			throw new IllegalArgumentException("invalid length: " + length);
+		if ( elementCount < -1L ) {
+			throw new IllegalArgumentException("invalid length: " + elementCount);
 		}
 	}
 	
@@ -50,10 +50,10 @@ public record ArrayType(SimpleType target, long length) implements SimpleType {
 	
 	@Override
 	public long size() {
-		if ( this.length <= 0L ) {
+		if ( this.elementCount <= 0L ) {
 			return 0L;
 		}
-		return this.target.size() * this.length;
+		return this.target.size() * this.elementCount;
 	}
 	
 	@Override
@@ -98,26 +98,26 @@ public record ArrayType(SimpleType target, long length) implements SimpleType {
 	
 	@Override
 	public String toString() {
-		if ( this.length == -1 ) {
+		if ( this.elementCount == -1 ) {
 			return "(" + this.target + ")[]";
 		}
-		return "(" + this.target + ")[" + this.length + "]";
+		return "(" + this.target + ")[" + this.elementCount + "]";
 	}
 	
 	@Override
 	public String toString(String idention) {
-		if ( this.length == -1 ) {
+		if ( this.elementCount == -1 ) {
 			return "(" + this.target.toString(idention) + ")[]";
 		}
-		return "(" + this.target.toString(idention) + ")[" + this.length + "]";
+		return "(" + this.target.toString(idention) + ")[" + this.elementCount + "]";
 	}
 	
 	@Override
 	public String toStringSingleLine() {
-		if ( this.length == -1 ) {
+		if ( this.elementCount == -1 ) {
 			return "(" + this.target.toStringSingleLine() + ")[]";
 		}
-		return "(" + this.target.toStringSingleLine() + ")[" + this.length + "]";
+		return "(" + this.target.toStringSingleLine() + ")[" + this.elementCount + "]";
 	}
 	
 }

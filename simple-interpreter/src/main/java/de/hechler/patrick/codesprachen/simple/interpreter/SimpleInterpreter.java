@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
+import java.util.function.LongBinaryOperator;
 import java.util.function.ToLongBiFunction;
 
 import de.hechler.patrick.codesprachen.simple.interpreter.fs.FSManager;
@@ -20,12 +21,18 @@ import de.hechler.patrick.codesprachen.simple.interpreter.fs.FSManagerImpl;
 import de.hechler.patrick.codesprachen.simple.interpreter.java.ConstantValue;
 import de.hechler.patrick.codesprachen.simple.interpreter.java.JavaCommand;
 import de.hechler.patrick.codesprachen.simple.interpreter.java.JavaStdLib;
-import de.hechler.patrick.codesprachen.simple.interpreter.java.StoredValue;
 import de.hechler.patrick.codesprachen.simple.interpreter.memory.MemoryManager;
 import de.hechler.patrick.codesprachen.simple.interpreter.memory.MemoryManagerImpl;
 import de.hechler.patrick.codesprachen.simple.parser.SimpleSourceFileParser;
 import de.hechler.patrick.codesprachen.simple.parser.error.ErrorContext;
+import de.hechler.patrick.codesprachen.simple.parser.objects.cmd.AssignCmd;
 import de.hechler.patrick.codesprachen.simple.parser.objects.cmd.BlockCmd;
+import de.hechler.patrick.codesprachen.simple.parser.objects.cmd.FuncCallCmd;
+import de.hechler.patrick.codesprachen.simple.parser.objects.cmd.IfCmd;
+import de.hechler.patrick.codesprachen.simple.parser.objects.cmd.SimpleCommand;
+import de.hechler.patrick.codesprachen.simple.parser.objects.cmd.StructFuncCallCmd;
+import de.hechler.patrick.codesprachen.simple.parser.objects.cmd.VarDeclCmd;
+import de.hechler.patrick.codesprachen.simple.parser.objects.cmd.WhileCmd;
 import de.hechler.patrick.codesprachen.simple.parser.objects.simplefile.SimpleDependency;
 import de.hechler.patrick.codesprachen.simple.parser.objects.simplefile.SimpleFile;
 import de.hechler.patrick.codesprachen.simple.parser.objects.simplefile.SimpleFunction;
@@ -38,11 +45,16 @@ import de.hechler.patrick.codesprachen.simple.parser.objects.types.SimpleType;
 import de.hechler.patrick.codesprachen.simple.parser.objects.types.StructType;
 import de.hechler.patrick.codesprachen.simple.parser.objects.value.AddressOfVal;
 import de.hechler.patrick.codesprachen.simple.parser.objects.value.BinaryOpVal;
+import de.hechler.patrick.codesprachen.simple.parser.objects.value.BinaryOpVal.BinaryOp;
 import de.hechler.patrick.codesprachen.simple.parser.objects.value.CastVal;
 import de.hechler.patrick.codesprachen.simple.parser.objects.value.CondVal;
 import de.hechler.patrick.codesprachen.simple.parser.objects.value.DataVal;
+import de.hechler.patrick.codesprachen.simple.parser.objects.value.FPNumericVal;
+import de.hechler.patrick.codesprachen.simple.parser.objects.value.FunctionVal;
 import de.hechler.patrick.codesprachen.simple.parser.objects.value.NameVal;
+import de.hechler.patrick.codesprachen.simple.parser.objects.value.ScalarNumericVal;
 import de.hechler.patrick.codesprachen.simple.parser.objects.value.SimpleValue;
+import de.hechler.patrick.codesprachen.simple.parser.objects.value.VariableVal;
 
 public class SimpleInterpreter {
 	
@@ -196,9 +208,69 @@ public class SimpleInterpreter {
 	}
 	
 	private void exec(LoadedSF lsf, SimpleFunction func, List<ConstantValue> list) {
-		ValueScope scope = new SubScope(lsf, func.type().argMembers(), func.type().resMembers());
-		// TODO
-		throw new UnsupportedOperationException("exec");
+		SubScope scope = new SubScope(this, lsf, func.type().argMembers(), func.type().resMembers());
+		final BlockCmd blk = func.block();
+		final int cc = blk.commandCount();
+		for (int pc = 0; pc < cc; pc++) {
+			exec(scope, blk.command(pc));
+		}
+		list.clear();
+		for (SimpleVariable sv : func.type().resMembers()) {
+			list.add(scope.value(this, sv.name()));
+		}
+	}
+	
+	private void exec(SubScope scope, SimpleCommand cmd) {
+		switch ( cmd ) {
+		case StructFuncCallCmd sfc:
+		case FuncCallCmd fc:
+		case BlockCmd b: {
+			SubScope sub = new SubScope(scope);
+			final int cc = b.commandCount();
+			for (int pc = 0; pc < cc; pc++) {
+				exec(scope, b.command(pc));
+			}
+			break;
+		}
+		case AssignCmd a:
+			
+		case VarDeclCmd vd:
+			if ( vd.sv.initialValue() != null ) {
+				scope.values.put(vd.sv.name(), calculate(scope, vd.sv.initialValue()));
+			} else {
+				scope.values.put(vd.sv.name(), switch ( vd.sv.type() ) {
+				case NativeType.FPNUM, NativeType.FPDWORD -> new ConstantValue.FPValue(vd.sv.type(), 0d);
+				case NativeType.UBYTE -> ConstantValue.ScalarValue.ZERO;
+				case NativeType nt -> new ConstantValue.ScalarValue(nt, 0L);
+				case PointerType pt -> new ConstantValue.ScalarValue(pt, 0L);
+				case FuncType ft when ( ft.flags() & FuncType.FLAG_FUNC_ADDRESS ) != 0 ->
+					new ConstantValue.ScalarValue(ft, 0L);
+				default -> {
+					long addr = allocData(this.mm, vd.sv.type().align(), vd.sv.type().size(), 0, this.rwaddr);
+					this.rwaddr = addr + vd.sv.type().size();
+					yield new ConstantValue.DataValue(vd.sv.type(), addr);
+				}
+				});
+			}
+			break;
+		case IfCmd i:
+			if ( ( (ConstantValue.ScalarValue) calculate(scope, i.condition) ).value() != 0L ) {
+				SubScope sub = new SubScope(scope);
+				exec(sub, i.trueCmd);
+			} else if ( i.falseCmd != null ) {
+				SubScope sub = new SubScope(scope);
+				exec(sub, i.falseCmd);
+			}
+			break;
+		case WhileCmd w:
+			while ( ( (ConstantValue.ScalarValue) calculate(scope, w.condition) ).value() != 0L ) {
+				SubScope sub = new SubScope(scope);
+				exec(sub, w.loop);
+			}
+			break;
+		default:
+			throw new AssertionError("unknown Command class: " + cmd.getClass());
+		}
 	}
 	
 	public List<ConstantValue> execute(SimpleFile sf, String funcName, List<ConstantValue> args) {
@@ -245,8 +317,8 @@ public class SimpleInterpreter {
 	
 	private ConstantValue calculate(ValueScope scope, SimpleValue val) {// NOSONAR
 		switch ( val ) {
-		case AddressOfVal ao:// NOSONAR
-			throw new UnsupportedOperationException("not yet done");
+		case AddressOfVal ao:
+			return new ConstantValue.ScalarValue(ao.type(), addressOf(scope, ao.a()));
 		case BinaryOpVal bo:
 			switch ( bo.a().type() ) {// NOSONAR
 			case NativeType.FPNUM, NativeType.FPDWORD:
@@ -346,9 +418,7 @@ public class SimpleInterpreter {
 					ConstantValue ca = calculate(scope, bo.a());
 					ConstantValue cb = calculate(scope, bo.b());
 					long off = ( (ConstantValue.ScalarValue) cb ).value();
-					if ( ca.type().size() != 1L ) {
-						off *= ca.type().size();
-					}
+					off *= arrPntrIndexMul(ca);
 					if ( ca.type() instanceof ArrayType ) {
 						return deref(bo.type(), ( (ConstantValue.DataValue) ca ).address() + off);
 					}
@@ -362,9 +432,7 @@ public class SimpleInterpreter {
 					case StructType st -> st.offset(name);
 					default -> throw new AssertionError("Unexpected value: " + bo.a().type());
 					};
-					if ( ca.type().size() != 1L ) {
-						off *= ca.type().size();
-					}
+					off *= arrPntrIndexMul(ca);
 					return deref(bo.type(), ( (ConstantValue.DataValue) ca ).address() + off);
 				}
 				case BIT_AND: {
@@ -507,9 +575,62 @@ public class SimpleInterpreter {
 		}
 		case DataVal d:
 			return scope.value(this, d);
+		case FunctionVal f:
+			return new ConstantValue.ScalarValue(f.type(), scope.addressOf(this, f.func().name()));
+		case ScalarNumericVal s:
+			return new ConstantValue.ScalarValue(s.type(), s.value());
+		case FPNumericVal s:
+			return new ConstantValue.FPValue(s.type(), s.value());
 		default:
 			throw new AssertionError("unknown value class: " + val.getClass());
 		}
+	}
+	
+	private long addressOf(ValueScope scope, SimpleValue v) {
+		switch ( v ) {
+		case CastVal cv:
+			return addressOf(scope, cv.value());
+		case DataVal d:
+			return scope.value(this, d).address();
+		case BinaryOpVal bo when bo.op() == BinaryOp.ARR_PNTR_INDEX: {
+			ConstantValue ca = calculate(scope, bo.a());
+			ConstantValue cb = calculate(scope, bo.b());
+			long a = ca instanceof ConstantValue.ScalarValue s ? s.value() : ( (ConstantValue.DataValue) ca ).address();
+			long b = ( (ConstantValue.ScalarValue) cb ).value();
+			b *= arrPntrIndexMul(ca);
+			return a + b;
+		}
+		case BinaryOpVal bo when bo.op() == BinaryOp.DEREF_BY_NAME: {
+			ConstantValue ca = calculate(scope, bo.a());
+			String name = ( (NameVal) bo.b() ).name();
+			long off = switch ( bo.a().type() ) {
+			case FuncType ft -> ft.offset(name);
+			case StructType st -> st.offset(name);
+			default -> throw new AssertionError("Unexpected value: " + bo.a().type());
+			};
+			off *= arrPntrIndexMul(ca);
+			return ( (ConstantValue.DataValue) ca ).address() + off;
+		}
+		case VariableVal vv:
+			return scope.addressOf(this, vv.sv().name());
+		default:
+			throw new IllegalStateException("can't calculate the address the value: " + v);
+		}
+	}
+	
+	private static long arrPntrIndexMul(ConstantValue ca) {
+		SimpleType target;
+		if ( ca.type() instanceof PointerType p ) {
+			target = p.target();
+		} else {
+			target = ( (ArrayType) ca.type() ).target();
+		}
+		long alignM1 = target.align() - 1L;
+		long mul = target.size();
+		if ( ( mul & alignM1 ) != 0 ) {
+			mul = ( mul & ~alignM1 ) + ( alignM1 + 1L );
+		}
+		return mul;
 	}
 	
 	private ConstantValue deref(SimpleType type, long address) {
@@ -597,27 +718,106 @@ public class SimpleInterpreter {
 	private long rwaddr;
 	private long roaddr;
 	
-	private record SubScope(ValueScope parent, Map<String, StoredValue> values) {
+	private record SubScope(ValueScope parent, Map<String, ConstantValue> values) implements ValueScope {
 		
-		public SubScope(ValueScope parent, List<SimpleVariable> l0, List<SimpleVariable> l1) {
-			this(parent, map(l0, l1));
+		public SubScope(SimpleInterpreter si, ValueScope parent, List<SimpleVariable> l0, List<SimpleVariable> l1) {
+			this(parent, funcMap(si, l0, l1));
 		}
 		
-		private static Map<String, StoredValue> map(List<SimpleVariable> l0, List<SimpleVariable> l1) {
+		public SubScope(ValueScope parent) {
+			this(parent, new HashMap<>());
+		}
+		
+		private static Map<String, ConstantValue> funcMap(SimpleInterpreter si, List<SimpleVariable> l0,
+			List<SimpleVariable> l1) {
+			Map<String, ConstantValue> map = new HashMap<>();
+			putList(si, l0, map);
+			putList(si, l1, map);
+			return map;
+		}
+		
+		private static void putList(SimpleInterpreter si, List<SimpleVariable> l0, Map<String, ConstantValue> map)
+			throws AssertionError {
 			for (SimpleVariable sv : l0) {
-				switch (sv.type()) {
-				
+				switch ( sv.type() ) {
+				case NativeType.FPNUM, NativeType.FPDWORD ->
+					map.put(sv.name(), new ConstantValue.FPValue(sv.type(), 0d));
+				case NativeType nt -> map.put(sv.name(), new ConstantValue.ScalarValue(nt, 0L));
+				case PointerType pt -> map.put(sv.name(), new ConstantValue.ScalarValue(pt, 0L));
+				case FuncType ft when ( ft.flags() & FuncType.FLAG_FUNC_ADDRESS ) != 0 ->
+					map.put(sv.name(), new ConstantValue.ScalarValue(ft, 0L));
+				case ArrayType at -> {
+					long rwaddr = SimpleInterpreter.allocData(si.mm, at.align(), at.size(), 0, si.rwaddr);
+					si.rwaddr = rwaddr + at.size();
+					map.put(sv.name(), new ConstantValue.DataValue(at, rwaddr));
+				}
+				case StructType st -> {
+					long rwaddr = SimpleInterpreter.allocData(si.mm, st.align(), st.size(), 0, si.rwaddr);
+					si.rwaddr = rwaddr + st.size();
+					map.put(sv.name(), new ConstantValue.DataValue(st, rwaddr));
+				}
+				case FuncType ft -> {
+					long rwaddr = SimpleInterpreter.allocData(si.mm, ft.align(), ft.size(), 0, si.rwaddr);
+					si.rwaddr = rwaddr + ft.size();
+					map.put(sv.name(), new ConstantValue.DataValue(ft, rwaddr));
+				}
+				default -> throw new AssertionError("unknown type class: " + sv.type().getClass());
 				}
 			}
+		}
+		
+		@Override
+		public ConstantValue value(SimpleInterpreter si, String name) {
+			ConstantValue v = this.values.get(name);
+			if ( v == null ) return this.parent.value(si, name);
+			if ( v instanceof ConstantValue.DataValue(SimpleType t, long addr)
+				&& ( t instanceof NativeType || t instanceof PointerType
+					|| ( t instanceof FuncType ft && ( ft.flags() & FuncType.FLAG_FUNC_ADDRESS ) != 0 ) ) ) {
+				return si.deref(t, addr);
+			}
+			return v;
+		}
+		
+		@Override
+		public void value(SimpleInterpreter si, String name, ConstantValue value) {
+			ConstantValue v = this.values.get(name);
+			if ( v == null ) {
+				this.parent.value(si, name);
+				return;
+			}
+			if ( v instanceof ConstantValue.DataValue d ) {
+				si.put(d.address(), value);
+			} else {
+				this.values.put(name, value);
+			}
+		}
+		
+		@Override
+		public long addressOf(SimpleInterpreter si, String name) {
+			ConstantValue v = this.values.get(name);
+			if ( v == null ) {
+				return this.parent.addressOf(si, name);
+			}
+			if ( v instanceof ConstantValue.DataValue d ) {
+				return d.address();
+			}
+			long rwaddr = SimpleInterpreter.allocData(si.mm, v.type().align(), v.type().size(), 0, si.rwaddr);
+			si.rwaddr = rwaddr + v.type().size();
+			si.put(rwaddr, v);
+			this.values.put(name, new ConstantValue.DataValue(v.type(), rwaddr));
+			return rwaddr;
+		}
+		
+		@Override
+		public ConstantValue.DataValue value(SimpleInterpreter si, DataVal data) {
+			return this.parent.value(si, data);
 		}
 		
 		
 	}
 	
-	private record LoadedValue(SimpleType type, long address) implements StoredValue {}
-	
-	private record LoadedSF(SimpleFile sf, Map<String, LoadedValue> addrs, Map<byte[], Long> rodata)
-		implements ValueScope {
+	private record LoadedSF(SimpleFile sf, Map<String, ConstantValue.DataValue> addrs, Map<byte[], Long> rodata,
+		Map<Long, SimpleFunction> funcs) implements ValueScope {
 		
 		public LoadedSF(SimpleFile sf) {
 			this(sf, new HashMap<>(), new TreeMap<>((a, b) -> {
@@ -632,45 +832,59 @@ public class SimpleInterpreter {
 					}
 				}
 				return 0;
-			}));
+			}), new HashMap<>());
+		}
+		
+		public SimpleFunction ofAddr(long addr) {
+			SimpleFunction f = this.funcs.get(Long.valueOf(addr));
+			if ( f != null ) return f;
+			throw new NullPointerException("there is no function at address 0x" + Long.toHexString(addr));
 		}
 		
 		@Override
 		public ConstantValue value(SimpleInterpreter si, String name) {
-			LoadedValue res = this.addrs.get(name);
+			ConstantValue.DataValue res = this.addrs.get(name);
 			if ( res == null ) {
 				res = allocValue(si, name);
 			}
-			return si.deref(res.type, res.address);
+			return si.deref(res.type(), res.address());
 		}
 		
 		@Override
 		public long addressOf(SimpleInterpreter si, String name) {
-			LoadedValue res = this.addrs.get(name);
+			ConstantValue.DataValue res = this.addrs.get(name);
 			if ( res == null ) {
 				res = allocValue(si, name);
 			}
-			return res.address;
+			return res.address();
 		}
 		
 		@Override
 		public void value(SimpleInterpreter si, String name, ConstantValue value) {
-			LoadedValue res = this.addrs.get(name);
+			ConstantValue.DataValue res = this.addrs.get(name);
 			if ( res == null ) {
 				res = allocValue(si, name);
 			}
-			si.put(res.address, value);
+			si.put(res.address(), value);
 		}
 		
-		private LoadedValue allocValue(SimpleInterpreter si, String name) {
-			LoadedValue res;
+		private ConstantValue.DataValue allocValue(SimpleInterpreter si, String name) {
+			ConstantValue.DataValue res;
 			SimpleVariable sv = this.sf.variable(name);
 			if ( sv == null ) {
-				throw new IllegalArgumentException(noVal(name));
+				SimpleFunction f = this.sf.function(name);
+				if ( f == null ) throw new IllegalArgumentException(noVal(name));
+				long roaddr = allocData(si.mm, 1, 1L, MemoryManager.FLAG_READ_ONLY, si.roaddr);
+				si.roaddr = roaddr + 1L;
+				res = new ConstantValue.DataValue(f.type(), roaddr);
+				Long l = Long.valueOf(roaddr);
+				this.addrs.put(name, res);
+				this.funcs.put(l, f);
+				return res;
 			}
-			long rwaddr = allocData(si.mm, sv.type().align(), sv.type().size(), MemoryManager.FLAG_READ_ONLY, si.rwaddr);
+			long rwaddr = allocData(si.mm, sv.type().align(), sv.type().size(), 0, si.rwaddr);
 			si.rwaddr = rwaddr + sv.type().size();
-			res = new LoadedValue(sv.type(), rwaddr);
+			res = new ConstantValue.DataValue(sv.type(), rwaddr);
 			this.addrs.put(name, res);
 			return res;
 		}
@@ -680,7 +894,7 @@ public class SimpleInterpreter {
 		}
 		
 		@Override
-		public ConstantValue value(SimpleInterpreter si, DataVal data) {
+		public ConstantValue.DataValue value(SimpleInterpreter si, DataVal data) {
 			DataVal orig = data.orig() == null ? data : data.orig();
 			byte[] bytes = orig.value();
 			Long addr = this.rodata.get(bytes);
@@ -715,7 +929,7 @@ public class SimpleInterpreter {
 		
 		ConstantValue value(SimpleInterpreter si, String name);
 		
-		ConstantValue value(SimpleInterpreter si, DataVal data);
+		ConstantValue.DataValue value(SimpleInterpreter si, DataVal data);
 		
 		void value(SimpleInterpreter si, String name, ConstantValue value);
 		

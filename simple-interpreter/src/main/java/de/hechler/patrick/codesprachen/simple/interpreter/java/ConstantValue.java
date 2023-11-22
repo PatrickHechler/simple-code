@@ -10,7 +10,7 @@ public sealed interface ConstantValue {
 	
 	record DataValue(SimpleType type, long address) implements ConstantValue {}
 	
-	record ScalarValue(SimpleType type, long value) implements ConstantValue, StoredValue {
+	record ScalarValue(SimpleType type, long value) implements ConstantValue {
 		
 		public static ScalarValue ONE = new ScalarValue(NativeType.UBYTE, 1L);
 		public static ScalarValue ZERO = new ScalarValue(NativeType.UBYTE, 0L);
@@ -32,7 +32,7 @@ public sealed interface ConstantValue {
 		
 	}
 	
-	record FPValue(SimpleType type, double value) implements ConstantValue, StoredValue {
+	record FPValue(SimpleType type, double value) implements ConstantValue {
 		
 		public FPValue(SimpleType type, double value) {
 			if ( type == NativeType.FPNUM ) {
