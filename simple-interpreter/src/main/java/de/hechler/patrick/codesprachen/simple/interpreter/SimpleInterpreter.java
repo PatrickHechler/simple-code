@@ -20,6 +20,7 @@ import de.hechler.patrick.codesprachen.simple.interpreter.fs.FSManagerImpl;
 import de.hechler.patrick.codesprachen.simple.interpreter.java.ConstantValue;
 import de.hechler.patrick.codesprachen.simple.interpreter.java.JavaCommand;
 import de.hechler.patrick.codesprachen.simple.interpreter.java.JavaStdLib;
+import de.hechler.patrick.codesprachen.simple.interpreter.java.StoredValue;
 import de.hechler.patrick.codesprachen.simple.interpreter.memory.MemoryManager;
 import de.hechler.patrick.codesprachen.simple.interpreter.memory.MemoryManagerImpl;
 import de.hechler.patrick.codesprachen.simple.parser.SimpleSourceFileParser;
@@ -195,6 +196,7 @@ public class SimpleInterpreter {
 	}
 	
 	private void exec(LoadedSF lsf, SimpleFunction func, List<ConstantValue> list) {
+		ValueScope scope = new SubScope(lsf, func.type().argMembers(), func.type().resMembers());
 		// TODO
 		throw new UnsupportedOperationException("exec");
 	}
@@ -595,10 +597,27 @@ public class SimpleInterpreter {
 	private long rwaddr;
 	private long roaddr;
 	
+	private record SubScope(ValueScope parent, Map<String, StoredValue> values) {
+		
+		public SubScope(ValueScope parent, List<SimpleVariable> l0, List<SimpleVariable> l1) {
+			this(parent, map(l0, l1));
+		}
+		
+		private static Map<String, StoredValue> map(List<SimpleVariable> l0, List<SimpleVariable> l1) {
+			for (SimpleVariable sv : l0) {
+				switch (sv.type()) {
+				
+				}
+			}
+		}
+		
+		
+	}
+	
+	private record LoadedValue(SimpleType type, long address) implements StoredValue {}
+	
 	private record LoadedSF(SimpleFile sf, Map<String, LoadedValue> addrs, Map<byte[], Long> rodata)
 		implements ValueScope {
-		
-		record LoadedValue(SimpleType type, long address) {}
 		
 		public LoadedSF(SimpleFile sf) {
 			this(sf, new HashMap<>(), new TreeMap<>((a, b) -> {
@@ -649,7 +668,7 @@ public class SimpleInterpreter {
 			if ( sv == null ) {
 				throw new IllegalArgumentException(noVal(name));
 			}
-			long rwaddr = allocData(si, sv.type().align(), sv.type().size(), MemoryManager.FLAG_READ_ONLY, si.rwaddr);
+			long rwaddr = allocData(si.mm, sv.type().align(), sv.type().size(), MemoryManager.FLAG_READ_ONLY, si.rwaddr);
 			si.rwaddr = rwaddr + sv.type().size();
 			res = new LoadedValue(sv.type(), rwaddr);
 			this.addrs.put(name, res);
@@ -668,7 +687,7 @@ public class SimpleInterpreter {
 			if ( addr != null ) {
 				return new ConstantValue.DataValue(data.type(), addr.longValue() + data.off());
 			}
-			long roaddr = allocData(si, data.type().align(), bytes.length, MemoryManager.FLAG_READ_ONLY, si.roaddr);
+			long roaddr = allocData(si.mm, data.type().align(), bytes.length, MemoryManager.FLAG_READ_ONLY, si.roaddr);
 			si.roaddr = roaddr + bytes.length;
 			MemoryManager mem = si.mm;
 			addr = Long.valueOf(roaddr);
@@ -678,22 +697,21 @@ public class SimpleInterpreter {
 			return new ConstantValue.DataValue(data.type(), roaddr + data.off());
 		}
 		
-		private static long allocData(SimpleInterpreter si, int align, long length, int flags, long roaddr) {
-			MemoryManager mem = si.mm;
-			final long pageSize = mem.pageSize();
-			final long mask = Math.min(mem.pageSize(), align) - 1L;
-			if ( ( roaddr & mask ) != 0 ) {
-				roaddr = ( roaddr & ~mask ) + align;
-			}
-			if ( pageSize >= ( roaddr & ( pageSize - 1L ) ) + length ) {
-				roaddr = mem.allocate(length, 0L, flags);
-			}
-			return roaddr;
-		}
-		
 	}
 	
-	interface ValueScope {
+	private static long allocData(MemoryManager mem, int align, long length, int flags, long roaddr) {
+		final long pageSize = mem.pageSize();
+		final long mask = Math.min(mem.pageSize(), align) - 1L;
+		if ( ( roaddr & mask ) != 0 ) {
+			roaddr = ( roaddr & ~mask ) + align;
+		}
+		if ( pageSize >= ( roaddr & ( pageSize - 1L ) ) + length ) {
+			roaddr = mem.allocate(length, 0L, flags);
+		}
+		return roaddr;
+	}
+	
+	private interface ValueScope {
 		
 		ConstantValue value(SimpleInterpreter si, String name);
 		

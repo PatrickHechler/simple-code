@@ -7,10 +7,10 @@ import de.hechler.patrick.codesprachen.simple.parser.objects.types.SimpleType;
 public sealed interface ConstantValue {
 	
 	SimpleType type();
-
+	
 	record DataValue(SimpleType type, long address) implements ConstantValue {}
-
-	record ScalarValue(SimpleType type, long value) implements ConstantValue {
+	
+	record ScalarValue(SimpleType type, long value) implements ConstantValue, StoredValue {
 		
 		public static ScalarValue ONE = new ScalarValue(NativeType.UBYTE, 1L);
 		public static ScalarValue ZERO = new ScalarValue(NativeType.UBYTE, 0L);
@@ -32,7 +32,7 @@ public sealed interface ConstantValue {
 		
 	}
 	
-	record FPValue(SimpleType type, double value) implements ConstantValue {
+	record FPValue(SimpleType type, double value) implements ConstantValue, StoredValue {
 		
 		public FPValue(SimpleType type, double value) {
 			if ( type == NativeType.FPNUM ) {
