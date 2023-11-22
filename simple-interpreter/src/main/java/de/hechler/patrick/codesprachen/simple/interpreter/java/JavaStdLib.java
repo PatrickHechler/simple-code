@@ -33,7 +33,7 @@ public class JavaStdLib extends JavaDependency {
 	 * <li>offset of allocation table</li>
 	 * </ol>
 	 * </li>
-	 * <li>next page</li>
+	 * <li>start address of the next page</li>
 	 * </ol>
 	 */
 	private final long firstPage;
