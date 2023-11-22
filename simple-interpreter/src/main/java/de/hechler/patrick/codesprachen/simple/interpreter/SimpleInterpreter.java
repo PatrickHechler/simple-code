@@ -13,12 +13,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
-import java.util.function.LongBinaryOperator;
 import java.util.function.ToLongBiFunction;
 
 import de.hechler.patrick.codesprachen.simple.interpreter.fs.FSManager;
 import de.hechler.patrick.codesprachen.simple.interpreter.fs.FSManagerImpl;
 import de.hechler.patrick.codesprachen.simple.interpreter.java.ConstantValue;
+import de.hechler.patrick.codesprachen.simple.interpreter.java.ConstantValue.DataValue;
 import de.hechler.patrick.codesprachen.simple.interpreter.java.JavaCommand;
 import de.hechler.patrick.codesprachen.simple.interpreter.java.JavaStdLib;
 import de.hechler.patrick.codesprachen.simple.interpreter.memory.MemoryManager;
@@ -199,12 +199,46 @@ public class SimpleInterpreter {
 				throw new IllegalStateException("no main file set");
 			}
 		}
-		SimpleFile mainFile = load(main, null).sf;
-		SimpleFunction func = Objects.requireNonNull(mainFile.main(), "the main file has no main function");
-		long addr = this.allocArgs.applyAsLong(this, args);
-		List<ConstantValue> list = List.of(new ConstantValue.ScalarValue(NativeType.UNUM, args.length),
-			new ConstantValue.ScalarValue(FuncType.MAIN_TYPE.argMembers().get(1).type(), addr));
-		return (int) ( (ConstantValue.ScalarValue) execute(mainFile, func, list).get(0) ).value();
+		try {
+			SimpleFile mainFile = load(main, null).sf;
+			SimpleFunction func = Objects.requireNonNull(mainFile.main(), "the main file has no main function");
+			long addr = this.allocArgs.applyAsLong(this, args);
+			List<ConstantValue> list = List.of(new ConstantValue.ScalarValue(NativeType.UNUM, args.length),
+				new ConstantValue.ScalarValue(FuncType.MAIN_TYPE.argMembers().get(1).type(), addr));
+			return (int) ( (ConstantValue.ScalarValue) execute(mainFile, func, list).get(0) ).value();
+		} catch (ExitError e) {
+			return e.exitnum;
+		}
+	}
+	
+	public static class ExitError extends RuntimeException {
+		
+		private static final long serialVersionUID = -8419388530355564771L;
+		
+		public final int exitnum;
+		
+		public ExitError(String message, Throwable cause, int exitnum) {
+			super(message, cause);
+			this.exitnum = exitnum;
+		}
+		
+		public ExitError(String message, int exitnum) {
+			super(message);
+			this.exitnum = exitnum;
+		}
+		
+		public ExitError(Throwable cause, int exitnum) {
+			super(cause);
+			this.exitnum = exitnum;
+		}
+		
+		public ExitError(int exitnum) {
+			super();
+			this.exitnum = exitnum;
+		}
+		
+		
+		
 	}
 	
 	private void exec(LoadedSF lsf, SimpleFunction func, List<ConstantValue> list) {
@@ -212,7 +246,7 @@ public class SimpleInterpreter {
 		final BlockCmd blk = func.block();
 		final int cc = blk.commandCount();
 		for (int pc = 0; pc < cc; pc++) {
-			exec(scope, blk.command(pc));
+			exec(scope, blk.command(pc), list);
 		}
 		list.clear();
 		for (SimpleVariable sv : func.type().resMembers()) {
@@ -220,20 +254,57 @@ public class SimpleInterpreter {
 		}
 	}
 	
-	private void exec(SubScope scope, SimpleCommand cmd) {
+	private void exec(SubScope scope, SimpleCommand cmd, List<ConstantValue> list) {
 		switch ( cmd ) {
-		case StructFuncCallCmd sfc:
-		case FuncCallCmd fc:
+		case StructFuncCallCmd sfc: {
+			long addr = ( (ConstantValue.ScalarValue) calculate(scope, sfc.func) ).value();
+			LoadedFunction lf = ofAddr(addr);
+			list.clear();
+			ConstantValue.DataValue fstruct = (DataValue) calculate(scope, sfc.fstruct);
+			for (SimpleVariable av : lf.func.type().argMembers()) {
+				long off = lf.func.type().offset(av.name());
+				list.add(new ConstantValue.DataValue(av.type(), fstruct.address() + off));
+			}
+			if ( lf.func.block() == null ) {
+				throw new IllegalStateException("the function " + lf.func + " could not be resolved!");
+			}
+			if ( lf.func.block().commandCount() == 1 && lf.func.block().command(0) instanceof JavaCommand jc ) {
+				list = jc.func.execute(this, list);
+			} else {
+				SubScope sub = new SubScope(this, lf.file, lf.func.type().argMembers(), lf.func.type().resMembers());
+				exec(sub, lf.func.block(), list);
+			}
+			List<SimpleVariable> rm = lf.func.type().resMembers();
+			for (int i = 0; i < list.size(); i++) {
+				long off = lf.func.type().offset(rm.get(i).name());
+				put(fstruct.address() + off, list.get(i));
+			}
+			break;
+		}
+		case FuncCallCmd fc: {
+			long addr = ( (ConstantValue.ScalarValue) calculate(scope, fc.func) ).value();
+			LoadedFunction lf = ofAddr(addr);
+			list.clear();
+			for (SimpleValue av : fc.arguments) {
+				list.add(calculate(scope, av));
+			}
+			list = execute(lf.file.sf, lf.func, list);
+			for (int i = 0; i < list.size(); i++) {
+				assign(scope, list.get(i), fc.results.get(i));
+			}
+			break;
+		}
 		case BlockCmd b: {
 			SubScope sub = new SubScope(scope);
 			final int cc = b.commandCount();
 			for (int pc = 0; pc < cc; pc++) {
-				exec(scope, b.command(pc));
+				exec(sub, b.command(pc), list);
 			}
 			break;
 		}
 		case AssignCmd a:
-			
+			assign(scope, calculate(scope, a.value), a.target);
+			break;
 		case VarDeclCmd vd:
 			if ( vd.sv.initialValue() != null ) {
 				scope.values.put(vd.sv.name(), calculate(scope, vd.sv.initialValue()));
@@ -256,20 +327,59 @@ public class SimpleInterpreter {
 		case IfCmd i:
 			if ( ( (ConstantValue.ScalarValue) calculate(scope, i.condition) ).value() != 0L ) {
 				SubScope sub = new SubScope(scope);
-				exec(sub, i.trueCmd);
+				exec(sub, i.trueCmd, list);
 			} else if ( i.falseCmd != null ) {
 				SubScope sub = new SubScope(scope);
-				exec(sub, i.falseCmd);
+				exec(sub, i.falseCmd, list);
 			}
 			break;
 		case WhileCmd w:
 			while ( ( (ConstantValue.ScalarValue) calculate(scope, w.condition) ).value() != 0L ) {
 				SubScope sub = new SubScope(scope);
-				exec(sub, w.loop);
+				exec(sub, w.loop, list);
 			}
 			break;
 		default:
 			throw new AssertionError("unknown Command class: " + cmd.getClass());
+		}
+	}
+	
+	private void assign(SubScope scope, ConstantValue newValue, SimpleValue targetValue) throws AssertionError {
+		switch ( targetValue ) {
+		case VariableVal v:
+			scope.value(this, v.sv().name(), newValue);
+			break;
+		case BinaryOpVal bo when bo.op() == BinaryOp.ARR_PNTR_INDEX: {
+			ConstantValue ca = calculate(scope, bo.a());
+			ConstantValue cb = calculate(scope, bo.b());
+			long off = ( (ConstantValue.ScalarValue) cb ).value();
+			off *= arrPntrIndexMul(ca);
+			long targetAddr;
+			if ( ca.type() instanceof ArrayType ) {
+				targetAddr = ( (ConstantValue.DataValue) ca ).address() + off;
+			} else {
+				targetAddr = ( (ConstantValue.ScalarValue) ca ).value() + off;
+			}
+			put(targetAddr, newValue);
+			break;
+		}
+		case BinaryOpVal bo when bo.op() == BinaryOp.DEREF_BY_NAME: {
+			ConstantValue ca = calculate(scope, bo.a());
+			String name = ( (NameVal) bo.b() ).name();
+			long off = switch ( bo.a().type() ) {
+			case FuncType ft -> ft.offset(name);
+			case StructType st -> st.offset(name);
+			default -> throw new AssertionError("illegal value class: " + bo.a().type().getClass());
+			};
+			off *= arrPntrIndexMul(ca);
+			long targetAddr = ( (ConstantValue.DataValue) ca ).address() + off;
+			put(targetAddr, newValue);
+			break;
+		}
+		default: {
+			long targetAddr = addressOf(scope, targetValue);
+			put(targetAddr, newValue);
+		}
 		}
 	}
 	
@@ -284,15 +394,10 @@ public class SimpleInterpreter {
 		FuncType t = func.type();
 		BlockCmd blk = func.block();
 		int ccnt = blk.commandCount();
-		if ( ccnt <= 0 ) {
-			if ( ccnt == 0 ) {
-				return List.of();
-			}
-			if ( blk.command(0) instanceof JavaCommand jc ) {
-				List<ConstantValue> result = jc.func.execute(this, args);
-				checkType(t.resMembers(), result, false);
-				return result;
-			}
+		if ( ccnt == 1 && blk.command(0) instanceof JavaCommand jc ) {
+			List<ConstantValue> result = jc.func.execute(this, args);
+			checkType(t.resMembers(), result, false);
+			return result;
 		}
 		List<ConstantValue> list = new ArrayList<>(args);
 		exec(load(sf.binaryTarget, null), func, list);
@@ -816,8 +921,18 @@ public class SimpleInterpreter {
 		
 	}
 	
-	private record LoadedSF(SimpleFile sf, Map<String, ConstantValue.DataValue> addrs, Map<byte[], Long> rodata,
-		Map<Long, SimpleFunction> funcs) implements ValueScope {
+	private final Map<Long, LoadedFunction> funcs = new HashMap<>();
+	
+	public LoadedFunction ofAddr(long addr) {
+		LoadedFunction f = this.funcs.get(Long.valueOf(addr));
+		if ( f != null ) return f;
+		throw new NullPointerException("there is no function at address 0x" + Long.toHexString(addr));
+	}
+	
+	private record LoadedFunction(LoadedSF file, SimpleFunction func) {}
+	
+	private record LoadedSF(SimpleFile sf, Map<String, ConstantValue.DataValue> addrs, Map<byte[], Long> rodata)
+		implements ValueScope {
 		
 		public LoadedSF(SimpleFile sf) {
 			this(sf, new HashMap<>(), new TreeMap<>((a, b) -> {
@@ -832,13 +947,7 @@ public class SimpleInterpreter {
 					}
 				}
 				return 0;
-			}), new HashMap<>());
-		}
-		
-		public SimpleFunction ofAddr(long addr) {
-			SimpleFunction f = this.funcs.get(Long.valueOf(addr));
-			if ( f != null ) return f;
-			throw new NullPointerException("there is no function at address 0x" + Long.toHexString(addr));
+			}));
 		}
 		
 		@Override
@@ -879,7 +988,7 @@ public class SimpleInterpreter {
 				res = new ConstantValue.DataValue(f.type(), roaddr);
 				Long l = Long.valueOf(roaddr);
 				this.addrs.put(name, res);
-				this.funcs.put(l, f);
+				si.funcs.put(l, new LoadedFunction(this, f));
 				return res;
 			}
 			long rwaddr = allocData(si.mm, sv.type().align(), sv.type().size(), 0, si.rwaddr);
@@ -925,7 +1034,7 @@ public class SimpleInterpreter {
 		return roaddr;
 	}
 	
-	private interface ValueScope {
+	private sealed interface ValueScope {
 		
 		ConstantValue value(SimpleInterpreter si, String name);
 		
