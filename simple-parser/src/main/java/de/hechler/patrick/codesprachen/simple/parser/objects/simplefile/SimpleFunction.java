@@ -19,10 +19,10 @@ package de.hechler.patrick.codesprachen.simple.parser.objects.simplefile;
 import de.hechler.patrick.codesprachen.simple.parser.objects.cmd.BlockCmd;
 import de.hechler.patrick.codesprachen.simple.parser.objects.types.FuncType;
 
-public record SimpleFunction(String name, FuncType type, BlockCmd block) {
+public record SimpleFunction(SimpleDependency dep, String name, FuncType type, BlockCmd block) {
 	
-	public SimpleFunction(String name, FuncType type) {
-		this(name, type, null);
+	public SimpleFunction(SimpleDependency dep, String name, FuncType type) {
+		this(dep, name, type, null);
 	}
 	
 	public SimpleFunction {

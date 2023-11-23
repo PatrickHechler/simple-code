@@ -6,12 +6,12 @@ import static java.util.List.of;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Path;
 import java.util.List;
 
 import de.hechler.patrick.codesprachen.simple.interpreter.SimpleInterpreter;
 import de.hechler.patrick.codesprachen.simple.interpreter.memory.MemoryManager;
 import de.hechler.patrick.codesprachen.simple.parser.error.ErrorContext;
+import de.hechler.patrick.codesprachen.simple.parser.objects.simplefile.SimpleFile;
 import de.hechler.patrick.codesprachen.simple.parser.objects.simplefile.SimpleVariable;
 import de.hechler.patrick.codesprachen.simple.parser.objects.types.FuncType;
 import de.hechler.patrick.codesprachen.simple.parser.objects.types.PointerType;
@@ -59,18 +59,18 @@ public class JavaStdLib extends JavaDependency {
 		if ( bs < 32L ) {
 			throw new IllegalArgumentException("page size too small");
 		}
-		final int ws = offSize(bs);
+		final int offSize = offSize(bs);
 		this.firstPage = mem.allocate(bs, 0L, 0);
 		final long blockEndOff = bs - 8L;
-		final long blockStartOff = blockEndOff - ws;
+		final long blockStartOff = blockEndOff - offSize * 3;
 		final long blockEndAddr = this.firstPage + blockEndOff;
-		btSetOffset(mem, blockEndAddr - ws, ws, blockStartOff);
-		btSetOffset(mem, blockEndAddr - ( ws << 1 ), ws, 8L);
+		btSetOffset(mem, blockEndAddr - offSize, offSize, blockStartOff);
+		btSetOffset(mem, blockEndAddr - ( offSize << 1 ), offSize, 8L);
 		function("exit", ft(of(), of(sv(UBYTE, "exitnum"))), (si_, args) -> {
 			int eval = (int) ( (ConstantValue.ScalarValue) args.get(0) ).value();
 			throw new SimpleInterpreter.ExitError(eval);
 		});
-		function("mem_alloc", ft(of(sv(PNTR, "addr")), of(sv(UNUM, "length"), sv(UNUM, "align"))), (si_, args) -> {
+		function("mem_alloc", ft(of(sv(PNTR, "addr")), of(sv(UNUM, "length"), sv(UNUM, "align"))), (si_, args) -> {// NOSONAR
 			long len = ( (ConstantValue.ScalarValue) args.get(0) ).value();
 			long align = ( (ConstantValue.ScalarValue) args.get(1) ).value();
 			return List.of(new ConstantValue.ScalarValue(UNUM, alloc(len, align)));
@@ -88,16 +88,47 @@ public class JavaStdLib extends JavaDependency {
 			free(addr);
 			return List.of();
 		});
-		JavaDependency sys = new JavaDependency(null);
-		sys.function("page_size", ft(of(sv(UNUM, "result")), of()),
+		function("mem_copy", ft(of(), of(sv(PNTR, "from"), sv(PNTR, "to"), sv(UNUM, "length"))), (si_, args) -> {
+			long from = ( (ConstantValue.ScalarValue) args.get(0) ).value();
+			long to = ( (ConstantValue.ScalarValue) args.get(1) ).value();
+			long length = ( (ConstantValue.ScalarValue) args.get(2) ).value();
+			si_.memManager().copy(from, to, length);
+			return List.of();
+		});
+		function("mem_move", ft(of(), of(sv(PNTR, "from"), sv(PNTR, "to"), sv(UNUM, "length"))), (si_, args) -> {
+			long from = ( (ConstantValue.ScalarValue) args.get(0) ).value();
+			long to = ( (ConstantValue.ScalarValue) args.get(1) ).value();
+			long length = ( (ConstantValue.ScalarValue) args.get(2) ).value();
+			si_.memManager().move(from, to, length);
+			return List.of();
+		});
+		function("puts", ft(of(sv(UNUM, "wrote"), sv(UNUM, "errno")), of(sv(PNTR, "string"))), (si_, args) -> {
+			long addr = ( (ConstantValue.ScalarValue) args.get(0) ).value();
+			long len;
+			for (len = 0L; mem.get8(addr + len) != 0; len++);
+			if ( len > Integer.MAX_VALUE ) len = Integer.MAX_VALUE;
+			ByteBuffer bb = ByteBuffer.allocate((int) len);
+			mem.get(addr, bb);
+			String str = new String(bb.array(), StandardCharsets.UTF_8);
+			System.out.print(str);
+			return List.of(new ConstantValue.ScalarValue(UNUM, len), new ConstantValue.ScalarValue(UNUM, 0L));
+		});
+		JavaDependency sys = new JavaDependency(null) {
+			@Override
+			public int hashCode() {
+				return "std:sys".hashCode();
+			}
+			
+			@Override
+			public boolean equals(Object obj) {
+				return obj == this;
+			}
+		};
+		sys.function("pagesize", ft(of(sv(UNUM, "result")), of()),
 			(si_, args) -> List.of(new ConstantValue.ScalarValue(UNUM, si_.memManager().pageSize())));
-		sys.function("page_shift", ft(of(sv(UNUM, "result")), of()),
+		sys.function("pageshift", ft(of(sv(UNUM, "result")), of()),
 			(si_, args) -> List.of(new ConstantValue.ScalarValue(UNUM, si_.memManager().pageShift())));
 		dependency(sys, "sys", ErrorContext.NO_CONTEXT);
-	}
-	
-	public static void main(String[] args) {
-		System.out.println(new SimpleInterpreter(List.of(Path.of(""))));
 	}
 	
 	private static SimpleVariable sv(SimpleType t, String name) {
@@ -130,12 +161,10 @@ public class JavaStdLib extends JavaDependency {
 			final long tableEndAddr = blockAddr + pageSize - 8L;
 			final long tableStartOffset = btGetOffset(mem, tableEndAddr - offSize, offSize);
 			final long tableStartAddr = blockAddr + tableStartOffset;
-			if ( tableEndAddr != tableStartAddr ) {
-				long lastEntryEnd = btGetOffset(mem, tableEndAddr - ( offSize << 1 ), offSize);
-				if ( tableStartOffset - lastEntryEnd < offSize ) {
-					blockAddr = nextPage(mem, pageSize, offSize, blockAddr);
-					continue;
-				}
+			long lastEntryEnd = btGetOffset(mem, tableEndAddr - ( offSize << 1 ), offSize);
+			if ( tableStartOffset - lastEntryEnd < offSize ) {
+				blockAddr = nextPage(mem, pageSize, offSize, blockAddr);
+				continue;
 			}
 			long resultAddress =
 				allocInPage(len, align, mem, blockAddr, offSize, tableEndAddr, tableStartOffset, tableStartAddr);
@@ -188,27 +217,27 @@ public class JavaStdLib extends JavaDependency {
 		final long alignM1 = align - 1L;
 		long addr = tableEndAddr - offSize;
 		while ( true ) {
-			long startAddr = pageAddr + btGetOffset(mem, addr, offSize);
+			final long startAddr = pageAddr + btGetOffset(mem, addr, offSize);
 			addr -= offSize;
 			long prevEndAddr;
 			if ( addr < tableStartAddr ) {
 				prevEndAddr = pageAddr;
 			} else {
-				prevEndAddr = btGetOffset(mem, addr, offSize);
+				prevEndAddr = pageAddr + btGetOffset(mem, addr, offSize);
 			}
 			if ( ( prevEndAddr & alignM1 ) != 0 ) {
 				prevEndAddr = ( prevEndAddr & ~alignM1 ) + align;
 			}
-			long free = startAddr - prevEndAddr;
+			final long free = startAddr - prevEndAddr;
 			if ( free >= len ) {
 				long nextHalfFree = ( free - len ) >>> 1;
 				long resultAddr = ( prevEndAddr + nextHalfFree ) & ~alignM1;
-				mem.move(tableStartAddr, tableStartOffset - ( offSize << 1 ), addr - tableStartAddr);
+				mem.move(tableStartAddr, tableStartAddr - ( offSize << 1 ), startAddr - tableStartAddr);
 				addr -= offSize;
 				btSetOffset(mem, addr, offSize, resultAddr - pageAddr + len);
 				addr -= offSize;
 				btSetOffset(mem, addr, offSize, resultAddr - pageAddr);
-				btSetOffset(mem, tableEndAddr - offSize, offSize, tableStartAddr - offSize);
+				btSetOffset(mem, tableEndAddr - offSize, offSize, tableStartOffset - offSize);
 				return resultAddr;
 			}
 			if ( addr < tableStartAddr ) {
@@ -315,12 +344,14 @@ public class JavaStdLib extends JavaDependency {
 					btSetOffset(mem, tableStartAddr, offSize, resultOff);
 					btSetOffset(mem, tableStartAddr + offSize, offSize, resultOff + newLength);
 					final long result = pageAddr + resultOff;
-					mem.move(oldAddr, result, Math.min(newLength, oldLength));
-					free(oldAddr);
+					if ( result != oldAddr ) {
+						mem.move(oldAddr, result, Math.min(newLength, oldLength));
+					}
 					return result;
 				}
 				long result = alloc(newLength, newAlign);
 				mem.copy(oldAddr, result, Math.min(newLength, oldLength));
+				free(oldAddr);
 				return result;
 			}
 		}
@@ -405,6 +436,37 @@ public class JavaStdLib extends JavaDependency {
 		throw new IllegalStateException(noAllocMsg(freeAddr));
 	}
 	
+	// used for debugging
+	@SuppressWarnings("unused")
+	private static String metadataToString(final MemoryManager mem, final long pageAddr, final long pageSize) {
+		StringBuilder sb = new StringBuilder().append('\n');
+		final int offSize = offSize(pageSize);
+		final boolean largePage = pageSize != mem.pageSize();
+		sb.append("page: 0x").append(Long.toHexString(pageAddr)).append(" : ").append(Long.toUnsignedString(pageAddr))
+			.append('\n');
+		sb.append("  size: 0x").append(Long.toHexString(pageSize)).append(" : ").append(pageSize).append('\n');
+		sb.append("  large page: ").append(largePage ? "yes" : "no").append('\n');
+		long off = pageSize - ( largePage ? 16L : 8L );
+		final long tableEndAddr = pageAddr + off;
+		final long tableStartOff = btGetOffset(mem, tableEndAddr - offSize, offSize);
+		sb.append("  tableStart: ").append(tableStartOff).append(" : 0x").append(Long.toHexString(tableStartOff)) // NOSONAR
+			.append(", addr: ").append(Long.toUnsignedString(pageAddr + tableStartOff)).append(" : 0x")
+			.append(Long.toHexString(pageAddr + tableStartOff)).append('\n');
+		int i = -1;
+		for (off -= offSize * 3; off >= tableStartOff; off -= offSize << 1, i--) {
+			long startOff = btGetOffset(mem, pageAddr + off, offSize);
+			long endOff = btGetOffset(mem, pageAddr + off + offSize, offSize);
+			sb.append("  tableEndAddr[").append(i).append("] : (page + ").append(off).append(" : 0x")
+				.append(Long.toHexString(off)).append("): ").append(startOff).append("..").append(endOff).append(" 0x")
+				.append(Long.toHexString(startOff)).append("..0x").append(Long.toHexString(endOff)).append(", addr: ")
+				.append(Long.toUnsignedString(pageAddr + startOff)).append("..")
+				.append(Long.toUnsignedString(pageAddr + endOff)).append(" 0x")
+				.append(Long.toHexString(pageAddr + startOff)).append("..0x")
+				.append(Long.toHexString(pageAddr + endOff)).append('\n');
+		}
+		return sb.toString();
+	}
+	
 	private static long btGetOffset(MemoryManager mem, long addr, int offSize) {
 		switch ( offSize ) {
 		case 1:
@@ -441,20 +503,39 @@ public class JavaStdLib extends JavaDependency {
 	}
 	
 	public static long allocArgs(SimpleInterpreter si, String[] args) {
-		JavaStdLib jsl = (JavaStdLib) si.stdlib();
+		SimpleFile sl = si.stdlib();
 		MemoryManager mem = si.memManager();
 		long len = ( args.length + 1L ) << 3;
-		long addr = jsl.alloc(len, 1L);
+		long addr = alloc(si, sl, len);
 		long a = addr;
-		for (int i = 0; i < args.length; i++, a += 8) {
+		for (int i = 0; i < args.length; i++, a += 8L) {
 			byte[] bytes = args[i].getBytes(StandardCharsets.UTF_8);
 			ByteBuffer buf = ByteBuffer.wrap(bytes);
-			long argAdr = jsl.alloc(bytes.length + 1L, 1L);
+			long argAdr = alloc(si, sl, bytes.length + 1L);
 			mem.set(argAdr, buf);
 			mem.set8(argAdr + bytes.length, 0);
 		}
 		mem.set64(a, 0L);
 		return addr;
+	}
+	
+	private static long alloc(SimpleInterpreter si, SimpleFile sl, long len) {
+		if ( sl instanceof JavaStdLib jsl ) return jsl.alloc(len, 1L);
+		ConstantValue.ScalarValue param0 = new ConstantValue.ScalarValue(UNUM, len);
+		ConstantValue.ScalarValue param1 = new ConstantValue.ScalarValue(UNUM, 1L);
+		List<ConstantValue> params = List.of(param0, param1);
+		ConstantValue result = si.execute(sl, "mem_alloc", params).get(0);
+		return ( (ConstantValue.ScalarValue) result ).value();
+	}
+	
+	@Override
+	public int hashCode() {
+		return "std".hashCode();
+	}
+	
+	@Override
+	public boolean equals(Object obj) {
+		return obj == this;
 	}
 	
 }

@@ -14,7 +14,7 @@
 //
 //You should have received a copy of the GNU General Public License
 //along with this program.  If not, see <https://www.gnu.org/licenses/>.
-package de.hechler.patrick.codesprachen.simple;
+package de.hechler.patrick.codesprachen.simple.interpreter;
 
 import de.hechler.patrick.zeugs.check.objects.BigCheckResult;
 import de.hechler.patrick.zeugs.check.objects.BigChecker;

@@ -712,7 +712,7 @@ public class SimpleExportFileParser {
 		if ( flags != 0 ) {
 			ftype = FuncType.create(ftype.resMembers(), ftype.argMembers(), flags, ctx);
 		}
-		SimpleFunction func = new SimpleFunction(name, ftype);
+		SimpleFunction func = new SimpleFunction(sf, name, ftype);
 		sf.function(func, ctx);
 	}
 	

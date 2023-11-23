@@ -147,6 +147,10 @@ public class SimpleFile extends SimpleDependency {
 		}
 	}
 	
+	public Collection<SimpleDependency> dependencies() {
+		return Collections.unmodifiableCollection(this.dependencies.values());
+	}
+	
 	public SimpleDependency dependency(String name) {
 		return this.dependencies.get(name);
 	}
@@ -229,6 +233,19 @@ public class SimpleFile extends SimpleDependency {
 			}
 		}
 		return b.toString();
+	}
+	
+	@Override
+	public int hashCode() {
+		return this.binaryTarget.hashCode();
+	}
+	
+	@Override
+	public boolean equals(Object obj) {
+		if ( this == obj ) return true;
+		if ( obj == null ) return false;
+		if ( !( obj instanceof SimpleFile sf ) ) return false;
+		return this.binaryTarget.equals(sf.binaryTarget);
 	}
 	
 }

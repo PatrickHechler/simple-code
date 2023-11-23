@@ -13,7 +13,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
-import java.util.function.ToLongBiFunction;
 
 import de.hechler.patrick.codesprachen.simple.interpreter.fs.FSManager;
 import de.hechler.patrick.codesprachen.simple.interpreter.fs.FSManagerImpl;
@@ -58,43 +57,45 @@ import de.hechler.patrick.codesprachen.simple.parser.objects.value.VariableVal;
 
 public class SimpleInterpreter {
 	
-	private final Path[]                                        src;
-	private final ToLongBiFunction<SimpleInterpreter, String[]> allocArgs;
-	private final Path                                          defMain;
-	private final MemoryManager                                 mm;
-	private final FSManager                                     fsm;
-	private final SimpleDependency                              stdlib;
-	private final Map<Path, LoadedSF>                           files  = new HashMap<>();
-	private final Map<SimpleFile, LoadedSF>                     loaded = new HashMap<>();
+	private final Path[]                    src;
+	private final Path                      defMain;
+	private final MemoryManager             mm;
+	private final FSManager                 fsm;
+	private final SimpleFile                stdlib;
+	private final Map<Path, LoadedSF>       files  = new HashMap<>();
+	private final Map<SimpleFile, LoadedSF> loaded = new HashMap<>();
 	
 	public SimpleInterpreter(List<Path> src) {
-		this(src, null, JavaStdLib::allocArgs);
+		this(src, null);
 	}
 	
-	public SimpleInterpreter(List<Path> src, SimpleDependency stdlib,
-		ToLongBiFunction<SimpleInterpreter, String[]> allocArgs) {
-		this(src, stdlib, allocArgs, null, src.get(0));
+	public SimpleInterpreter(List<Path> src, SimpleFile stdlib) {
+		this(src, stdlib, null, src.get(0));
 	}
 	
-	public SimpleInterpreter(List<Path> src, SimpleDependency stdlib,
-		ToLongBiFunction<SimpleInterpreter, String[]> allocArgs, Path defMain, Path root) {
-		this(src, stdlib, allocArgs, defMain, new MemoryManagerImpl(), root);
+	public SimpleInterpreter(List<Path> src, SimpleFile stdlib, Path defMain, Path root) {
+		this(src, stdlib, defMain, new MemoryManagerImpl(), root);
 	}
 	
-	public SimpleInterpreter(List<Path> src, SimpleDependency stdlib,
-		ToLongBiFunction<SimpleInterpreter, String[]> allocArgs, Path defMain, MemoryManager memManager, Path root) {
-		this(src, stdlib, allocArgs, defMain, memManager, new FSManagerImpl(root, memManager));
+	public SimpleInterpreter(List<Path> src, SimpleFile stdlib, Path defMain, MemoryManager memManager, Path root) {
+		this(src, stdlib, defMain, memManager, new FSManagerImpl(root, memManager));
 	}
 	
-	public SimpleInterpreter(List<Path> src, SimpleDependency stdlib,
-		ToLongBiFunction<SimpleInterpreter, String[]> allocArgs, Path defMain, MemoryManager memManager,
+	public SimpleInterpreter(List<Path> src, SimpleFile stdlib, Path defMain, MemoryManager memManager,
 		FSManager fsManager) {
 		this.src = src.toArray(new Path[src.size()]);
-		this.allocArgs = allocArgs;
 		this.defMain = defMain;
 		this.mm = memManager;
 		this.fsm = fsManager;
 		this.stdlib = stdlib == null ? new JavaStdLib(this) : stdlib;
+		putWithDependencies(this.stdlib);
+	}
+	
+	private void putWithDependencies(SimpleFile putSf) {
+		this.loaded.put(putSf, new LoadedSF(putSf));
+		for (SimpleDependency sd : putSf.dependencies()) {
+			putWithDependencies((SimpleFile) sd);
+		}
 	}
 	
 	protected LoadedSF load(String p0, String rel0) {
@@ -115,11 +116,9 @@ public class SimpleInterpreter {
 				if ( lsf != null ) return lsf;
 			}
 		} else {
-			p = p.relativize(p.getRoot());
+			p = p.getRoot().relativize(p);
 		}
 		LoadedSF lsf = this.files.get(p);
-		if ( lsf != null ) return lsf;
-		lsf = this.files.get(p);
 		if ( lsf != null ) return lsf;
 		for (Path path : this.src) {
 			p = path.resolve(p);
@@ -188,7 +187,7 @@ public class SimpleInterpreter {
 		return this.mm;
 	}
 	
-	public SimpleDependency stdlib() {
+	public SimpleFile stdlib() {
 		return this.stdlib;
 	}
 	
@@ -202,7 +201,7 @@ public class SimpleInterpreter {
 		try {
 			SimpleFile mainFile = load(main, null).sf;
 			SimpleFunction func = Objects.requireNonNull(mainFile.main(), "the main file has no main function");
-			long addr = this.allocArgs.applyAsLong(this, args);
+			long addr = JavaStdLib.allocArgs(this, args);
 			List<ConstantValue> list = List.of(new ConstantValue.ScalarValue(NativeType.UNUM, args.length),
 				new ConstantValue.ScalarValue(FuncType.MAIN_TYPE.argMembers().get(1).type(), addr));
 			return (int) ( (ConstantValue.ScalarValue) execute(mainFile, func, list).get(0) ).value();
@@ -393,8 +392,7 @@ public class SimpleInterpreter {
 	private List<ConstantValue> execute(SimpleFile sf, SimpleFunction func, List<ConstantValue> args) {
 		FuncType t = func.type();
 		BlockCmd blk = func.block();
-		int ccnt = blk.commandCount();
-		if ( ccnt == 1 && blk.command(0) instanceof JavaCommand jc ) {
+		if ( blk.commandCount() == 1 && blk.command(0) instanceof JavaCommand jc ) {
 			List<ConstantValue> result = jc.func.execute(this, args);
 			checkType(t.resMembers(), result, false);
 			return result;
@@ -658,6 +656,9 @@ public class SimpleInterpreter {
 					throw new AssertionError("unknown/illegal cast type: " + c.type());
 				}
 			case ConstantValue.DataValue d:
+				if ( c.type() instanceof PointerType p ) {
+					return new ConstantValue.ScalarValue(p, d.address());
+				}
 				return new ConstantValue.DataValue(c.type(), d.address());
 			case ConstantValue.FPValue f:
 				switch ( c.type() ) {
@@ -680,12 +681,18 @@ public class SimpleInterpreter {
 		}
 		case DataVal d:
 			return scope.value(this, d);
-		case FunctionVal f:
-			return new ConstantValue.ScalarValue(f.type(), scope.addressOf(this, f.func().name()));
+		case FunctionVal f: {
+			SimpleFile sf = (SimpleFile) f.func().dep();
+			LoadedSF lsf = this.loaded.get(sf);
+			long addr = lsf.addressOf(this, f.func().name());
+			return new ConstantValue.ScalarValue(f.type(), addr);
+		}
 		case ScalarNumericVal s:
 			return new ConstantValue.ScalarValue(s.type(), s.value());
 		case FPNumericVal s:
 			return new ConstantValue.FPValue(s.type(), s.value());
+		case VariableVal v:
+			return scope.value(this, v.sv().name());
 		default:
 			throw new AssertionError("unknown value class: " + val.getClass());
 		}
@@ -875,10 +882,10 @@ public class SimpleInterpreter {
 		public ConstantValue value(SimpleInterpreter si, String name) {
 			ConstantValue v = this.values.get(name);
 			if ( v == null ) return this.parent.value(si, name);
-			if ( v instanceof ConstantValue.DataValue(SimpleType t, long addr)
-				&& ( t instanceof NativeType || t instanceof PointerType
-					|| ( t instanceof FuncType ft && ( ft.flags() & FuncType.FLAG_FUNC_ADDRESS ) != 0 ) ) ) {
-				return si.deref(t, addr);
+			if ( v instanceof ConstantValue.DataValue d
+				&& ( d.type() instanceof NativeType || d.type() instanceof PointerType
+					|| ( d.type() instanceof FuncType ft && ( ft.flags() & FuncType.FLAG_FUNC_ADDRESS ) != 0 ) ) ) {
+				return si.deref(d.type(), d.address());
 			}
 			return v;
 		}

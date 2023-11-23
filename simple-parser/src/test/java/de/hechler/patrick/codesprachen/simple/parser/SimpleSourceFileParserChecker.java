@@ -5,7 +5,6 @@ import static de.hechler.patrick.zeugs.check.Assert.assertEquals;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 
-import de.hechler.patrick.codesprachen.simple.parser.SimpleSourceFileParser;
 import de.hechler.patrick.codesprachen.simple.parser.objects.simplefile.SimpleDependency;
 import de.hechler.patrick.zeugs.check.anotations.Check;
 import de.hechler.patrick.zeugs.check.anotations.CheckClass;
@@ -17,8 +16,8 @@ class SimpleSourceFileParserChecker {
 	
 	@Check
 	void checkParser() {
-		InputStream in = SimpleSourceFileParser.class.getResourceAsStream("/programs/hello-world.ssf");
-		SimpleSourceFileParser ssp = new SimpleSourceFileParser(in, "hello-world.ssf", null);
+		InputStream in = SimpleSourceFileParser.class.getResourceAsStream("/programs/some-impl.ssf");
+		SimpleSourceFileParser ssp = new SimpleSourceFileParser(in, "some-impl.ssf", null);
 		SimpleDependency sf = ssp.parse("/bin");
 		assertEquals("""
 			typedef ubyte char;
@@ -29,10 +28,10 @@ class SimpleSourceFileParserChecker {
 			func main <ubyte exitnum> <-- (unum argc, ((ubyte)#)# argv) {
 			    unum wrote;
 			    unum err;
-			    puts <wrote, err> <-- ((((ubyte)#) DataVal [value=%s, type=(ubyte)[%d]] ));
+			    puts <wrote, err> <-- ((((ubyte)#) DataVal [value=%s, type=(ubyte)[%s]] ));
 			    exitnum <-- (err != 0);
 			}
-			""".formatted(toCSVHexBytes(HELLO_WORLD), HELLO_WORLD.length), sf.toString());
+			""".formatted(toCSVHexBytes(HELLO_WORLD), Integer.toString(HELLO_WORLD.length)), sf.toString());
 	}
 	
 	private static String toCSVHexBytes(byte[] data) {

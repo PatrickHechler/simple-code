@@ -223,7 +223,7 @@ public class JavaDependency extends SimpleFile {
 	
 	public void function(String name, FuncType type, JavaFunction func) {
 		BlockCmd blk = new BlockCmd(SimpleScope.newFuncScope(this, type, ErrorContext.NO_CONTEXT));
-		SimpleFunction sf = new SimpleFunction(name, type, blk);
+		SimpleFunction sf = new SimpleFunction(this, name, type, blk);
 		super.function(sf, ErrorContext.NO_CONTEXT);
 		blk.addCmd(new JavaCommand(blk.currentAsParent(), func));
 		blk.seal();

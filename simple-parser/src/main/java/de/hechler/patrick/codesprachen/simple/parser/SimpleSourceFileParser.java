@@ -172,7 +172,7 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 		}
 		ftype = FuncType.create(ftype.resMembers(), ftype.argMembers(), flags, ctx);
 		BlockCmd block = new BlockCmd(SimpleScope.newFuncScope(sf, ftype, ctx));
-		SimpleFunction func = new SimpleFunction(name, ftype, block);
+		SimpleFunction func = new SimpleFunction(sf, name, ftype, block);
 		sf.function(func, ctx);
 		parseCmdBlock(block);
 	}

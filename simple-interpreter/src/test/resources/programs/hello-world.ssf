@@ -14,27 +14,9 @@
 //
 //You should have received a copy of the GNU General Public License
 //along with this program.  If not, see <https://www.gnu.org/licenses/>.
-package de.hechler.patrick.codesprachen.simple;
 
-import de.hechler.patrick.zeugs.check.objects.BigCheckResult;
-import de.hechler.patrick.zeugs.check.objects.BigChecker;
-
-public class Test { // NOSONAR
-	
-	public void testname() {
-		main(new String[0]);
-	}
-	
-	public static void main(String[] args) {
-		System.out.println("java.version=" + System.getProperty("java.version"));
-		BigCheckResult check = BigChecker.tryCheckAll(true, Test.class.getPackage(), Test.class.getClassLoader());
-		check.print();
-		if ( check.wentUnexpected() ) {
-			System.out.println("unexpected result, detailed print below:");
-			check.detailedPrint(System.out);
-			throw new Error(check.toString());
-		}
-		System.out.println("finish: successful");
-	}
-	
+// this function prints hello world and exits with 0 if the print was successful
+func main <ubyte exitnum> <-- (unum argc, char## argv) {
+    unum wrote;
+    call std:puts <wrote, exitnum> <-- ("hello world\n");
 }

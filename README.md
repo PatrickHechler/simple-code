@@ -11,11 +11,9 @@ simple-code is a simple programming language.
 `( [dependency] | [variable] | [typedef] | [dep-function] )* EOF`
 
 * note that simple-export-files are parsed with some special rules:
-    * `exp` markings are ignored
-        * this is a export file, everything here is here because it was exported!
     * only `const` variables are allowed to have an initilizer
         * having a `const` variable without initilizer is still an error
-    * dependencies **must not** use `<ME>` instead of a `NAME`
+    * dependencies must not use `<ME>` instead of a `NAME`
 
 ### dependency
 
@@ -59,6 +57,7 @@ a function is a block of commands used to do something for example convert the a
                 1. `num` argc: this will be set to the number of arguments passed to the program
                 2. `char##` argv: this will point the arguments passed to the program
                     * the first argument will be the program itself
+                    * `argv[argc]` will be set to `(char#) 0`
             * return value:
                 1. `ubyte` exitnum: the return number of the main function will be the exit number of the process
 * note that only one function can be marked with `init`/`main`
@@ -278,6 +277,9 @@ comments are treated like whitespace, they are allowed everywhere exept in the m
     * the `std:sys´ dependency **must** be a compile time only dependency.
 * if `std` has dependencies, which are not used the binary must not rely on these dependencies
     * the only exception is the `std:sys´ dependency
+* the `std` dependency **must not** define variables
+    * the dependencies of `std` **must not** define variables
+        * dependencies of the `std` dependency are dependencies of `std` or a dependency of a dependency of `std`
 
 ### std:sys
 
@@ -285,15 +287,43 @@ this dependency interacts as a low level interface
 this dependency may define additional symbols not mentioned here
 
 * `func pagesize <unum result> <-- ();`
-    * returns the size of a memory page
+    * returns the size of a memory page (whatever this may be, it will always be a non zero power of two)
 * `func pageshift <unum result> <-- ();`
-    * returns the shift of a memory page
+    * returns the shift of a memory page (whatever this may be)
     * the page shift is defined as the bit count of `pagesize:result - 1` (or `pagesize:result = 1 << pageshift:result`)
 
 ### functions
 
-### variables
+system functions;
+* `func exit <> <-- (ubyte exitnum);`
+    * terminates the process with the given exit number
+    * this function will never return to the caller
+
+memory functions:
+* `func mem_alloc <ubyte# addr> <-- (unum length, unum align);`
+    * allocates `length` bytes, which are aligned to `align` bytes and stores the address of the allocated block in `addr`
+    * `align` must be a non zero power of two
+* `func mem_realloc <ubyte# new_addr> <-- (ubyte# old_addr, unum new_length, unum new_align);`
+    * reallocates the memory block to now store `new_length` bytes aligned to `new_align`
+    * the new address of the memory block is stored in `new_addr`
+    * `new_align` must be a non zero power of two
+* `func mem_free <> <-- (ubyte# addr);`
+    * frees the given memory block
+* `func mem_copy <> <-- (ubyte# from, ubyte# to, unum length);`
+    * copies `length` bytes from `from` to `to`
+    * if the memory regiones `from..(from+length)` and `to..(to+length)` overlap the new content of `from..(from+length)` is undefined
+    * otherwise the new content of `from..(from+length)` is the old content of `to..(to+length)`
+* `func mem_move <> <-- (ubyte# from, ubyte# to, unum length);`
+    * copies `length` bytes from `from` to `to`
+    * the new content of `from..(from+length)` is the old content of `to..(to+length)`
+        * even if the memory regiones `from..(from+length)` and `to..(to+length)` overlap 
+
+* `func puts <unum wrote, unum errno> <-- (char# string);`
+    * prints the given (`\0` terminated) string to stdout
+
 
 ### constants
+
+´const ubyte# NULL <-- (ubyte#) 0;´
 
 ### structures

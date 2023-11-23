@@ -1,5 +1,6 @@
 package de.hechler.patrick.codesprachen.simple.interpreter.java;
 
+import de.hechler.patrick.codesprachen.simple.parser.objects.types.FuncType;
 import de.hechler.patrick.codesprachen.simple.parser.objects.types.NativeType;
 import de.hechler.patrick.codesprachen.simple.parser.objects.types.PointerType;
 import de.hechler.patrick.codesprachen.simple.parser.objects.types.SimpleType;
@@ -18,7 +19,6 @@ public sealed interface ConstantValue {
 		public ScalarValue(SimpleType type, long value) {
 			this.type = type;
 			switch ( type ) {
-			case PointerType _pt -> this.value = value; // NOSONAR
 			case NativeType.NUM, NativeType.UNUM -> this.value = value;
 			case NativeType.DWORD -> this.value = (int) value;
 			case NativeType.UDWORD -> this.value = 0xFFFFFFFFL & value;
@@ -26,6 +26,8 @@ public sealed interface ConstantValue {
 			case NativeType.UWORD -> this.value = 0xFFFFL & value;
 			case NativeType.BYTE -> this.value = (byte) value;
 			case NativeType.UBYTE -> this.value = 0xFFL & value;
+			case PointerType _pt -> this.value = value; // NOSONAR
+			case FuncType ft when ( ft.flags() & FuncType.FLAG_FUNC_ADDRESS ) != 0 -> this.value = value; // NOSONAR
 			default -> throw new AssertionError("unknown/illegal type class: " + type.getClass());
 			}
 		}

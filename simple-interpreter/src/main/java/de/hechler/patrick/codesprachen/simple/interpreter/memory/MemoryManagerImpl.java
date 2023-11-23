@@ -129,7 +129,7 @@ public class MemoryManagerImpl implements MemoryManager {
 	private Page allocImpl(long minSize, long requestedAddress, int flags) { // NOSONAR
 		long pageSize = 1L << this.pageShift;
 		long maxPageIndex = pageSize - 1L;
-		long allocCount = minSize >>> pageSize;
+		long allocCount = minSize >>> this.pageShift;
 		if ( ( minSize & maxPageIndex ) != 0 ) {
 			allocCount++;
 		}
@@ -164,7 +164,8 @@ public class MemoryManagerImpl implements MemoryManager {
 			this.free = f;// later cleared
 		}
 		loop: for (long remain = allocCount; --remain >= 0; f = f.next) {// NOSONAR
-			if ( f.next == null ) {
+			f.page.seg.fill((byte) 0);
+			if ( f.next == null && remain > 0 ) {
 				while ( true ) {
 					ListEntry n = new ListEntry();
 					MemorySegment seg = this.arena.allocate(pageSize, pageSize);
@@ -177,7 +178,6 @@ public class MemoryManagerImpl implements MemoryManager {
 					}
 				}
 			}
-			f.page.seg.fill((byte) 0);
 		}
 		f = this.free;
 		if ( ( flags & FLAG_MUST_REQUEST ) == 0 ) {
@@ -251,6 +251,12 @@ public class MemoryManagerImpl implements MemoryManager {
 			}
 			return allocImpl(1L, addr, p.flags | FLAG_MUST_REQUEST);
 		}
+		if (o instanceof Page p) {
+			if (p.address == addr) {
+				return p;
+			}
+			throw new IllegalArgumentException(noPageMsg(addr));
+		}
 		ListEntry old = (ListEntry) o;
 		while ( true ) {
 			if ( old.page.address == addr ) {
@@ -299,10 +305,9 @@ public class MemoryManagerImpl implements MemoryManager {
 		return "the page 0x" + Long.toHexString(addr) + " could not be found";
 	}
 	
-	private static boolean putIfAbsent(Object[] ps, Page p) {
-		final int len = ps.length;
+	private boolean putIfAbsent(Object[] ps, Page p) {
 		final long addr = p.address;
-		final int hash = (int) ( addr >>> len ) & ( len - 1 );
+		final int hash = hash(p.address, ps.length);
 		Object o = ps[hash];
 		if ( o == null ) {
 			ps[hash] = p;
@@ -473,7 +478,7 @@ public class MemoryManagerImpl implements MemoryManager {
 		if ( len <= 0 ) {
 			throw new IllegalArgumentException("len <= 0: " + len);
 		}
-		assert ( bVal & 0xFF ) != bVal; // NOSONAR
+		assert ( bVal & 0xFF ) == bVal; // NOSONAR
 		final long pageSize = 1L << this.pageShift;
 		final long pageSizeM1 = pageSize - 1;
 		final long pageAddr = address & ~pageSizeM1;
@@ -600,7 +605,7 @@ public class MemoryManagerImpl implements MemoryManager {
 	
 	@Override
 	public void set16(long address, int value) {
-		assert ( value & 0xFFFF ) != value; // NOSONAR
+		assert ( value & 0xFFFF ) == value : value; // NOSONAR
 		final long pageSizeM1 = ( 1L << this.pageShift ) - 1;
 		final long pageAddr = address & ~pageSizeM1;
 		final long offset = address & pageSizeM1;
@@ -618,7 +623,7 @@ public class MemoryManagerImpl implements MemoryManager {
 	
 	@Override
 	public void set8(long address, int value) {
-		assert ( value & 0xFF ) != value; // NOSONAR
+		assert ( value & 0xFF ) == value; // NOSONAR
 		final long pageSizeM1 = ( 1L << this.pageShift ) - 1;
 		final long pageAddr = address & ~pageSizeM1;
 		final long offset = address & pageSizeM1;
@@ -790,7 +795,7 @@ public class MemoryManagerImpl implements MemoryManager {
 	public void move(long src, long dst, long len) {
 		if ( len <= 0 ) {
 			if ( len == 0 ) return;
-			throw new IllegalArgumentException("len < 0");
+			throw new IllegalArgumentException("len < 0: " + len);
 		}
 		long us = src ^ Long.MIN_VALUE;
 		long ud = dst ^ Long.MIN_VALUE;
