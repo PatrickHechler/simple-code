@@ -318,12 +318,15 @@ memory functions:
     * the new content of `from..(from+length)` is the old content of `to..(to+length)`
         * even if the memory regiones `from..(from+length)` and `to..(to+length)` overlap 
 
+write to stdout:
 * `func puts <unum wrote, unum errno> <-- (char# string);`
     * prints the given (`\0` terminated) string to stdout
-
 
 ### constants
 
 ´const ubyte# NULL <-- (ubyte#) 0;´
 
-### structures
+### types
+
+* `typedef ? file_handle;`
+* `typedef ? fs_element_handle;`
