@@ -130,8 +130,8 @@ public class JavaStdLib extends JavaDependency {
 		sys.function("pageshift", ft(of(sv(UNUM, "result")), of()),
 			(si_, args) -> List.of(new ConstantValue.ScalarValue(UNUM, si_.memManager().pageShift())));
 		dependency(sys, "sys", ErrorContext.NO_CONTEXT);
-		variable(new SimpleVariable(PNTR, "NULL", ScalarNumericVal.create(PNTR, 0L, ErrorContext.NO_CONTEXT), SimpleVariable.FLAG_CONSTANT | SimpleVariable.FLAG_EXPORT),
-			ErrorContext.NO_CONTEXT);
+		variable(new SimpleVariable(PNTR, "NULL", ScalarNumericVal.create(PNTR, 0L, ErrorContext.NO_CONTEXT),
+			SimpleVariable.FLAG_CONSTANT | SimpleVariable.FLAG_EXPORT), ErrorContext.NO_CONTEXT);
 	}
 	
 	private static SimpleVariable sv(SimpleType t, String name) {
@@ -235,11 +235,11 @@ public class JavaStdLib extends JavaDependency {
 			if ( free >= len ) {
 				long nextHalfFree = ( free - len ) >>> 1;
 				long resultAddr = ( prevEndAddr + nextHalfFree ) & ~alignM1;
-				mem.move(tableStartAddr, tableStartAddr - ( offSize << 1 ), startAddr - tableStartAddr);
-				addr -= offSize;
+				mem.get8(tableStartAddr);
+				mem.get8(tableEndAddr);
+				mem.move(tableStartAddr, tableStartAddr - ( offSize << 1 ), addr + offSize - tableStartAddr);
 				btSetOffset(mem, addr, offSize, resultAddr - pageAddr + len);
-				addr -= offSize;
-				btSetOffset(mem, addr, offSize, resultAddr - pageAddr);
+				btSetOffset(mem, addr - offSize, offSize, resultAddr - pageAddr);
 				btSetOffset(mem, tableEndAddr - offSize, offSize, tableStartOffset - offSize);
 				return resultAddr;
 			}
@@ -517,6 +517,7 @@ public class JavaStdLib extends JavaDependency {
 			long argAdr = alloc(si, sl, bytes.length + 1L);
 			mem.set(argAdr, buf);
 			mem.set8(argAdr + bytes.length, 0);
+			mem.set64(a, argAdr);
 		}
 		mem.set64(a, 0L);
 		return addr;

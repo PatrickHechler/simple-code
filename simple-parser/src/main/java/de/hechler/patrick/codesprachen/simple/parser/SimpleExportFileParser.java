@@ -531,6 +531,10 @@ public class SimpleExportFileParser {
 			List.of(name(NUM), name(UNUM), name(FPNUM), name(FPDWORD), name(DWORD), name(WORD), name(UWORD), name(BYTE),
 				name(UBYTE), name(STRUCT), name(FSTRUCT), name(NOPAD), name(LT), name(SMALL_OPEN), name(NAME)));
 		}
+		return parseTypePostfix(scope, type);
+	}
+	
+	protected SimpleType parseTypePostfix(SimpleScope scope, SimpleType type) {
 		while ( true ) {
 			switch ( this.in.tok() ) {
 			case DIAMOND -> {

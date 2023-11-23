@@ -242,11 +242,14 @@ public class SimpleInterpreter {
 	
 	private void exec(LoadedSF lsf, SimpleFunction func, List<ConstantValue> list) {
 		SubScope scope = new SubScope(this, lsf, func.type().argMembers(), func.type().resMembers());
-		final BlockCmd blk = func.block();
-		final int cc = blk.commandCount();
-		for (int pc = 0; pc < cc; pc++) {
-			exec(scope, blk.command(pc), list);
+		List<SimpleVariable> am = func.type().argMembers();
+		if ( am.size() != list.size() ) {
+			throw new IllegalArgumentException("illegal argument count");
 		}
+		for (int i = 0; i < am.size(); i++) {
+			scope.value(this, am.get(i).name(), list.get(i));
+		}
+		exec(scope, func.block(), list);
 		list.clear();
 		for (SimpleVariable sv : func.type().resMembers()) {
 			list.add(scope.value(this, sv.name()));
@@ -346,18 +349,20 @@ public class SimpleInterpreter {
 	private void assign(SubScope scope, ConstantValue newValue, SimpleValue targetValue) throws AssertionError {
 		switch ( targetValue ) {
 		case VariableVal v:
-			scope.value(this, v.sv().name(), newValue);
+			scope.value(this, v.sv().name(), adjust(v.sv().type(), newValue));
 			break;
 		case BinaryOpVal bo when bo.op() == BinaryOp.ARR_PNTR_INDEX: {
 			ConstantValue ca = calculate(scope, bo.a());
 			ConstantValue cb = calculate(scope, bo.b());
 			long off = ( (ConstantValue.ScalarValue) cb ).value();
-			off *= arrPntrIndexMul(ca);
+			off *= arrPntrIndexMul(ca.type());
 			long targetAddr;
-			if ( ca.type() instanceof ArrayType ) {
+			if ( ca.type() instanceof ArrayType at ) {
 				targetAddr = ( (ConstantValue.DataValue) ca ).address() + off;
+				newValue = adjust(at.target(), newValue);
 			} else {
 				targetAddr = ( (ConstantValue.ScalarValue) ca ).value() + off;
+				newValue = adjust(( (PointerType) ca.type() ).target(), newValue);
 			}
 			put(targetAddr, newValue);
 			break;
@@ -366,19 +371,37 @@ public class SimpleInterpreter {
 			ConstantValue ca = calculate(scope, bo.a());
 			String name = ( (NameVal) bo.b() ).name();
 			long off = switch ( bo.a().type() ) {
-			case FuncType ft -> ft.offset(name);
-			case StructType st -> st.offset(name);
+			case FuncType ft -> {
+				newValue = adjust(ft.member(name, ErrorContext.NO_CONTEXT, false).type(), newValue);
+				yield ft.offset(name);
+			}
+			case StructType st -> {
+				newValue = adjust(st.member(name, ErrorContext.NO_CONTEXT).type(), newValue);
+				yield st.offset(name);
+			}
 			default -> throw new AssertionError("illegal value class: " + bo.a().type().getClass());
 			};
-			off *= arrPntrIndexMul(ca);
+			off *= arrPntrIndexMul(ca.type());
 			long targetAddr = ( (ConstantValue.DataValue) ca ).address() + off;
 			put(targetAddr, newValue);
 			break;
 		}
 		default: {
 			long targetAddr = addressOf(scope, targetValue);
-			put(targetAddr, newValue);
+			put(targetAddr, adjust(targetValue.type(), newValue));
 		}
+		}
+	}
+	
+	private static ConstantValue adjust(SimpleType type, ConstantValue value) {
+		if ( type == value.type() ) return value;
+		switch ( value ) {
+		case ConstantValue.DataValue dv:
+			return new ConstantValue.DataValue(type, dv.address());
+		case ConstantValue.ScalarValue sv:
+			return new ConstantValue.ScalarValue(type, sv.value());
+		case ConstantValue.FPValue fv:
+			return new ConstantValue.FPValue(type, fv.value());
 		}
 	}
 	
@@ -516,12 +539,12 @@ public class SimpleInterpreter {
 					throw new AssertionError("unknown/invalid binary operator: " + bo.op().name());
 				}
 			default:
-				switch ( bo.op() ) {
+				switch ( bo.op().type ) {
 				case ARR_PNTR_INDEX: {
 					ConstantValue ca = calculate(scope, bo.a());
 					ConstantValue cb = calculate(scope, bo.b());
 					long off = ( (ConstantValue.ScalarValue) cb ).value();
-					off *= arrPntrIndexMul(ca);
+					off *= arrPntrIndexMul(ca.type());
 					if ( ca.type() instanceof ArrayType ) {
 						return deref(bo.type(), ( (ConstantValue.DataValue) ca ).address() + off);
 					}
@@ -535,108 +558,116 @@ public class SimpleInterpreter {
 					case StructType st -> st.offset(name);
 					default -> throw new AssertionError("Unexpected value: " + bo.a().type());
 					};
-					off *= arrPntrIndexMul(ca);
+					off *= arrPntrIndexMul(ca.type());
 					return deref(bo.type(), ( (ConstantValue.DataValue) ca ).address() + off);
 				}
-				case BIT_AND: {
+				case MATH, SHIFT, CMP, BOOL:
+					switch ( bo.op() ) {
+					case BIT_AND: {
+						long ca = ( (ConstantValue.ScalarValue) calculate(scope, bo.a()) ).value();
+						long cb = ( (ConstantValue.ScalarValue) calculate(scope, bo.b()) ).value();
+						return new ConstantValue.ScalarValue(bo.type(), ca & cb);
+					}
+					case BIT_OR: {
+						long ca = ( (ConstantValue.ScalarValue) calculate(scope, bo.a()) ).value();
+						long cb = ( (ConstantValue.ScalarValue) calculate(scope, bo.b()) ).value();
+						return new ConstantValue.ScalarValue(bo.type(), ca | cb);
+					}
+					case BIT_XOR: {
+						long ca = ( (ConstantValue.ScalarValue) calculate(scope, bo.a()) ).value();
+						long cb = ( (ConstantValue.ScalarValue) calculate(scope, bo.b()) ).value();
+						return new ConstantValue.ScalarValue(bo.type(), ca ^ cb);
+					}
+					case BOOL_AND: {
+						long ca = ( (ConstantValue.ScalarValue) calculate(scope, bo.a()) ).value();
+						if ( ca == 0L ) return ConstantValue.ScalarValue.ZERO;
+						long cb = ( (ConstantValue.ScalarValue) calculate(scope, bo.b()) ).value();
+						return ( cb != 0L ) ? ConstantValue.ScalarValue.ONE : ConstantValue.ScalarValue.ZERO;
+					}
+					case BOOL_OR: {
+						long ca = ( (ConstantValue.ScalarValue) calculate(scope, bo.a()) ).value();
+						if ( ca != 0L ) return ConstantValue.ScalarValue.ONE;
+						long cb = ( (ConstantValue.ScalarValue) calculate(scope, bo.b()) ).value();
+						return ( cb != 0L ) ? ConstantValue.ScalarValue.ONE : ConstantValue.ScalarValue.ZERO;
+					}
+					case CMP_NAN_NEQ, CMP_NEQ: {
+						long ca = ( (ConstantValue.ScalarValue) calculate(scope, bo.a()) ).value();
+						long cb = ( (ConstantValue.ScalarValue) calculate(scope, bo.b()) ).value();
+						return ( ca != cb ) ? ConstantValue.ScalarValue.ONE : ConstantValue.ScalarValue.ZERO;
+					}
+					case CMP_NAN_EQ, CMP_EQ: {
+						long ca = ( (ConstantValue.ScalarValue) calculate(scope, bo.a()) ).value();
+						long cb = ( (ConstantValue.ScalarValue) calculate(scope, bo.b()) ).value();
+						return ( ca == cb ) ? ConstantValue.ScalarValue.ONE : ConstantValue.ScalarValue.ZERO;
+					}
+					case CMP_NAN_GE, CMP_GE: {
+						long ca = ( (ConstantValue.ScalarValue) calculate(scope, bo.a()) ).value();
+						long cb = ( (ConstantValue.ScalarValue) calculate(scope, bo.b()) ).value();
+						return ( ca >= cb ) ? ConstantValue.ScalarValue.ONE : ConstantValue.ScalarValue.ZERO;
+					}
+					case CMP_NAN_GT, CMP_GT: {
+						long ca = ( (ConstantValue.ScalarValue) calculate(scope, bo.a()) ).value();
+						long cb = ( (ConstantValue.ScalarValue) calculate(scope, bo.b()) ).value();
+						return ( ca > cb ) ? ConstantValue.ScalarValue.ONE : ConstantValue.ScalarValue.ZERO;
+					}
+					case CMP_NAN_LE, CMP_LE: {
+						long ca = ( (ConstantValue.ScalarValue) calculate(scope, bo.a()) ).value();
+						long cb = ( (ConstantValue.ScalarValue) calculate(scope, bo.b()) ).value();
+						return ( ca <= cb ) ? ConstantValue.ScalarValue.ONE : ConstantValue.ScalarValue.ZERO;
+					}
+					case CMP_NAN_LT, CMP_LT: {
+						long ca = ( (ConstantValue.ScalarValue) calculate(scope, bo.a()) ).value();
+						long cb = ( (ConstantValue.ScalarValue) calculate(scope, bo.b()) ).value();
+						return ( ca < cb ) ? ConstantValue.ScalarValue.ONE : ConstantValue.ScalarValue.ZERO;
+					}
+					case SHIFT_LEFT: {
+						long ca = ( (ConstantValue.ScalarValue) calculate(scope, bo.a()) ).value();
+						long cb = ( (ConstantValue.ScalarValue) calculate(scope, bo.b()) ).value();
+						return new ConstantValue.ScalarValue(bo.type(), ca << cb);
+					}
+					case SHIFT_LOGIC_RIGTH: {
+						long ca = ( (ConstantValue.ScalarValue) calculate(scope, bo.a()) ).value();
+						long cb = ( (ConstantValue.ScalarValue) calculate(scope, bo.b()) ).value();
+						return new ConstantValue.ScalarValue(bo.type(), ca >>> cb);
+					}
+					case SHIFT_ARITMETIC_RIGTH: {
+						long ca = ( (ConstantValue.ScalarValue) calculate(scope, bo.a()) ).value();
+						long cb = ( (ConstantValue.ScalarValue) calculate(scope, bo.b()) ).value();
+						return new ConstantValue.ScalarValue(bo.type(), ca >> cb);
+					}
+					case MATH_DIV: {
+						long ca = ( (ConstantValue.ScalarValue) calculate(scope, bo.a()) ).value();
+						long cb = ( (ConstantValue.ScalarValue) calculate(scope, bo.b()) ).value();
+						return new ConstantValue.ScalarValue(bo.type(), ca / cb);
+					}
+					case MATH_MOD: {
+						long ca = ( (ConstantValue.ScalarValue) calculate(scope, bo.a()) ).value();
+						long cb = ( (ConstantValue.ScalarValue) calculate(scope, bo.b()) ).value();
+						return new ConstantValue.ScalarValue(bo.type(), ca % cb);
+					}
+					case MATH_MUL: {
+						long ca = ( (ConstantValue.ScalarValue) calculate(scope, bo.a()) ).value();
+						long cb = ( (ConstantValue.ScalarValue) calculate(scope, bo.b()) ).value();
+						return new ConstantValue.ScalarValue(bo.type(), ca * cb);
+					}
+					// $CASES-OMITTED$
+					default:
+						throw new AssertionError();
+					}
+				case MATH_ADDSUB: {
 					long ca = ( (ConstantValue.ScalarValue) calculate(scope, bo.a()) ).value();
 					long cb = ( (ConstantValue.ScalarValue) calculate(scope, bo.b()) ).value();
-					return new ConstantValue.ScalarValue(bo.type(), ca & cb);
-				}
-				case BIT_OR: {
-					long ca = ( (ConstantValue.ScalarValue) calculate(scope, bo.a()) ).value();
-					long cb = ( (ConstantValue.ScalarValue) calculate(scope, bo.b()) ).value();
-					return new ConstantValue.ScalarValue(bo.type(), ca | cb);
-				}
-				case BIT_XOR: {
-					long ca = ( (ConstantValue.ScalarValue) calculate(scope, bo.a()) ).value();
-					long cb = ( (ConstantValue.ScalarValue) calculate(scope, bo.b()) ).value();
-					return new ConstantValue.ScalarValue(bo.type(), ca ^ cb);
-				}
-				case BOOL_AND: {
-					long ca = ( (ConstantValue.ScalarValue) calculate(scope, bo.a()) ).value();
-					if ( ca == 0L ) return ConstantValue.ScalarValue.ZERO;
-					long cb = ( (ConstantValue.ScalarValue) calculate(scope, bo.b()) ).value();
-					return ( cb != 0L ) ? ConstantValue.ScalarValue.ONE : ConstantValue.ScalarValue.ZERO;
-				}
-				case BOOL_OR: {
-					long ca = ( (ConstantValue.ScalarValue) calculate(scope, bo.a()) ).value();
-					if ( ca != 0L ) return ConstantValue.ScalarValue.ONE;
-					long cb = ( (ConstantValue.ScalarValue) calculate(scope, bo.b()) ).value();
-					return ( cb != 0L ) ? ConstantValue.ScalarValue.ONE : ConstantValue.ScalarValue.ZERO;
-				}
-				case CMP_NAN_NEQ, CMP_NEQ: {
-					long ca = ( (ConstantValue.ScalarValue) calculate(scope, bo.a()) ).value();
-					long cb = ( (ConstantValue.ScalarValue) calculate(scope, bo.b()) ).value();
-					return ( ca != cb ) ? ConstantValue.ScalarValue.ONE : ConstantValue.ScalarValue.ZERO;
-				}
-				case CMP_NAN_EQ, CMP_EQ: {
-					long ca = ( (ConstantValue.ScalarValue) calculate(scope, bo.a()) ).value();
-					long cb = ( (ConstantValue.ScalarValue) calculate(scope, bo.b()) ).value();
-					return ( ca == cb ) ? ConstantValue.ScalarValue.ONE : ConstantValue.ScalarValue.ZERO;
-				}
-				case CMP_NAN_GE, CMP_GE: {
-					long ca = ( (ConstantValue.ScalarValue) calculate(scope, bo.a()) ).value();
-					long cb = ( (ConstantValue.ScalarValue) calculate(scope, bo.b()) ).value();
-					return ( ca >= cb ) ? ConstantValue.ScalarValue.ONE : ConstantValue.ScalarValue.ZERO;
-				}
-				case CMP_NAN_GT, CMP_GT: {
-					long ca = ( (ConstantValue.ScalarValue) calculate(scope, bo.a()) ).value();
-					long cb = ( (ConstantValue.ScalarValue) calculate(scope, bo.b()) ).value();
-					return ( ca > cb ) ? ConstantValue.ScalarValue.ONE : ConstantValue.ScalarValue.ZERO;
-				}
-				case CMP_NAN_LE, CMP_LE: {
-					long ca = ( (ConstantValue.ScalarValue) calculate(scope, bo.a()) ).value();
-					long cb = ( (ConstantValue.ScalarValue) calculate(scope, bo.b()) ).value();
-					return ( ca <= cb ) ? ConstantValue.ScalarValue.ONE : ConstantValue.ScalarValue.ZERO;
-				}
-				case CMP_NAN_LT, CMP_LT: {
-					long ca = ( (ConstantValue.ScalarValue) calculate(scope, bo.a()) ).value();
-					long cb = ( (ConstantValue.ScalarValue) calculate(scope, bo.b()) ).value();
-					return ( ca < cb ) ? ConstantValue.ScalarValue.ONE : ConstantValue.ScalarValue.ZERO;
-				}
-				case MATH_ADD: {
-					long ca = ( (ConstantValue.ScalarValue) calculate(scope, bo.a()) ).value();
-					long cb = ( (ConstantValue.ScalarValue) calculate(scope, bo.b()) ).value();
-					return new ConstantValue.ScalarValue(bo.type(), ca + cb);
-				}
-				case MATH_DIV: {
-					long ca = ( (ConstantValue.ScalarValue) calculate(scope, bo.a()) ).value();
-					long cb = ( (ConstantValue.ScalarValue) calculate(scope, bo.b()) ).value();
-					return new ConstantValue.ScalarValue(bo.type(), ca / cb);
-				}
-				case MATH_MOD: {
-					long ca = ( (ConstantValue.ScalarValue) calculate(scope, bo.a()) ).value();
-					long cb = ( (ConstantValue.ScalarValue) calculate(scope, bo.b()) ).value();
-					return new ConstantValue.ScalarValue(bo.type(), ca % cb);
-				}
-				case MATH_MUL: {
-					long ca = ( (ConstantValue.ScalarValue) calculate(scope, bo.a()) ).value();
-					long cb = ( (ConstantValue.ScalarValue) calculate(scope, bo.b()) ).value();
-					return new ConstantValue.ScalarValue(bo.type(), ca * cb);
-				}
-				case MATH_SUB: {
-					long ca = ( (ConstantValue.ScalarValue) calculate(scope, bo.a()) ).value();
-					long cb = ( (ConstantValue.ScalarValue) calculate(scope, bo.b()) ).value();
+					if ( bo.a().type() instanceof PointerType || bo.a().type() instanceof ArrayType ) {
+						cb *= arrPntrIndexMul(bo.a().type());
+					}
+					if ( bo.op() == BinaryOp.MATH_ADD ) {
+						return new ConstantValue.ScalarValue(bo.type(), ca + cb);
+					}
 					return new ConstantValue.ScalarValue(bo.type(), ca - cb);
 				}
-				case SHIFT_LEFT: {
-					long ca = ( (ConstantValue.ScalarValue) calculate(scope, bo.a()) ).value();
-					long cb = ( (ConstantValue.ScalarValue) calculate(scope, bo.b()) ).value();
-					return new ConstantValue.ScalarValue(bo.type(), ca << cb);
-				}
-				case SHIFT_LOGIC_RIGTH: {
-					long ca = ( (ConstantValue.ScalarValue) calculate(scope, bo.a()) ).value();
-					long cb = ( (ConstantValue.ScalarValue) calculate(scope, bo.b()) ).value();
-					return new ConstantValue.ScalarValue(bo.type(), ca >>> cb);
-				}
-				case SHIFT_ARITMETIC_RIGTH: {
-					long ca = ( (ConstantValue.ScalarValue) calculate(scope, bo.a()) ).value();
-					long cb = ( (ConstantValue.ScalarValue) calculate(scope, bo.b()) ).value();
-					return new ConstantValue.ScalarValue(bo.type(), ca >> cb);
-				}
+				// $CASES-OMITTED$
 				default:
-					throw new AssertionError("unknown binary operator: " + bo.op().name());
+					throw new AssertionError("unknown binary operator type: " + bo.op().type.name());
 				}
 			}
 		case CastVal c: { // NOSONAR
@@ -709,7 +740,7 @@ public class SimpleInterpreter {
 			ConstantValue cb = calculate(scope, bo.b());
 			long a = ca instanceof ConstantValue.ScalarValue s ? s.value() : ( (ConstantValue.DataValue) ca ).address();
 			long b = ( (ConstantValue.ScalarValue) cb ).value();
-			b *= arrPntrIndexMul(ca);
+			b *= arrPntrIndexMul(ca.type());
 			return a + b;
 		}
 		case BinaryOpVal bo when bo.op() == BinaryOp.DEREF_BY_NAME: {
@@ -720,7 +751,7 @@ public class SimpleInterpreter {
 			case StructType st -> st.offset(name);
 			default -> throw new AssertionError("Unexpected value: " + bo.a().type());
 			};
-			off *= arrPntrIndexMul(ca);
+			off *= arrPntrIndexMul(ca.type());
 			return ( (ConstantValue.DataValue) ca ).address() + off;
 		}
 		case VariableVal vv:
@@ -730,12 +761,12 @@ public class SimpleInterpreter {
 		}
 	}
 	
-	private static long arrPntrIndexMul(ConstantValue ca) {
+	private static long arrPntrIndexMul(SimpleType t) {
 		SimpleType target;
-		if ( ca.type() instanceof PointerType p ) {
+		if ( t instanceof PointerType p ) {
 			target = p.target();
 		} else {
-			target = ( (ArrayType) ca.type() ).target();
+			target = ( (ArrayType) t ).target();
 		}
 		long alignM1 = target.align() - 1L;
 		long mul = target.size();
@@ -894,7 +925,7 @@ public class SimpleInterpreter {
 		public void value(SimpleInterpreter si, String name, ConstantValue value) {
 			ConstantValue v = this.values.get(name);
 			if ( v == null ) {
-				this.parent.value(si, name);
+				this.parent.value(si, name, value);
 				return;
 			}
 			if ( v instanceof ConstantValue.DataValue d ) {

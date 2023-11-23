@@ -251,11 +251,15 @@ public class MemoryManagerImpl implements MemoryManager {
 			}
 			return allocImpl(1L, addr, p.flags | FLAG_MUST_REQUEST);
 		}
-		if (o instanceof Page p) {
-			if (p.address == addr) {
+		if ( o instanceof Page p ) {
+			if ( p.address == addr ) {
 				return p;
 			}
-			throw new IllegalArgumentException(noPageMsg(addr));
+			p = getNoAlloc(addr + ( 1L << this.pageShift ));
+			if ( ( p.flags & FLAG_GROW_DOWN ) == 0 ) {
+				throw new IllegalArgumentException(noPageMsg(addr));
+			}
+			return allocImpl(1L, addr, p.flags | FLAG_MUST_REQUEST);
 		}
 		ListEntry old = (ListEntry) o;
 		while ( true ) {
@@ -279,6 +283,12 @@ public class MemoryManagerImpl implements MemoryManager {
 		final int hash = hash(addr, len);
 		Object o = ps[hash];
 		if ( o == null ) {
+			throw new IllegalArgumentException(noPageMsg(addr - ( 1L << this.pageShift )));
+		}
+		if ( o instanceof Page p ) {
+			if ( p.address == addr ) {
+				return p;
+			}
 			throw new IllegalArgumentException(noPageMsg(addr - ( 1L << this.pageShift )));
 		}
 		ListEntry old = (ListEntry) o;
@@ -565,7 +575,7 @@ public class MemoryManagerImpl implements MemoryManager {
 		final long offset = address & pageSizeM1;
 		MemorySegment page = getWWA(pageAddr).seg;
 		if ( ( offset & 7 ) == 0 ) {
-			page.set(INT64, offset, (short) value);
+			page.set(INT64, offset, value);
 		} else if ( offset + 7 >= pageSize ) {
 			MemorySegment next = getWWA(pageAddr + pageSize).seg;
 			page.set(INT8, offset, (byte) value);
@@ -579,7 +589,7 @@ public class MemoryManagerImpl implements MemoryManager {
 			set(pageSize, page, next, offset + 6, high >>> 16);
 			set(pageSize, page, next, offset + 7, high >>> 24);
 		} else {
-			page.set(MA_INT64, offset, (short) value);
+			page.set(MA_INT64, offset, value);
 		}
 	}
 	
@@ -757,36 +767,45 @@ public class MemoryManagerImpl implements MemoryManager {
 			get(s);
 			getWWA(d);
 		}
-		while ( len > 0 ) {
+		while ( true ) {// NOSONAR
 			if ( sOffset > dOffset ) {
 				long cpy = pageSize - sOffset;
 				if ( cpy > len ) cpy = len;
 				MemorySegment.copy(sSeg, INT8, sOffset, dSeg, INT8, dOffset, cpy);
+				len -= cpy;
+				if ( len == 0L ) {
+					break;
+				}
 				sOffset = 0;
 				sPageAddr += pageSize;
-				sSeg = get(sPageAddr).seg;
 				dOffset += cpy;
-				len -= cpy;
+				sSeg = get(sPageAddr).seg;
 			} else if ( sOffset < dOffset ) {
 				long cpy = pageSize - dOffset;
 				if ( cpy > len ) cpy = len;
 				MemorySegment.copy(sSeg, INT8, sOffset, dSeg, INT8, dOffset, cpy);
+				len -= cpy;
+				if ( len == 0L ) {
+					break;
+				}
 				dOffset = 0;
 				dPageAddr += pageSize;
-				dSeg = getWWA(dPageAddr).seg;
 				sOffset += cpy;
-				len -= cpy;
+				dSeg = getWWA(dPageAddr).seg;
 			} else {
 				long cpy = pageSize - dOffset;
 				if ( cpy > len ) cpy = len;
 				MemorySegment.copy(sSeg, INT8, sOffset, dSeg, INT8, dOffset, cpy);
+				len -= cpy;
+				if ( len == 0L ) {
+					break;
+				}
 				sOffset = 0;
 				dOffset = 0;
 				sPageAddr += pageSize;
 				dPageAddr += pageSize;
 				sSeg = get(sPageAddr).seg;
 				dSeg = getWWA(dPageAddr).seg;
-				len -= cpy;
 			}
 		}
 	}
@@ -821,31 +840,40 @@ public class MemoryManagerImpl implements MemoryManager {
 				long cpy = sOffset;
 				if ( cpy > len ) cpy = len;
 				MemorySegment.copy(sSeg, INT8, sOffset, dSeg, INT8, dOffset, cpy);
+				len -= cpy;
+				if ( len == 0L ) {
+					break;
+				}
 				sOffset = 0;
 				sPageAddr -= pageSize;
 				sSeg = get(sPageAddr).seg;
 				dOffset -= cpy;
-				len -= cpy;
 			} else if ( sOffset > dOffset ) {
 				long cpy = dOffset;
 				if ( cpy > len ) cpy = len;
 				MemorySegment.copy(sSeg, INT8, sOffset, dSeg, INT8, dOffset, cpy);
+				len -= cpy;
+				if ( len == 0L ) {
+					break;
+				}
 				dOffset = 0;
 				dPageAddr -= pageSize;
 				dSeg = getWWA(dPageAddr).seg;
 				sOffset -= cpy;
-				len -= cpy;
 			} else {
 				long cpy = dOffset;
 				if ( cpy > len ) cpy = len;
 				MemorySegment.copy(sSeg, INT8, sOffset, dSeg, INT8, dOffset, cpy);
+				len -= cpy;
+				if ( len == 0L ) {
+					break;
+				}
 				sOffset = 0;
 				dOffset = 0;
 				sPageAddr -= pageSize;
 				dPageAddr -= pageSize;
 				sSeg = get(sPageAddr).seg;
 				dSeg = getWWA(dPageAddr).seg;
-				len -= cpy;
 			}
 		}
 	}

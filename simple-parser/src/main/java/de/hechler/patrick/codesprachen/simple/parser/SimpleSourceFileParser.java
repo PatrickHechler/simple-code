@@ -253,7 +253,7 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 					continue;
 				}
 				case SimpleType type -> {
-					return type;
+					return parseTypePostfix(scope, type);
 				}
 				case null, default -> {
 					SimpleValue value = scope.nameValueOrErr(name, this.in.ctx());

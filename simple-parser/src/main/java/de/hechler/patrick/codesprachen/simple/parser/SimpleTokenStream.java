@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
+import java.nio.charset.CharacterCodingException;
 import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CoderResult;
 import java.nio.charset.CodingErrorAction;
@@ -101,7 +102,8 @@ public class SimpleTokenStream {
 	public static final int  CHARACTER       = 62;
 	public static final int  ASM_BLOCK       = 63;
 	
-	private static final String[] NAMES = { // @formatter:off
+	private static final String[] NAMES =
+		{ // @formatter:off
 		"!",           // BOOL_NOT
 		"!=",          // NOT_EQ
 		"#",           // DIAMOND
@@ -167,7 +169,7 @@ public class SimpleTokenStream {
 		"[CHARACTER]", // CHARACTER
 		"[ASM_BLOCK]", // ASM_BLOCK
 	};//@formatter:on
-	
+		
 	public static String name(int token) { // NOSONAR
 		if ( token < 0 || token >= NAMES.length ) {
 			if ( token == EOF ) return "EOF";
@@ -305,7 +307,7 @@ public class SimpleTokenStream {
 			int low = 0;
 			int high = FIRST_DYN - 1;
 			return findToken(r, low, high);
-		} catch ( IOException e ) {
+		} catch (IOException e) {
 			throw new IllegalStateException(e);
 		}
 	}
@@ -646,14 +648,16 @@ public class SimpleTokenStream {
 		}
 		default -> {
 			ByteBuffer bb = ByteBuffer.wrap(bytes, 0, 1);
-			CharBuffer cb = StandardCharsets.UTF_8.newDecoder().replaceWith("--")
-				.onMalformedInput(CodingErrorAction.REPLACE).onUnmappableCharacter(CodingErrorAction.REPLACE)
-				.decode(bb);
-			if ( cb.remaining() != 1 ) {
-				throw new CompileError(this.file, this.line, this.charInLine, this.totalChar, "'", null,
+			try {
+				CharBuffer cb = StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
+					.onUnmappableCharacter(CodingErrorAction.REPORT).decode(bb);
+				this.dynTok = Character.toString(cb.get(0));
+			} catch (CharacterCodingException e) {
+				CompileError ce = new CompileError(this.file, this.line, this.charInLine, this.totalChar, "'", null,
 					"invalid character sequence (maybe a non single byte character)");
+				ce.initCause(e);
+				throw ce;
 			}
-			this.dynTok = Character.toString(cb.get(0));
 		}
 		}
 		if ( bytes[off] != '\'' ) {
@@ -662,7 +666,7 @@ public class SimpleTokenStream {
 				"character not directly closed");
 		}
 		this.in.reset();
-		this.in.mark(off + 1);
+		this.in.skipNBytes(off + 1L);
 		this.charInLine += off + 2;
 		this.totalChar += off + 2;
 		this.tok = CHARACTER; // dynTok is already set

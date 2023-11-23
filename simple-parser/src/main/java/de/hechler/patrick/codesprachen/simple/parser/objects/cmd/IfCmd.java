@@ -41,17 +41,18 @@ public class IfCmd extends SimpleCommand {
 	}
 	
 	@Override
+	@SuppressWarnings("unused")
 	public SimpleValue directNameValueOrNull(String name, ErrorContext ctx) {
 		return null;
 	}
 	
 	@Override
 	public void toString(StringBuilder append, StringBuilder indent) {
-		append.append("while (").append(this.condition).append(") ");
-		trueCmd.toString(append, indent);
+		append.append("if (").append(this.condition).append(") ");
+		this.trueCmd.toString(append, indent);
 		if ( this.falseCmd != null ) {
 			append.append('\n').append(indent);
-			falseCmd.toString(append, indent);
+			this.falseCmd.toString(append, indent);
 		}
 	}
 	
