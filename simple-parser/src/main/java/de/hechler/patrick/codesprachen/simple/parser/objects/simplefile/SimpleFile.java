@@ -91,9 +91,9 @@ public class SimpleFile extends SimpleDependency {
 		this.typedefs.put(typedef.name(), typedef);
 	}
 	
-	public void variable(SimpleVariable sv, String name, ErrorContext ctx) {
-		checkDuplicateName(name, ctx);
-		this.variables.put(name, sv);
+	public void variable(SimpleVariable sv, ErrorContext ctx) {
+		checkDuplicateName(sv.name(), ctx);
+		this.variables.put(sv.name(), sv);
 	}
 	
 	public void function(SimpleFunction func, ErrorContext ctx) {

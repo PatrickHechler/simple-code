@@ -16,6 +16,7 @@ import de.hechler.patrick.codesprachen.simple.parser.objects.simplefile.SimpleVa
 import de.hechler.patrick.codesprachen.simple.parser.objects.types.FuncType;
 import de.hechler.patrick.codesprachen.simple.parser.objects.types.PointerType;
 import de.hechler.patrick.codesprachen.simple.parser.objects.types.SimpleType;
+import de.hechler.patrick.codesprachen.simple.parser.objects.value.ScalarNumericVal;
 
 public class JavaStdLib extends JavaDependency {
 	
@@ -129,6 +130,8 @@ public class JavaStdLib extends JavaDependency {
 		sys.function("pageshift", ft(of(sv(UNUM, "result")), of()),
 			(si_, args) -> List.of(new ConstantValue.ScalarValue(UNUM, si_.memManager().pageShift())));
 		dependency(sys, "sys", ErrorContext.NO_CONTEXT);
+		variable(new SimpleVariable(PNTR, "NULL", ScalarNumericVal.create(PNTR, 0L, ErrorContext.NO_CONTEXT), SimpleVariable.FLAG_CONSTANT | SimpleVariable.FLAG_EXPORT),
+			ErrorContext.NO_CONTEXT);
 	}
 	
 	private static SimpleVariable sv(SimpleType t, String name) {
@@ -136,7 +139,7 @@ public class JavaStdLib extends JavaDependency {
 	}
 	
 	private static FuncType ft(List<SimpleVariable> res, List<SimpleVariable> args) {
-		return FuncType.create(res, args, FuncType.FLAG_FUNC_ADDRESS, ErrorContext.NO_CONTEXT);
+		return FuncType.create(res, args, FuncType.FLAG_FUNC_ADDRESS | FuncType.FLAG_EXPORT, ErrorContext.NO_CONTEXT);
 	}
 	
 	public long alloc(final long len, final long align) {

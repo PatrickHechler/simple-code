@@ -19,4 +19,7 @@
 func main <ubyte exitnum> <-- (unum argc, char## argv) {
     unum wrote;
     call std:puts <wrote, exitnum> <-- ("hello world\n");
+    if (wrote != 0 && !exitnum) {
+    	exitnum <-- 1;
+    }
 }

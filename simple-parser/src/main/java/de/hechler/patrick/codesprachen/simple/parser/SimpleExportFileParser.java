@@ -50,14 +50,14 @@ import de.hechler.patrick.codesprachen.simple.parser.objects.value.UnaryOpVal.Un
 
 public class SimpleExportFileParser {
 	
-	protected final SimpleTokenStream                          in;
-	protected final BiFunction<String,String,SimpleDependency> dep;
+	protected final SimpleTokenStream                            in;
+	protected final BiFunction<String, String, SimpleDependency> dep;
 	
-	public SimpleExportFileParser(InputStream in, String file, BiFunction<String,String,SimpleDependency> dep) {
+	public SimpleExportFileParser(InputStream in, String file, BiFunction<String, String, SimpleDependency> dep) {
 		this(new SimpleTokenStream(in, file), dep);
 	}
 	
-	public SimpleExportFileParser(SimpleTokenStream in, BiFunction<String,String,SimpleDependency> dep) {
+	public SimpleExportFileParser(SimpleTokenStream in, BiFunction<String, String, SimpleDependency> dep) {
 		this.in = in;
 		this.dep = dep;
 	}
@@ -343,6 +343,7 @@ public class SimpleExportFileParser {
 		case BOOL_NOT -> op = UnaryOp.BOOL_NOT;
 		default -> { return parseValuePostfixExp(scope, 0, null); }
 		}
+		this.in.consume();
 		SimpleValue a = parseValuePostfixExp(scope, 0, null);
 		return UnaryOpVal.create(op, a, this.in.ctx());
 	}
@@ -557,14 +558,14 @@ public class SimpleExportFileParser {
 		return parseTypeNamedType(ctx, scope, SimpleType.class);
 	}
 	
-	private < T > T parseTypeNamedType(ErrorContext ctx, SimpleScope scope, Class<T> cls) {
+	private <T> T parseTypeNamedType(ErrorContext ctx, SimpleScope scope, Class<T> cls) {
 		while ( true ) {
 			Object obj = scope.nameTypeOrDepOrFuncOrNull(this.in.dynTokSpecialText(), ctx);
 			if ( cls.isInstance(obj) ) return cls.cast(obj);
 			if ( !( obj instanceof SimpleDependency nscope ) ) {
-				String simpleName = cls.getSimpleName().startsWith("Simple")
-					? cls.getSimpleName().substring("Simple".length())
-					: cls.getSimpleName();
+				String simpleName =
+					cls.getSimpleName().startsWith("Simple") ? cls.getSimpleName().substring("Simple".length())
+						: cls.getSimpleName();
 				if ( obj == null ) {
 					throw new CompileError(this.in.ctx(), "expected the `[NAME]´ to be the [NAME] of a " + simpleName
 						+ " or a dependency, but there is nothing with the given name");
