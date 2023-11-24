@@ -33,7 +33,6 @@ func main <ubyte exitnum> <-- (unum argc, char## argv) {
             print[off] <-- '\0';
 			// to print big-endian reverse the buffer
 			// alternatively you could of course initialize off with 3 and decrement it
-			// but this would make no sense here, because then this would be just a duplicate of the LE file
 			unum lowI <-- 0;
 			unum highI <-- off - 1;
 			while (lowI < highI) {
