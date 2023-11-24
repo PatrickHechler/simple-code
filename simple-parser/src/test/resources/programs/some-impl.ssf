@@ -24,6 +24,6 @@ func puts <unum wrote, unum errno> <-- (char# string) {
 func main <ubyte exitnum> <-- (unum argc, char## argv) {
     unum wrote;
     unum err;
-    call puts <wrote, err> <-- ("hello world\n");
+    puts <wrote, err> <-- ("hello world\n");
     exitnum <-- err != 0;
 }

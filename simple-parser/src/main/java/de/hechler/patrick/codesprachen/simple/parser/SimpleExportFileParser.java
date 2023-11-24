@@ -16,7 +16,64 @@
 //along with this program.  If not, see <https://www.gnu.org/licenses/>.
 package de.hechler.patrick.codesprachen.simple.parser;
 
-import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.*;
+import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.ARR_CLOSE;
+import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.ARR_OPEN;
+import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.ASM_BLOCK;
+import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.BIT_AND;
+import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.BIT_NOT;
+import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.BIT_OR;
+import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.BIT_XOR;
+import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.BLOCK_CLOSE;
+import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.BLOCK_OPEN;
+import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.BOOL_AND;
+import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.BOOL_NOT;
+import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.BOOL_OR;
+import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.BYTE;
+import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.CHARACTER;
+import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.COLON;
+import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.COMMA;
+import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.CONST;
+import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.DEP;
+import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.DIAMOND;
+import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.DIV;
+import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.DWORD;
+import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.EOF;
+import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.EQ;
+import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.EXP;
+import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.FIRST_DYN;
+import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.FPDWORD;
+import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.FPNUM;
+import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.FSTRUCT;
+import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.FUNC;
+import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.GE;
+import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.GT;
+import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.LARROW;
+import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.LE;
+import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.LT;
+import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.MINUS;
+import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.MOD;
+import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.NAME;
+import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.NOPAD;
+import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.NOT_EQ;
+import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.NUM;
+import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.NUMBER;
+import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.PLUS;
+import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.QUESTION;
+import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.SEMI;
+import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.SHIFT_LEFT;
+import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.SHIFT_RIGTH;
+import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.SMALL_CLOSE;
+import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.SMALL_OPEN;
+import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.STAR;
+import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.STRING;
+import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.STRUCT;
+import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.TYPEDEF;
+import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.UBYTE;
+import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.UDWORD;
+import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.UNUM;
+import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.UWORD;
+import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.WORD;
+import static de.hechler.patrick.codesprachen.simple.parser.SimpleTokenStream.name;
 
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -38,6 +95,7 @@ import de.hechler.patrick.codesprachen.simple.parser.objects.types.PointerType;
 import de.hechler.patrick.codesprachen.simple.parser.objects.types.SimpleType;
 import de.hechler.patrick.codesprachen.simple.parser.objects.types.StructType;
 import de.hechler.patrick.codesprachen.simple.parser.objects.value.BinaryOpVal;
+import de.hechler.patrick.codesprachen.simple.parser.objects.value.BinaryOpVal.BinaryOp;
 import de.hechler.patrick.codesprachen.simple.parser.objects.value.CastVal;
 import de.hechler.patrick.codesprachen.simple.parser.objects.value.CondVal;
 import de.hechler.patrick.codesprachen.simple.parser.objects.value.DataVal;
@@ -45,7 +103,6 @@ import de.hechler.patrick.codesprachen.simple.parser.objects.value.NameVal;
 import de.hechler.patrick.codesprachen.simple.parser.objects.value.ScalarNumericVal;
 import de.hechler.patrick.codesprachen.simple.parser.objects.value.SimpleValue;
 import de.hechler.patrick.codesprachen.simple.parser.objects.value.UnaryOpVal;
-import de.hechler.patrick.codesprachen.simple.parser.objects.value.BinaryOpVal.BinaryOp;
 import de.hechler.patrick.codesprachen.simple.parser.objects.value.UnaryOpVal.UnaryOp;
 
 public class SimpleExportFileParser {
@@ -265,13 +322,12 @@ public class SimpleExportFileParser {
 		if ( magic == SHIFT_MAGIC ) return mvalue;
 		SimpleValue a = parseValueAddExp(scope, magic, mvalue);
 		int t = this.in.tok();
-		while ( t == SHIFT_LEFT || t == SHIFT_RIGTH_LOG || t == SHIFT_RIGTH_ARI ) {
+		while ( t == SHIFT_LEFT || t == SHIFT_RIGTH ) {
 			this.in.consume();
 			SimpleValue b = parseValueAddExp(scope, 0, null);
 			a = BinaryOpVal.create(a, switch ( t ) {
 			case SHIFT_LEFT -> BinaryOp.SHIFT_LEFT;
-			case SHIFT_RIGTH_ARI -> BinaryOp.SHIFT_ARITMETIC_RIGTH;
-			case SHIFT_RIGTH_LOG -> BinaryOp.SHIFT_LOGIC_RIGTH;
+			case SHIFT_RIGTH -> BinaryOp.SHIFT_RIGTH;
 			default -> throw new AssertionError();
 			}, b, this.in.ctx());
 			t = this.in.tok();
@@ -319,10 +375,10 @@ public class SimpleExportFileParser {
 	protected SimpleValue parseValueCastExp(SimpleScope scope, int magic, SimpleValue mvalue) {
 		if ( magic == CAST_MAGIC ) return mvalue;
 		if ( magic != 0 ) return parseValueUnaryExp(scope, magic, mvalue);
-		if ( this.in.tok() == SMALL_OPEN ) {
+		if ( this.in.tok() == LT ) {
 			this.in.consume();
 			SimpleType t = parseType(scope);
-			consumeToken(SMALL_CLOSE, "expected `) [VALUE]´ after `( [TYPE]´");
+			consumeToken(GT, "expected `> [UNARY_EXP]´ after `< [TYPE]´");
 			SimpleValue a = parseValueUnaryExp(scope, 0, null);
 			return CastVal.create(a, t, this.in.ctx());
 		}

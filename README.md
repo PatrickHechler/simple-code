@@ -208,13 +208,13 @@ if marked with `const` there must be a constant initial value
 * REL_EXP
     * `[REL_EXP] ( ( > | >= | <= | < ) [REL_EXP] )*`
 * SHIFT_EXP
-    * `[SHIFT_EXP] ( ( << | >> | >>> ) [SHIFT_EXP] )*`
+    * `[SHIFT_EXP] ( ( << | >> ) [SHIFT_EXP] )*`
 * ADD_EXP
     * `[MUL_EXP] ( ( \+ | - ) [MUL_EXP] )*`
 * MUL_EXP
     * `[CAST_EXP] ( ( \* | / | % ) [CAST_EXP] )*`
 * CAST_EXP
-    * `( \( [TYPE] \) )? [UNARY_EXP]`
+    * `( < [TYPE] > )? [UNARY_EXP]`
 * UNARY_EXP
     * `( \+ | - | & | ~ | ! )? [POSTFIX_EXP]`
 * POSTFIX_EXP

@@ -98,13 +98,13 @@ public class SimpleinterpreterChecker {
 	@Check
 	private void parsePringNumLECheck() throws URISyntaxException {
 		singleParsePrintNumCheck("/parse-printLE-num.ssf", "5", "5");
-		singleParsePrintNumCheck("/parse-printLE-num.ssf", "05", "50");
-		singleParsePrintNumCheck("/parse-printLE-num.ssf", "442", "500");
-		singleParsePrintNumCheck("/parse-printLE-num.ssf", "34", "555");
-		singleParsePrintNumCheck("/parse-printLE-num.ssf", "552", "255");
+		singleParsePrintNumCheck("/parse-printLE-num.ssf", "23", "50");
+		singleParsePrintNumCheck("/parse-printLE-num.ssf", "4F", "500");
+		singleParsePrintNumCheck("/parse-printLE-num.ssf", "B2", "555");
+		singleParsePrintNumCheck("/parse-printLE-num.ssf", "FF", "255");
 		singleParsePrintNumCheck("/parse-printLE-num.ssf", "0", "256");
-		singleParsePrintNumCheck("/parse-printLE-num.ssf", "001", "0100");
-		singleParsePrintNumCheck("/parse-printLE-num.ssf", "802", "000000000000000000000000002000");
+		singleParsePrintNumCheck("/parse-printLE-num.ssf", "46", "0100");
+		singleParsePrintNumCheck("/parse-printLE-num.ssf", "0D", "000000000000000000000000002000");
 		singleParsePrintNumCheck("/parse-printLE-num.ssf", "0", "0");
 		singleParsePrintNumCheck("/parse-printLE-num.ssf", "0", "");
 	}

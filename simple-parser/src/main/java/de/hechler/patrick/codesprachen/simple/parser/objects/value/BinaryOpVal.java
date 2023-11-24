@@ -205,8 +205,7 @@ public record BinaryOpVal(SimpleValue a, BinaryOp op, SimpleValue b, ErrorContex
 		CMP_NAN_LE(BinaryOpType.CMP),
 		
 		SHIFT_LEFT(BinaryOpType.SHIFT),
-		SHIFT_LOGIC_RIGTH(BinaryOpType.SHIFT),
-		SHIFT_ARITMETIC_RIGTH(BinaryOpType.SHIFT),
+		SHIFT_RIGTH(BinaryOpType.SHIFT),
 		
 		MATH_ADD(BinaryOpType.MATH_ADDSUB),
 		MATH_SUB(BinaryOpType.MATH_ADDSUB),
@@ -255,8 +254,7 @@ public record BinaryOpVal(SimpleValue a, BinaryOp op, SimpleValue b, ErrorContex
 		case MATH_DIV -> "(" + this.a + " / " + this.b + ")";
 		case MATH_MOD -> "(" + this.a + " % " + this.b + ")";
 		case SHIFT_LEFT -> "(" + this.a + " << " + this.b + ")";
-		case SHIFT_ARITMETIC_RIGTH -> "(" + this.a + " >> " + this.b + ")";
-		case SHIFT_LOGIC_RIGTH -> "(" + this.a + " >>> " + this.b + ")";
+		case SHIFT_RIGTH -> "(" + this.a + " >> " + this.b + ")";
 		};
 	}
 	
@@ -540,15 +538,14 @@ public record BinaryOpVal(SimpleValue a, BinaryOp op, SimpleValue b, ErrorContex
 			}
 			yield null;
 		}
-		case SHIFT_ARITMETIC_RIGTH -> {
+		case SHIFT_RIGTH -> {
 			if ( sa instanceof ScalarNumericVal na && sb instanceof ScalarNumericVal nb ) {
-				yield ScalarNumericVal.createAllowTruncate(type(), na.value() >> nb.value(), this.ctx);
-			}
-			yield null;
-		}
-		case SHIFT_LOGIC_RIGTH -> {
-			if ( sa instanceof ScalarNumericVal na && sb instanceof ScalarNumericVal nb ) {
-				yield ScalarNumericVal.createAllowTruncate(type(), na.value() >>> nb.value(), this.ctx);
+				switch ( sa.type() ) {
+				case NativeType.NUM, NativeType.DWORD, NativeType.WORD, NativeType.BYTE:
+					yield ScalarNumericVal.createAllowTruncate(type(), na.value() >> nb.value(), this.ctx);
+				default:
+					yield ScalarNumericVal.createAllowTruncate(type(), na.value() >>> nb.value(), this.ctx);
+				}
 			}
 			yield null;
 		}

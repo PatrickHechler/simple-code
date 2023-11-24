@@ -32,78 +32,76 @@ import de.hechler.patrick.codesprachen.simple.parser.error.ErrorContext;
 
 public class SimpleTokenStream {
 	
-	public static final int  INVALID         = -2;
-	public static final int  EOF             = -1;
-	public static final int  BOOL_NOT        = 0;
-	public static final int  NOT_EQ          = 1;
-	public static final int  DIAMOND         = 2;
-	public static final int  MOD             = 3;
-	public static final int  BIT_AND         = 4;
-	public static final int  BOOL_AND        = 5;
-	public static final int  SMALL_OPEN      = 6;
-	public static final int  SMALL_CLOSE     = 7;
-	public static final int  STAR            = 8;
-	public static final int  PLUS            = 9;
-	public static final int  COMMA           = 10;
-	public static final int  MINUS           = 11;
-	public static final int  DIV             = 12;
-	public static final int  COLON           = 13;
-	public static final int  SEMI            = 14;
-	public static final int  LT              = 15;
-	public static final int  LARROW          = 16;
-	public static final int  SHIFT_LEFT      = 17;
-	public static final int  LE              = 18;
-	public static final int  ME              = 19;
-	public static final int  EQ              = 20;
-	public static final int  GT              = 21;
-	public static final int  GE              = 22;
-	public static final int  SHIFT_RIGTH_ARI = 23;
-	public static final int  SHIFT_RIGTH_LOG = 24;
-	public static final int  QUESTION        = 25;
-	public static final int  ARR_OPEN        = 26;
-	public static final int  ARR_CLOSE       = 27;
-	public static final int  BIT_XOR         = 28;
-	public static final int  ASM             = 29;
-	private static final int MIN_NAME        = ASM;
-	public static final int  BYTE            = 30;
-	public static final int  CALL            = 31;
-	public static final int  CONST           = 32;
-	public static final int  DEP             = 33;
-	public static final int  DWORD           = 34;
-	public static final int  ELSE            = 35;
-	public static final int  EXP             = 36;
-	public static final int  FPDWORD         = 37;
-	public static final int  FPNUM           = 38;
-	public static final int  FSTRUCT         = 39;
-	public static final int  FUNC            = 40;
-	public static final int  IF              = 41;
-	public static final int  INIT            = 42;
-	public static final int  MAIN            = 43;
-	public static final int  NOPAD           = 44;
-	public static final int  NUM             = 45;
-	public static final int  STRUCT          = 46;
-	public static final int  TYPEDEF         = 47;
-	public static final int  UBYTE           = 48;
-	public static final int  UDWORD          = 49;
-	public static final int  UNUM            = 50;
-	public static final int  UWORD           = 51;
-	public static final int  WHILE           = 52;
-	public static final int  WORD            = 53;
-	private static final int MAX_NAME        = WORD;
-	public static final int  BLOCK_OPEN      = 54;
-	public static final int  BIT_OR          = 55;
-	public static final int  BOOL_OR         = 56;
-	public static final int  BLOCK_CLOSE     = 57;
-	public static final int  BIT_NOT         = 58;
-	public static final int  NAME            = 59;
-	static final int         FIRST_DYN       = NAME;
-	public static final int  NUMBER          = 60;
-	public static final int  STRING          = 61;
-	public static final int  CHARACTER       = 62;
-	public static final int  ASM_BLOCK       = 63;
+	public static final int  INVALID     = -2;
+	public static final int  EOF         = -1;
+	public static final int  BOOL_NOT    = 0;
+	public static final int  NOT_EQ      = 1;
+	public static final int  DIAMOND     = 2;
+	public static final int  MOD         = 3;
+	public static final int  BIT_AND     = 4;
+	public static final int  BOOL_AND    = 5;
+	public static final int  SMALL_OPEN  = 6;
+	public static final int  SMALL_CLOSE = 7;
+	public static final int  STAR        = 8;
+	public static final int  PLUS        = 9;
+	public static final int  COMMA       = 10;
+	public static final int  MINUS       = 11;
+	public static final int  DIV         = 12;
+	public static final int  COLON       = 13;
+	public static final int  SEMI        = 14;
+	public static final int  LT          = 15;
+	public static final int  LARROW      = 16;
+	public static final int  SHIFT_LEFT  = 17;
+	public static final int  LE          = 18;
+	public static final int  ME          = 19;
+	public static final int  EQ          = 20;
+	public static final int  GT          = 21;
+	public static final int  GE          = 22;
+	public static final int  SHIFT_RIGTH = 23;
+	public static final int  QUESTION    = 24;
+	public static final int  ARR_OPEN    = 25;
+	public static final int  ARR_CLOSE   = 26;
+	public static final int  BIT_XOR     = 27;
+	public static final int  ASM         = 28;
+	private static final int MIN_NAME    = ASM;
+	public static final int  BYTE        = 29;
+	public static final int  CALL        = 30;
+	public static final int  CONST       = 31;
+	public static final int  DEP         = 32;
+	public static final int  DWORD       = 33;
+	public static final int  ELSE        = 34;
+	public static final int  EXP         = 35;
+	public static final int  FPDWORD     = 36;
+	public static final int  FPNUM       = 37;
+	public static final int  FSTRUCT     = 38;
+	public static final int  FUNC        = 39;
+	public static final int  IF          = 40;
+	public static final int  INIT        = 41;
+	public static final int  MAIN        = 42;
+	public static final int  NOPAD       = 43;
+	public static final int  NUM         = 44;
+	public static final int  STRUCT      = 45;
+	public static final int  TYPEDEF     = 46;
+	public static final int  UBYTE       = 47;
+	public static final int  UDWORD      = 48;
+	public static final int  UNUM        = 49;
+	public static final int  UWORD       = 50;
+	public static final int  WHILE       = 51;
+	public static final int  WORD        = 52;
+	private static final int MAX_NAME    = WORD;
+	public static final int  BLOCK_OPEN  = 53;
+	public static final int  BIT_OR      = 54;
+	public static final int  BOOL_OR     = 55;
+	public static final int  BLOCK_CLOSE = 56;
+	public static final int  BIT_NOT     = 57;
+	public static final int  NAME        = 58;
+	static final int         FIRST_DYN   = NAME;
+	public static final int  NUMBER      = 59;
+	public static final int  STRING      = 60;
+	public static final int  CHARACTER   = 61;
+	public static final int  ASM_BLOCK   = 62;
 	
-	private static final String[] NAMES =
-		{ // @formatter:off
+	private static final String[] NAMES = { // @formatter:off
 		"!",           // BOOL_NOT
 		"!=",          // NOT_EQ
 		"#",           // DIAMOND
@@ -127,8 +125,7 @@ public class SimpleTokenStream {
 		"==",          // EQ
 		">",           // GT
 		">=",          // GE
-		">>",          // SHIFT_RIGTH_ARITMETIC
-		">>>",         // SHIFT_RIGTH_LOGIC
+		">>",          // SHIFT_RIGTH
 		"?",           // QUESTION
 		"[",           // ARR_OPEN
 		"]",           // ARR_CLOSE
@@ -169,7 +166,7 @@ public class SimpleTokenStream {
 		"[CHARACTER]", // CHARACTER
 		"[ASM_BLOCK]", // ASM_BLOCK
 	};//@formatter:on
-		
+	
 	public static String name(int token) { // NOSONAR
 		if ( token < 0 || token >= NAMES.length ) {
 			if ( token == EOF ) return "EOF";
@@ -307,7 +304,7 @@ public class SimpleTokenStream {
 			int low = 0;
 			int high = FIRST_DYN - 1;
 			return findToken(r, low, high);
-		} catch (IOException e) {
+		} catch ( IOException e ) {
 			throw new IllegalStateException(e);
 		}
 	}
@@ -353,11 +350,11 @@ public class SimpleTokenStream {
 		this.in.reset();
 		int r = this.in.read();
 		// assert r >= 0
-		if ( nameStart(r) ) {
-			return returnName(new StringBuilder().append((char) r));
-		}
 		if ( numberStart(r) ) {
 			return returnNumber(new StringBuilder().append((char) r));
+		}
+		if ( nameStart(r) ) {
+			return returnName(new StringBuilder().append((char) r));
 		}
 		if ( r == '"' ) {
 			return returnString(new StringBuilder());
@@ -512,8 +509,12 @@ public class SimpleTokenStream {
 			for (i = 0; i < r; i++) {
 				if ( sb.length() < prefix.length() ) {
 					if ( bytes[i] != prefix.charAt(sb.length()) ) {
-						throw new CompileError(this.file, this.line, this.charInLine, this.totalChar,
-							sb.append((char) bytes[i]).toString(), null, "invalid number prefix");
+						this.in.reset();
+						this.in.skipNBytes(i);
+						return returnName(sb);
+						// the prefix contains of a valid name followed by a '-'
+						// the string builder is still smaller than the prefix
+						// thus it contains a valid name
 					}
 				} else if ( invalidNumber(bytes[i], number) ) {
 					int val = bytes[i];
@@ -652,7 +653,7 @@ public class SimpleTokenStream {
 				CharBuffer cb = StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
 					.onUnmappableCharacter(CodingErrorAction.REPORT).decode(bb);
 				this.dynTok = Character.toString(cb.get(0));
-			} catch (CharacterCodingException e) {
+			} catch ( CharacterCodingException e ) {
 				CompileError ce = new CompileError(this.file, this.line, this.charInLine, this.totalChar, "'", null,
 					"invalid character sequence (maybe a non single byte character)");
 				ce.initCause(e);

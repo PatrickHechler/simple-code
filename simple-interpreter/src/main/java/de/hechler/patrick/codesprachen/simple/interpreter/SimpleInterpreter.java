@@ -60,13 +60,13 @@ public class SimpleInterpreter {
 	private long roaddr;
 	private long stack;
 	
-	private final Path[]                    src;
-	private final Path                      defMain;
-	private final MemoryManager             mm;
-	private final FSManager                 fsm;
-	private final SimpleFile                stdlib;
-	private final Map<Path, LoadedSF>       files  = new HashMap<>();
-	private final Map<SimpleFile, LoadedSF> loaded = new HashMap<>();
+	private final Path[]                   src;
+	private final Path                     defMain;
+	private final MemoryManager            mm;
+	private final FSManager                fsm;
+	private final SimpleFile               stdlib;
+	private final Map<Path,LoadedSF>       files  = new HashMap<>();
+	private final Map<SimpleFile,LoadedSF> loaded = new HashMap<>();
 	
 	public SimpleInterpreter(List<Path> src) {
 		this(src, null);
@@ -84,14 +84,16 @@ public class SimpleInterpreter {
 		this(src, stdlib, defMain, memManager, new FSManagerImpl(root, memManager));
 	}
 	
-	public SimpleInterpreter(List<Path> src, SimpleFile stdlib, Path defMain, MemoryManager memManager, FSManager fsManager) {
+	public SimpleInterpreter(List<Path> src, SimpleFile stdlib, Path defMain, MemoryManager memManager,
+		FSManager fsManager) {
 		this.src = src.toArray(new Path[src.size()]);
 		this.defMain = defMain;
 		this.mm = memManager;
 		this.fsm = fsManager;
 		this.stdlib = stdlib == null ? new JavaStdLib(this) : stdlib;
 		final long pageSize = memManager.pageSize();
-		this.stack = pageSize + memManager.allocate(1L, 0x7FFFFFFFFFFFFFFFL & ~( pageSize - 1 ), MemoryManager.FLAG_GROW_DOWN);
+		this.stack = pageSize
+			+ memManager.allocate(1L, 0x7FFFFFFFFFFFFFFFL & ~( pageSize - 1 ), MemoryManager.FLAG_GROW_DOWN);
 		putWithDependencies(this.stdlib);
 	}
 	
@@ -140,20 +142,21 @@ public class SimpleInterpreter {
 		try {
 			Path realP = p.toRealPath();
 			Path p0 = realP;
-			try (InputStream in = Files.newInputStream(p0)) {
-				SimpleSourceFileParser parser = new SimpleSourceFileParser(in, oldP.toString(), (srcPath, runtimePath) -> {
-					if ( runtimePath == null ) {
-						if ( srcPath.endsWith(".sexp") ) {
-							runtimePath = srcPath.substring(0, srcPath.length() - ".sexp".length());
-						} else {
-							runtimePath = srcPath;
+			try ( InputStream in = Files.newInputStream(p0) ) {
+				SimpleSourceFileParser parser = new SimpleSourceFileParser(in, oldP.toString(),
+					(srcPath, runtimePath) -> {
+						if ( runtimePath == null ) {
+							if ( srcPath.endsWith(".sexp") ) {
+								runtimePath = srcPath.substring(0, srcPath.length() - ".sexp".length());
+							} else {
+								runtimePath = srcPath;
+							}
 						}
-					}
-					runtimePath += ".ssf"; // NOSONAR
-					Path srcFile = realP.getFileSystem().getPath(runtimePath);
-					Path relDir = realP.getParent();
-					return load(srcFile, relDir).sf;
-				});
+						runtimePath += ".ssf"; // NOSONAR
+						Path srcFile = realP.getFileSystem().getPath(runtimePath);
+						Path relDir = realP.getParent();
+						return load(srcFile, relDir).sf;
+					});
 				SimpleFile sf = new SimpleFile(oldP.toString());
 				lsf = new LoadedSF(sf);
 				sf.dependency(this.stdlib, "std", ErrorContext.NO_CONTEXT);
@@ -163,8 +166,7 @@ public class SimpleInterpreter {
 				this.loaded.put(sf, lsf);
 				return lsf;
 			}
-		} catch (@SuppressWarnings("unused") IOException e) {
-		}
+		} catch ( @SuppressWarnings("unused") IOException e ) {}
 		return null;
 	}
 	
@@ -206,11 +208,11 @@ public class SimpleInterpreter {
 			SimpleFunction func = Objects.requireNonNull(mainFile.main(), "the main file has no main function");
 			long addr = JavaStdLib.allocArgs(this, args);
 			List<ConstantValue> list = List.of(new ConstantValue.ScalarValue(NativeType.UNUM, args.length),
-					new ConstantValue.ScalarValue(FuncType.MAIN_TYPE.argMembers().get(1).type(), addr));
+				new ConstantValue.ScalarValue(FuncType.MAIN_TYPE.argMembers().get(1).type(), addr));
 			List<ConstantValue> resultList = execute(mainFile, func, list);
 			ConstantValue.ScalarValue exitNum = (ConstantValue.ScalarValue) resultList.get(0);
 			return (int) exitNum.value();
-		} catch (ExitError e) {
+		} catch ( ExitError e ) {
 			return e.exitnum;
 		}
 	}
@@ -310,9 +312,9 @@ public class SimpleInterpreter {
 			list = execute(lf.file.sf, lf.func, list);
 			for (int i = 0; i < list.size(); i++) {
 				SimpleValue resultTarget = fc.results.get(i);
-				if (resultTarget != null) {
+				if ( resultTarget != null ) {
 					assign(scope, resultTarget, list.get(i));
-				}// else function result is ignored (? was used)
+				} // else function result is ignored (? was used)
 			}
 			break;
 		}
@@ -573,7 +575,7 @@ public class SimpleInterpreter {
 					off *= arrPntrIndexMul(ca.type());
 					return deref(bo.type(), ( (ConstantValue.DataValue) ca ).address() + off);
 				}
-				case MATH, SHIFT, CMP, BOOL:
+				case MATH, SHIFT, CMP, BOOL, BIT:
 					switch ( bo.op() ) {
 					case BIT_AND: {
 						long ca = ( (ConstantValue.ScalarValue) calculate(scope, bo.a()) ).value();
@@ -637,15 +639,15 @@ public class SimpleInterpreter {
 						long cb = ( (ConstantValue.ScalarValue) calculate(scope, bo.b()) ).value();
 						return new ConstantValue.ScalarValue(bo.type(), ca << cb);
 					}
-					case SHIFT_LOGIC_RIGTH: {
+					case SHIFT_RIGTH: {
 						long ca = ( (ConstantValue.ScalarValue) calculate(scope, bo.a()) ).value();
 						long cb = ( (ConstantValue.ScalarValue) calculate(scope, bo.b()) ).value();
-						return new ConstantValue.ScalarValue(bo.type(), ca >>> cb);
-					}
-					case SHIFT_ARITMETIC_RIGTH: {
-						long ca = ( (ConstantValue.ScalarValue) calculate(scope, bo.a()) ).value();
-						long cb = ( (ConstantValue.ScalarValue) calculate(scope, bo.b()) ).value();
-						return new ConstantValue.ScalarValue(bo.type(), ca >> cb);
+						switch ( bo.type() ) {
+						case NativeType.NUM, NativeType.DWORD, NativeType.WORD, NativeType.BYTE:
+							return new ConstantValue.ScalarValue(bo.type(), ca >>> cb);
+						default:
+							return new ConstantValue.ScalarValue(bo.type(), ca >> cb);
+						}
 					}
 					case MATH_DIV: {
 						long ca = ( (ConstantValue.ScalarValue) calculate(scope, bo.a()) ).value();
@@ -716,7 +718,8 @@ public class SimpleInterpreter {
 		}
 		case CondVal c: {
 			ConstantValue v = calculate(scope, c.condition());
-			if ( v instanceof ConstantValue.ScalarValue s ? s.value() != 0L : ( (ConstantValue.DataValue) v ).address() != 0L ) {
+			if ( v instanceof ConstantValue.ScalarValue s ? s.value() != 0L
+				: ( (ConstantValue.DataValue) v ).address() != 0L ) {
 				return calculate(scope, c.trueValue());
 			}
 			return calculate(scope, c.falseValue());
@@ -869,7 +872,7 @@ public class SimpleInterpreter {
 		}
 	}
 	
-	private record SubScope(ValueScope parent, Map<String, ConstantValue> values) implements ValueScope {
+	private record SubScope(ValueScope parent, Map<String,ConstantValue> values) implements ValueScope {
 		
 		public SubScope(SimpleInterpreter si, ValueScope parent, List<SimpleVariable> l0, List<SimpleVariable> l1) {
 			this(parent, funcMap(si, l0, l1));
@@ -879,20 +882,24 @@ public class SimpleInterpreter {
 			this(parent, new HashMap<>());
 		}
 		
-		private static Map<String, ConstantValue> funcMap(SimpleInterpreter si, List<SimpleVariable> l0, List<SimpleVariable> l1) {
-			Map<String, ConstantValue> map = new HashMap<>();
+		private static Map<String,ConstantValue> funcMap(SimpleInterpreter si, List<SimpleVariable> l0,
+			List<SimpleVariable> l1) {
+			Map<String,ConstantValue> map = new HashMap<>();
 			putList(si, l0, map);
 			putList(si, l1, map);
 			return map;
 		}
 		
-		private static void putList(SimpleInterpreter si, List<SimpleVariable> l0, Map<String, ConstantValue> map) throws AssertionError {
+		private static void putList(SimpleInterpreter si, List<SimpleVariable> l0, Map<String,ConstantValue> map)
+			throws AssertionError {
 			for (SimpleVariable sv : l0) {
 				switch ( sv.type() ) {
-				case NativeType.FPNUM, NativeType.FPDWORD -> map.put(sv.name(), new ConstantValue.FPValue(sv.type(), 0d));
+				case NativeType.FPNUM, NativeType.FPDWORD ->
+					map.put(sv.name(), new ConstantValue.FPValue(sv.type(), 0d));
 				case NativeType nt -> map.put(sv.name(), new ConstantValue.ScalarValue(nt, 0L));
 				case PointerType pt -> map.put(sv.name(), new ConstantValue.ScalarValue(pt, 0L));
-				case FuncType ft when ( ft.flags() & FuncType.FLAG_FUNC_ADDRESS ) != 0 -> map.put(sv.name(), new ConstantValue.ScalarValue(ft, 0L));
+				case FuncType ft when ( ft.flags() & FuncType.FLAG_FUNC_ADDRESS ) != 0 ->
+					map.put(sv.name(), new ConstantValue.ScalarValue(ft, 0L));
 				case ArrayType at -> {
 					long addr = si.allocStackData(at.align(), at.size());
 					map.put(sv.name(), new ConstantValue.DataValue(at, addr));
@@ -914,7 +921,8 @@ public class SimpleInterpreter {
 		public ConstantValue value(SimpleInterpreter si, String name) {
 			ConstantValue v = this.values.get(name);
 			if ( v == null ) return this.parent.value(si, name);
-			if ( v instanceof ConstantValue.DataValue d && ( d.type() instanceof NativeType || d.type() instanceof PointerType
+			if ( v instanceof ConstantValue.DataValue d
+				&& ( d.type() instanceof NativeType || d.type() instanceof PointerType
 					|| ( d.type() instanceof FuncType ft && ( ft.flags() & FuncType.FLAG_FUNC_ADDRESS ) != 0 ) ) ) {
 				return si.deref(d.type(), d.address());
 			}
@@ -958,7 +966,7 @@ public class SimpleInterpreter {
 		
 	}
 	
-	private final Map<Long, LoadedFunction> funcs = new HashMap<>();
+	private final Map<Long,LoadedFunction> funcs = new HashMap<>();
 	
 	public LoadedFunction ofAddr(long addr) {
 		LoadedFunction f = this.funcs.get(Long.valueOf(addr));
@@ -968,7 +976,8 @@ public class SimpleInterpreter {
 	
 	private record LoadedFunction(LoadedSF file, SimpleFunction func) {}
 	
-	private record LoadedSF(SimpleFile sf, Map<String, ConstantValue.DataValue> addrs, Map<byte[], Long> rodata) implements ValueScope {
+	private record LoadedSF(SimpleFile sf, Map<String,ConstantValue.DataValue> addrs, Map<byte[],Long> rodata)
+		implements ValueScope {
 		
 		public LoadedSF(SimpleFile sf) {
 			this(sf, new HashMap<>(), new TreeMap<>((a, b) -> {
