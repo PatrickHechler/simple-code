@@ -67,7 +67,7 @@ public class SimpleinterpreterChecker {
 		mem.get(addr, bb);
 		return new String(bb.array(), StandardCharsets.UTF_8);
 	}
-	
+
 	@Check
 	private void parseNumCheck() throws URISyntaxException {
 		singleParseNumCheck(5, "5");
@@ -79,6 +79,7 @@ public class SimpleinterpreterChecker {
 		singleParseNumCheck(100, "0100");
 		singleParseNumCheck(0xFF & 2000, "000000000000000000000000002000");
 		singleParseNumCheck(0, "0");
+		singleParseNumCheck(0, "");
 	}
 	
 	private void singleParseNumCheck(int exitNum, String arg1) throws URISyntaxException, CheckerException {
@@ -88,6 +89,29 @@ public class SimpleinterpreterChecker {
 		assertEquals(exitNum, si.execute(path, new String[] { "/parse-num.ssf", arg1 }));
 		assertEquals(0, this.stderr.toByteArray().length);
 		assertEquals(0, this.stdout.toByteArray().length);
+	}
+	
+	@Check
+	private void parsePringNumCheck() throws URISyntaxException {
+		singleParsePrintNumCheck("5", "5");
+		singleParsePrintNumCheck("50", "50");
+		singleParsePrintNumCheck(Integer.toString(0xFF & 500), "500");
+		singleParsePrintNumCheck(Integer.toString(0xFF & 555), "555");
+		singleParsePrintNumCheck("255", "255");
+		singleParsePrintNumCheck("0", "256");
+		singleParsePrintNumCheck("100", "0100");
+		singleParsePrintNumCheck(Integer.toString(0xFF & 2000), "000000000000000000000000002000");
+		singleParsePrintNumCheck("0", "0");
+		singleParsePrintNumCheck("0", "");
+	}
+	
+	private void singleParsePrintNumCheck(String stdout, String arg1) throws URISyntaxException, CheckerException {
+		Path path = Path.of(getClass().getResource("/programs/parse-print-num.ssf").toURI());
+		SimpleInterpreter si = new SimpleInterpreter(List.of(path.getParent()));
+		path = path.getFileSystem().getPath("/parse-print-num.ssf");
+		assertEquals(0, si.execute(path, new String[] { "/parse-print-num.ssf", arg1 }));
+		assertEquals(0, this.stderr.toByteArray().length);
+		assertEquals(stdout, new String(this.stdout.toByteArray(), StandardCharsets.UTF_8));
 	}
 	
 }
