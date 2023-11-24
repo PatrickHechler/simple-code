@@ -41,9 +41,9 @@ public class UnaryOpVal {
 			return BinaryOpVal.create(a, BinaryOp.BIT_XOR, MINUS_ONE, ctx);
 		case BOOL_NOT:
 			if ( a.type() instanceof PointerType ) {
-				return BinaryOpVal.create(a, BinaryOp.CMP_NEQ, ZERO_8B, ctx);
+				return BinaryOpVal.create(a, BinaryOp.CMP_EQ, ZERO_8B, ctx);
 			}
-			return BinaryOpVal.create(a, BinaryOp.CMP_NEQ, ZERO, ctx);
+			return BinaryOpVal.create(a, BinaryOp.CMP_EQ, ZERO, ctx);
 		case DEREF_PNTR:
 			return BinaryOpVal.create(a, BinaryOp.ARR_PNTR_INDEX, ZERO, ctx);
 		default:

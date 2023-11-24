@@ -60,6 +60,10 @@ public class FuncCallCmd extends SimpleCommand {
 			throw new CompileError(ctx, "wrong number of function result assignments!");
 		}
 		for (int i = 0; i < resMembers.size(); i++) {
+			if ( results.get(i) == null ) {
+				res.add(null);
+				continue;
+			}
 			SimpleType targetType = resMembers.get(i).type();
 			results.get(i).type().checkCastable(targetType, ctx, false);
 			res.add(CastVal.create(results.get(i), targetType, ctx));
@@ -84,9 +88,15 @@ public class FuncCallCmd extends SimpleCommand {
 	
 	private static void append(StringBuilder append, List<SimpleValue> list) {
 		if ( list.isEmpty() ) return;
-		append.append(list.get(0));
+		if ( list.get(0) == null ) append.append('?');
+		else append.append(list.get(0));
 		for (int i = 1, s = list.size(); i < s; i++) {
-			append.append(", ").append(list.get(i));
+			SimpleValue e = list.get(i);
+			if ( e != null ) {
+				append.append(", ").append(e);
+			} else {
+				append.append(", ?");
+			}
 		}
 	}
 	

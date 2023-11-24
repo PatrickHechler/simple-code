@@ -1,0 +1,50 @@
+//This file is part of the Simple Code Project
+//DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+//Copyright (C) 2023  Patrick Hechler
+//
+//This program is free software: you can redistribute it and/or modify
+//it under the terms of the GNU General Public License as published by
+//the Free Software Foundation, either version 3 of the License, or
+//(at your option) any later version.
+//
+//This program is distributed in the hope that it will be useful,
+//but WITHOUT ANY WARRANTY; without even the implied warranty of
+//MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//GNU General Public License for more details.
+//
+//You should have received a copy of the GNU General Public License
+//along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+// this function parses the first argument (modulo 255) and then prints it
+func main <ubyte exitnum> <-- (unum argc, char## argv) {
+    char# number <-- argv[1];
+	exitnum <-- 0;
+	while (number#) {
+		exitnum <-- exitnum * 10 + number# - '0';
+		number <-- number + 1;
+	}
+	char[4] print;
+	unum off <-- 0;
+	while (1) {
+		print[off] <-- exitnum % 10 + '0';
+		exitnum <-- exitnum / 10;
+		off <-- off + 1;
+		if (!exitnum) {
+            print[off] <-- '\0';
+			// to print big-endian reverse the buffer
+			// alternatively you could of course initialize off with 3 and decrement it
+			// but this would make no sense here, because then this would be just a duplicate of the LE file
+			unum lowI <-- 0;
+			unum highI <-- off - 1;
+			while (lowI < highI) {
+				char tmp <-- print[lowI];
+				print[lowI] <-- print[highI];
+				print[highI] <-- tmp;
+				highI <-- highI - 1;
+				lowI <-- lowI + 1;
+			}
+			std:puts<?,exitnum><--(print);
+			std:exit(exitnum);
+		}
+	}
+}

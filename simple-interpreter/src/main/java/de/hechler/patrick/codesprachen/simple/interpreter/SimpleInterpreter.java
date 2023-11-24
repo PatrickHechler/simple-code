@@ -91,7 +91,7 @@ public class SimpleInterpreter {
 		this.fsm = fsManager;
 		this.stdlib = stdlib == null ? new JavaStdLib(this) : stdlib;
 		final long pageSize = memManager.pageSize();
-		this.stack = memManager.allocate(1L, 0x7FFFFFFFFFFFFFFFL & ~( pageSize - 1 ), MemoryManager.FLAG_GROW_DOWN);
+		this.stack = pageSize + memManager.allocate(1L, 0x7FFFFFFFFFFFFFFFL & ~( pageSize - 1 ), MemoryManager.FLAG_GROW_DOWN);
 		putWithDependencies(this.stdlib);
 	}
 	
@@ -309,14 +309,17 @@ public class SimpleInterpreter {
 			}
 			list = execute(lf.file.sf, lf.func, list);
 			for (int i = 0; i < list.size(); i++) {
-				assign(scope, list.get(i), fc.results.get(i));
+				SimpleValue resultTarget = fc.results.get(i);
+				if (resultTarget != null) {
+					assign(scope, resultTarget, list.get(i));
+				}// else function result is ignored (? was used)
 			}
 			break;
 		}
 		case BlockCmd b: {
+			final long origStack = this.stack;
 			SubScope sub = new SubScope(scope);
 			final int cc = b.commandCount();
-			final long origStack = this.stack;
 			for (int pc = 0; pc < cc; pc++) {
 				exec(sub, b.command(pc), list);
 			}
@@ -324,7 +327,7 @@ public class SimpleInterpreter {
 			break;
 		}
 		case AssignCmd a:
-			assign(scope, calculate(scope, a.value), a.target);
+			assign(scope, a.target, calculate(scope, a.value));
 			break;
 		case VarDeclCmd vd: {
 			long addr = allocStackData(vd.sv.type());
@@ -355,7 +358,7 @@ public class SimpleInterpreter {
 		}
 	}
 	
-	private void assign(SubScope scope, ConstantValue newValue, SimpleValue targetValue) throws AssertionError {
+	private void assign(SubScope scope, SimpleValue targetValue, ConstantValue newValue) throws AssertionError {
 		switch ( targetValue ) {
 		case VariableVal v:
 			scope.value(this, v.sv().name(), adjust(v.sv().type(), newValue));

@@ -153,9 +153,9 @@ if marked with `const` there must be a constant initial value
 * VAR_DECL
 	* `(const)? [NAMED_TYPE] ( <-- [VALUE] )? ;`
 * ASSIGN
-    * `[VALUE] <-- [VALUE] ;`
+    * `[SHIFT_EXP] <-- [VALUE] ;`
 * FUNC_CALL
-    * `call [SHIFT_EXP] [FUNC_CALL_RESULT] [FUNC_CALL_ARGS] ;`
+    * `[SHIFT_EXP] [FUNC_CALL_RESULT] [FUNC_CALL_ARGS] ;`
         * FUNC_CALL_RESULT
             * `( ( < ( [IGNOREABLE_SHIFT_EXP] ( , [IGNOREABLE_SHIFT_EXP] )* )? > ) <-- )?`
             * IGNOREABLE_SHIFT_EXP
