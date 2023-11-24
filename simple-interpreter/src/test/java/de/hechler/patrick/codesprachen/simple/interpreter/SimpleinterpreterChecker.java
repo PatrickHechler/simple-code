@@ -98,51 +98,34 @@ public class SimpleinterpreterChecker {
 	@Check
 	private void parsePringNumLECheck() throws URISyntaxException {
 		singleParsePrintNumCheck("/parse-printLE-num.ssf", "5", "5");
-		redirectStdNoSave();
 		singleParsePrintNumCheck("/parse-printLE-num.ssf", "05", "50");
-		redirectStdNoSave();
 		singleParsePrintNumCheck("/parse-printLE-num.ssf", "442", "500");
-		redirectStdNoSave();
 		singleParsePrintNumCheck("/parse-printLE-num.ssf", "34", "555");
-		redirectStdNoSave();
 		singleParsePrintNumCheck("/parse-printLE-num.ssf", "552", "255");
-		redirectStdNoSave();
 		singleParsePrintNumCheck("/parse-printLE-num.ssf", "0", "256");
-		redirectStdNoSave();
 		singleParsePrintNumCheck("/parse-printLE-num.ssf", "001", "0100");
-		redirectStdNoSave();
 		singleParsePrintNumCheck("/parse-printLE-num.ssf", "802", "000000000000000000000000002000");
-		redirectStdNoSave();
 		singleParsePrintNumCheck("/parse-printLE-num.ssf", "0", "0");
-		redirectStdNoSave();
 		singleParsePrintNumCheck("/parse-printLE-num.ssf", "0", "");
 	}
 	
 	@Check
 	private void parsePringNumBECheck() throws URISyntaxException {
 		singleParsePrintNumCheck("/parse-printBE-num.ssf", "5", "5");
-		redirectStdNoSave();
 		singleParsePrintNumCheck("/parse-printBE-num.ssf", "50", "50");
-		redirectStdNoSave();
 		singleParsePrintNumCheck("/parse-printBE-num.ssf", "244", "500");
-		redirectStdNoSave();
 		singleParsePrintNumCheck("/parse-printBE-num.ssf", "43", "555");
-		redirectStdNoSave();
 		singleParsePrintNumCheck("/parse-printBE-num.ssf", "255", "255");
-		redirectStdNoSave();
 		singleParsePrintNumCheck("/parse-printBE-num.ssf", "0", "256");
-		redirectStdNoSave();
 		singleParsePrintNumCheck("/parse-printBE-num.ssf", "100", "0100");
-		redirectStdNoSave();
 		singleParsePrintNumCheck("/parse-printBE-num.ssf", "208", "000000000000000000000000002000");
-		redirectStdNoSave();
 		singleParsePrintNumCheck("/parse-printBE-num.ssf", "0", "0");
-		redirectStdNoSave();
 		singleParsePrintNumCheck("/parse-printBE-num.ssf", "0", "");
 	}
 	
 	private void singleParsePrintNumCheck(String fileName, String stdout, String arg1)
 		throws URISyntaxException, CheckerException {
+		redirectStdNoSave();
 		Path path = Path.of(getClass().getResource("/programs" + fileName).toURI());
 		SimpleInterpreter si = new SimpleInterpreter(List.of(path.getParent()));
 		path = path.getFileSystem().getPath(fileName);
