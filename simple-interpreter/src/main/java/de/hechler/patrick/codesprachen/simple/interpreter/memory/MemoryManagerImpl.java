@@ -10,6 +10,8 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Objects;
 import java.util.Random;
+import java.util.function.LongSupplier;
+import java.util.stream.LongStream;
 
 
 public class MemoryManagerImpl implements MemoryManager {
@@ -45,12 +47,12 @@ public class MemoryManagerImpl implements MemoryManager {
 		}
 	}
 	
-	private final int    pageShift;
-	private final Random rnd;
-	private final Arena  arena;
-	private Object[]     pages;
-	private ListEntry    free;
-	private int          allocatedPages;
+	private final int          pageShift;
+	private final LongSupplier rnd;
+	private final Arena        arena;
+	private Object[]           pages;
+	private ListEntry          free;
+	private int                allocatedPages;
 	
 	private static final int MAX_ARR_SIZE = 1 << 30;
 	
@@ -61,26 +63,34 @@ public class MemoryManagerImpl implements MemoryManager {
 	public static final long MAX_PAGE_SIZE = 1L << MAX_PAGE_SHIFT;
 	
 	public MemoryManagerImpl() {
-		this(new Random());
+		this(defSup());
 	}
 	
-	public MemoryManagerImpl(Random rnd) {
+	public MemoryManagerImpl(LongSupplier rnd) {
 		this(clacDefPageShift(), rnd);
 	}
 	
 	public MemoryManagerImpl(int pageShift) {
-		this(pageShift, new Random());
+		this(pageShift, defSup());
 	}
 	
-	public MemoryManagerImpl(int pageShift, Random rnd) {
+	private static LongSupplier defSup() {
+		Random rnd = new Random();
+		// by default only use the first 62 bits:
+		// this prevents requested pages with the GROW_DOWN flag set
+		// to hit randomly allocated pages when they are in the high address space
+		// theoretical the pages are unsigned but the negative pages may be used for something else
+		return () -> rnd.nextLong() & 0x3FFFFFFFFFFFFFFFL;
+	}
+	
+	public MemoryManagerImpl(int pageShift, LongSupplier rnd) {
 		if ( pageShift < MIN_PAGE_SHIFT || pageShift > MAX_PAGE_SHIFT ) {
 			throw new IllegalArgumentException("pageShift is invalid: " + pageShift);
 		}
 		long pageSize = 1L << pageShift;
 		long totalMem = Runtime.getRuntime().totalMemory();
 		if ( totalMem <= pageSize ) {
-			throw new IllegalArgumentException("there is not even enough memory for a single page! pageSize: "
-				+ pageSize + " totalMemory: " + totalMem);
+			throw new IllegalArgumentException("there is not even enough memory for a single page! pageSize: " + pageSize + " totalMemory: " + totalMem);
 		}
 		this.pageShift = pageShift;
 		this.rnd = Objects.requireNonNull(rnd, "random");
@@ -91,8 +101,7 @@ public class MemoryManagerImpl implements MemoryManager {
 	private static int clacDefPageShift() {
 		try {
 			MemoryManagerImpl.class.getClassLoader();
-			Field tu = Class.forName("sun.misc.Unsafe", true, ClassLoader.getSystemClassLoader())
-				.getDeclaredField("theUnsafe");
+			Field tu = Class.forName("sun.misc.Unsafe", true, ClassLoader.getSystemClassLoader()).getDeclaredField("theUnsafe");
 			tu.setAccessible(true); // NOSONAR
 			Object obj = tu.get(null);
 			Method pageSize = obj.getClass().getDeclaredMethod("pageSize");
@@ -103,8 +112,8 @@ public class MemoryManagerImpl implements MemoryManager {
 					return Integer.bitCount(psM1);
 				}
 			}
-		} catch (@SuppressWarnings("unused") ClassNotFoundException | NoSuchMethodException | NoSuchFieldException
-			| SecurityException | IllegalArgumentException | IllegalAccessException | InvocationTargetException e) {
+		} catch (@SuppressWarnings("unused") ClassNotFoundException | NoSuchMethodException | NoSuchFieldException | SecurityException
+				| IllegalArgumentException | IllegalAccessException | InvocationTargetException e) {
 			System.err.println("can not get the native page size, use 1024");
 		}
 		return 10;
@@ -182,7 +191,7 @@ public class MemoryManagerImpl implements MemoryManager {
 		f = this.free;
 		if ( ( flags & FLAG_MUST_REQUEST ) == 0 ) {
 			if ( requestedAddress == 0 ) {
-				requestedAddress = this.rnd.nextLong() & ~maxPageIndex;
+				requestedAddress = this.rnd.getAsLong() & ~maxPageIndex;
 				if ( requestedAddress == 0 ) {
 					requestedAddress = pageSize;
 				}
@@ -217,8 +226,7 @@ public class MemoryManagerImpl implements MemoryManager {
 			}
 		} else if ( requestedAddress == 0 || ( requestedAddress & maxPageIndex ) != 0 ) {
 			throw new IllegalArgumentException(
-				"the flag FLAG_MUST_REQUEST is set but requestedAddress is invalid: requestedAddress="
-					+ requestedAddress + " pageSize=" + pageSize);
+					"the flag FLAG_MUST_REQUEST is set but requestedAddress is invalid: requestedAddress=" + requestedAddress + " pageSize=" + pageSize);
 		} else {
 			flags &= ~FLAG_MUST_REQUEST;
 			final Page firstPage = f.page;
@@ -230,8 +238,7 @@ public class MemoryManagerImpl implements MemoryManager {
 					for (ListEntry sf = this.free; sf != f; sf = sf.next) {
 						remove0(ps, sf.page);
 					}
-					throw new IllegalStateException(
-						"the flag FLAG_MUST_REQUEST is set but requestedAddress is already used");
+					throw new IllegalStateException("the flag FLAG_MUST_REQUEST is set but requestedAddress is already used");
 				}
 			}
 			this.free = f;
@@ -550,8 +557,8 @@ public class MemoryManagerImpl implements MemoryManager {
 		setImpl(buf, pageSize, pageSizeM1, pageAddr, remain, endPageAddr, offset, page);
 	}
 	
-	private void setImpl(ByteBuffer buf, final long pageSize, final long pageSizeM1, final long pageAddr,
-		final int remain, final long endPageAddr, final long offset, MemorySegment page) {
+	private void setImpl(ByteBuffer buf, final long pageSize, final long pageSizeM1, final long pageAddr, final int remain, final long endPageAddr,
+			final long offset, MemorySegment page) {
 		MemorySegment seg = MemorySegment.ofBuffer(buf);
 		int pos = buf.position();
 		MemorySegment.copy(seg, INT8, pos, page, INT8, offset, pageSize);

@@ -57,6 +57,9 @@ import de.hechler.patrick.codesprachen.simple.parser.objects.value.VariableVal;
 
 public class SimpleInterpreter {
 	
+	private long roaddr;
+	private long stack;
+	
 	private final Path[]                    src;
 	private final Path                      defMain;
 	private final MemoryManager             mm;
@@ -81,13 +84,14 @@ public class SimpleInterpreter {
 		this(src, stdlib, defMain, memManager, new FSManagerImpl(root, memManager));
 	}
 	
-	public SimpleInterpreter(List<Path> src, SimpleFile stdlib, Path defMain, MemoryManager memManager,
-		FSManager fsManager) {
+	public SimpleInterpreter(List<Path> src, SimpleFile stdlib, Path defMain, MemoryManager memManager, FSManager fsManager) {
 		this.src = src.toArray(new Path[src.size()]);
 		this.defMain = defMain;
 		this.mm = memManager;
 		this.fsm = fsManager;
 		this.stdlib = stdlib == null ? new JavaStdLib(this) : stdlib;
+		final long pageSize = memManager.pageSize();
+		this.stack = memManager.allocate(1L, 0x7FFFFFFFFFFFFFFFL & ~( pageSize - 1 ), MemoryManager.FLAG_GROW_DOWN);
 		putWithDependencies(this.stdlib);
 	}
 	
@@ -137,20 +141,19 @@ public class SimpleInterpreter {
 			Path realP = p.toRealPath();
 			Path p0 = realP;
 			try (InputStream in = Files.newInputStream(p0)) {
-				SimpleSourceFileParser parser =
-					new SimpleSourceFileParser(in, oldP.toString(), (srcPath, runtimePath) -> {
-						if ( runtimePath == null ) {
-							if ( srcPath.endsWith(".sexp") ) {
-								runtimePath = srcPath.substring(0, srcPath.length() - ".sexp".length());
-							} else {
-								runtimePath = srcPath;
-							}
+				SimpleSourceFileParser parser = new SimpleSourceFileParser(in, oldP.toString(), (srcPath, runtimePath) -> {
+					if ( runtimePath == null ) {
+						if ( srcPath.endsWith(".sexp") ) {
+							runtimePath = srcPath.substring(0, srcPath.length() - ".sexp".length());
+						} else {
+							runtimePath = srcPath;
 						}
-						runtimePath += ".ssf"; // NOSONAR
-						Path srcFile = realP.getFileSystem().getPath(runtimePath);
-						Path relDir = realP.getParent();
-						return load(srcFile, relDir).sf;
-					});
+					}
+					runtimePath += ".ssf"; // NOSONAR
+					Path srcFile = realP.getFileSystem().getPath(runtimePath);
+					Path relDir = realP.getParent();
+					return load(srcFile, relDir).sf;
+				});
 				SimpleFile sf = new SimpleFile(oldP.toString());
 				lsf = new LoadedSF(sf);
 				sf.dependency(this.stdlib, "std", ErrorContext.NO_CONTEXT);
@@ -203,8 +206,10 @@ public class SimpleInterpreter {
 			SimpleFunction func = Objects.requireNonNull(mainFile.main(), "the main file has no main function");
 			long addr = JavaStdLib.allocArgs(this, args);
 			List<ConstantValue> list = List.of(new ConstantValue.ScalarValue(NativeType.UNUM, args.length),
-				new ConstantValue.ScalarValue(FuncType.MAIN_TYPE.argMembers().get(1).type(), addr));
-			return (int) ( (ConstantValue.ScalarValue) execute(mainFile, func, list).get(0) ).value();
+					new ConstantValue.ScalarValue(FuncType.MAIN_TYPE.argMembers().get(1).type(), addr));
+			List<ConstantValue> resultList = execute(mainFile, func, list);
+			ConstantValue.ScalarValue exitNum = (ConstantValue.ScalarValue) resultList.get(0);
+			return (int) exitNum.value();
 		} catch (ExitError e) {
 			return e.exitnum;
 		}
@@ -236,23 +241,35 @@ public class SimpleInterpreter {
 			this.exitnum = exitnum;
 		}
 		
-		
-		
 	}
 	
 	private void exec(LoadedSF lsf, SimpleFunction func, List<ConstantValue> list) {
+		final long origStack = this.stack;
 		SubScope scope = new SubScope(this, lsf, func.type().argMembers(), func.type().resMembers());
 		List<SimpleVariable> am = func.type().argMembers();
 		if ( am.size() != list.size() ) {
 			throw new IllegalArgumentException("illegal argument count");
 		}
+		allocVars(scope, am);
+		allocVars(scope, func.type().resMembers());
 		for (int i = 0; i < am.size(); i++) {
-			scope.value(this, am.get(i).name(), list.get(i));
+			SimpleVariable argVar = am.get(i);
+			scope.value(this, argVar.name(), adjust(argVar.type(), list.get(i)));
 		}
 		exec(scope, func.block(), list);
 		list.clear();
 		for (SimpleVariable sv : func.type().resMembers()) {
 			list.add(scope.value(this, sv.name()));
+		}
+		this.stack = origStack;
+	}
+	
+	private void allocVars(SubScope scope, List<SimpleVariable> list) {
+		for (int i = 0; i < list.size(); i++) {
+			SimpleVariable sv = list.get(i);
+			long addr = allocStackData(sv.type());
+			ConstantValue.DataValue addrValue = new ConstantValue.DataValue(sv.type(), addr);
+			scope.values.put(sv.name(), addrValue);
 		}
 	}
 	
@@ -299,33 +316,25 @@ public class SimpleInterpreter {
 		case BlockCmd b: {
 			SubScope sub = new SubScope(scope);
 			final int cc = b.commandCount();
+			final long origStack = this.stack;
 			for (int pc = 0; pc < cc; pc++) {
 				exec(sub, b.command(pc), list);
 			}
+			this.stack = origStack;
 			break;
 		}
 		case AssignCmd a:
 			assign(scope, calculate(scope, a.value), a.target);
 			break;
-		case VarDeclCmd vd:
+		case VarDeclCmd vd: {
+			long addr = allocStackData(vd.sv.type());
+			ConstantValue.DataValue addrValue = new ConstantValue.DataValue(vd.sv.type(), addr);
+			scope.values.put(vd.sv.name(), addrValue);
 			if ( vd.sv.initialValue() != null ) {
-				scope.values.put(vd.sv.name(), calculate(scope, vd.sv.initialValue()));
-			} else {
-				scope.values.put(vd.sv.name(), switch ( vd.sv.type() ) {
-				case NativeType.FPNUM, NativeType.FPDWORD -> new ConstantValue.FPValue(vd.sv.type(), 0d);
-				case NativeType.UBYTE -> ConstantValue.ScalarValue.ZERO;
-				case NativeType nt -> new ConstantValue.ScalarValue(nt, 0L);
-				case PointerType pt -> new ConstantValue.ScalarValue(pt, 0L);
-				case FuncType ft when ( ft.flags() & FuncType.FLAG_FUNC_ADDRESS ) != 0 ->
-					new ConstantValue.ScalarValue(ft, 0L);
-				default -> {
-					long addr = allocData(this.mm, vd.sv.type().align(), vd.sv.type().size(), 0, this.rwaddr);
-					this.rwaddr = addr + vd.sv.type().size();
-					yield new ConstantValue.DataValue(vd.sv.type(), addr);
-				}
-				});
+				scope.value(this, vd.sv.name(), calculate(scope, vd.sv.initialValue()));
 			}
 			break;
+		}
 		case IfCmd i:
 			if ( ( (ConstantValue.ScalarValue) calculate(scope, i.condition) ).value() != 0L ) {
 				SubScope sub = new SubScope(scope);
@@ -704,8 +713,7 @@ public class SimpleInterpreter {
 		}
 		case CondVal c: {
 			ConstantValue v = calculate(scope, c.condition());
-			if ( v instanceof ConstantValue.ScalarValue s ? s.value() != 0L
-				: ( (ConstantValue.DataValue) v ).address() != 0L ) {
+			if ( v instanceof ConstantValue.ScalarValue s ? s.value() != 0L : ( (ConstantValue.DataValue) v ).address() != 0L ) {
 				return calculate(scope, c.trueValue());
 			}
 			return calculate(scope, c.falseValue());
@@ -858,9 +866,6 @@ public class SimpleInterpreter {
 		}
 	}
 	
-	private long rwaddr;
-	private long roaddr;
-	
 	private record SubScope(ValueScope parent, Map<String, ConstantValue> values) implements ValueScope {
 		
 		public SubScope(SimpleInterpreter si, ValueScope parent, List<SimpleVariable> l0, List<SimpleVariable> l1) {
@@ -871,38 +876,31 @@ public class SimpleInterpreter {
 			this(parent, new HashMap<>());
 		}
 		
-		private static Map<String, ConstantValue> funcMap(SimpleInterpreter si, List<SimpleVariable> l0,
-			List<SimpleVariable> l1) {
+		private static Map<String, ConstantValue> funcMap(SimpleInterpreter si, List<SimpleVariable> l0, List<SimpleVariable> l1) {
 			Map<String, ConstantValue> map = new HashMap<>();
 			putList(si, l0, map);
 			putList(si, l1, map);
 			return map;
 		}
 		
-		private static void putList(SimpleInterpreter si, List<SimpleVariable> l0, Map<String, ConstantValue> map)
-			throws AssertionError {
+		private static void putList(SimpleInterpreter si, List<SimpleVariable> l0, Map<String, ConstantValue> map) throws AssertionError {
 			for (SimpleVariable sv : l0) {
 				switch ( sv.type() ) {
-				case NativeType.FPNUM, NativeType.FPDWORD ->
-					map.put(sv.name(), new ConstantValue.FPValue(sv.type(), 0d));
+				case NativeType.FPNUM, NativeType.FPDWORD -> map.put(sv.name(), new ConstantValue.FPValue(sv.type(), 0d));
 				case NativeType nt -> map.put(sv.name(), new ConstantValue.ScalarValue(nt, 0L));
 				case PointerType pt -> map.put(sv.name(), new ConstantValue.ScalarValue(pt, 0L));
-				case FuncType ft when ( ft.flags() & FuncType.FLAG_FUNC_ADDRESS ) != 0 ->
-					map.put(sv.name(), new ConstantValue.ScalarValue(ft, 0L));
+				case FuncType ft when ( ft.flags() & FuncType.FLAG_FUNC_ADDRESS ) != 0 -> map.put(sv.name(), new ConstantValue.ScalarValue(ft, 0L));
 				case ArrayType at -> {
-					long rwaddr = SimpleInterpreter.allocData(si.mm, at.align(), at.size(), 0, si.rwaddr);
-					si.rwaddr = rwaddr + at.size();
-					map.put(sv.name(), new ConstantValue.DataValue(at, rwaddr));
+					long addr = si.allocStackData(at.align(), at.size());
+					map.put(sv.name(), new ConstantValue.DataValue(at, addr));
 				}
 				case StructType st -> {
-					long rwaddr = SimpleInterpreter.allocData(si.mm, st.align(), st.size(), 0, si.rwaddr);
-					si.rwaddr = rwaddr + st.size();
-					map.put(sv.name(), new ConstantValue.DataValue(st, rwaddr));
+					long addr = si.allocStackData(st.align(), st.size());
+					map.put(sv.name(), new ConstantValue.DataValue(st, addr));
 				}
 				case FuncType ft -> {
-					long rwaddr = SimpleInterpreter.allocData(si.mm, ft.align(), ft.size(), 0, si.rwaddr);
-					si.rwaddr = rwaddr + ft.size();
-					map.put(sv.name(), new ConstantValue.DataValue(ft, rwaddr));
+					long addr = si.allocStackData(ft.align(), ft.size());
+					map.put(sv.name(), new ConstantValue.DataValue(ft, addr));
 				}
 				default -> throw new AssertionError("unknown type class: " + sv.type().getClass());
 				}
@@ -913,8 +911,7 @@ public class SimpleInterpreter {
 		public ConstantValue value(SimpleInterpreter si, String name) {
 			ConstantValue v = this.values.get(name);
 			if ( v == null ) return this.parent.value(si, name);
-			if ( v instanceof ConstantValue.DataValue d
-				&& ( d.type() instanceof NativeType || d.type() instanceof PointerType
+			if ( v instanceof ConstantValue.DataValue d && ( d.type() instanceof NativeType || d.type() instanceof PointerType
 					|| ( d.type() instanceof FuncType ft && ( ft.flags() & FuncType.FLAG_FUNC_ADDRESS ) != 0 ) ) ) {
 				return si.deref(d.type(), d.address());
 			}
@@ -944,11 +941,10 @@ public class SimpleInterpreter {
 			if ( v instanceof ConstantValue.DataValue d ) {
 				return d.address();
 			}
-			long rwaddr = SimpleInterpreter.allocData(si.mm, v.type().align(), v.type().size(), 0, si.rwaddr);
-			si.rwaddr = rwaddr + v.type().size();
-			si.put(rwaddr, v);
-			this.values.put(name, new ConstantValue.DataValue(v.type(), rwaddr));
-			return rwaddr;
+			long addr = si.allocStackData(v.type().align(), v.type().size());
+			si.put(addr, v);
+			this.values.put(name, new ConstantValue.DataValue(v.type(), addr));
+			return addr;
 		}
 		
 		@Override
@@ -969,8 +965,7 @@ public class SimpleInterpreter {
 	
 	private record LoadedFunction(LoadedSF file, SimpleFunction func) {}
 	
-	private record LoadedSF(SimpleFile sf, Map<String, ConstantValue.DataValue> addrs, Map<byte[], Long> rodata)
-		implements ValueScope {
+	private record LoadedSF(SimpleFile sf, Map<String, ConstantValue.DataValue> addrs, Map<byte[], Long> rodata) implements ValueScope {
 		
 		public LoadedSF(SimpleFile sf) {
 			this(sf, new HashMap<>(), new TreeMap<>((a, b) -> {
@@ -1021,17 +1016,15 @@ public class SimpleInterpreter {
 			if ( sv == null ) {
 				SimpleFunction f = this.sf.function(name);
 				if ( f == null ) throw new IllegalArgumentException(noVal(name));
-				long roaddr = allocData(si.mm, 1, 1L, MemoryManager.FLAG_READ_ONLY, si.roaddr);
-				si.roaddr = roaddr + 1L;
-				res = new ConstantValue.DataValue(f.type(), roaddr);
-				Long l = Long.valueOf(roaddr);
+				long addr = si.allocROData(1, 1L);
+				res = new ConstantValue.DataValue(f.type(), addr);
+				Long l = Long.valueOf(addr);
 				this.addrs.put(name, res);
 				si.funcs.put(l, new LoadedFunction(this, f));
 				return res;
 			}
-			long rwaddr = allocData(si.mm, sv.type().align(), sv.type().size(), 0, si.rwaddr);
-			si.rwaddr = rwaddr + sv.type().size();
-			res = new ConstantValue.DataValue(sv.type(), rwaddr);
+			long addr = si.allocStackData(sv.type().align(), sv.type().size());
+			res = new ConstantValue.DataValue(sv.type(), addr);
 			this.addrs.put(name, res);
 			return res;
 		}
@@ -1048,7 +1041,7 @@ public class SimpleInterpreter {
 			if ( addr != null ) {
 				return new ConstantValue.DataValue(data.type(), addr.longValue() + data.off());
 			}
-			long roaddr = allocData(si.mm, data.type().align(), bytes.length, MemoryManager.FLAG_READ_ONLY, si.roaddr);
+			long roaddr = si.allocROData(data.type().align(), bytes.length);
 			si.roaddr = roaddr + bytes.length;
 			MemoryManager mem = si.mm;
 			addr = Long.valueOf(roaddr);
@@ -1060,16 +1053,35 @@ public class SimpleInterpreter {
 		
 	}
 	
-	private static long allocData(MemoryManager mem, int align, long length, int flags, long roaddr) {
+	private long allocROData(int requestedAlign, long length) {
+		final MemoryManager mem = this.mm;
 		final long pageSize = mem.pageSize();
-		final long mask = Math.min(mem.pageSize(), align) - 1L;
-		if ( ( roaddr & mask ) != 0 ) {
-			roaddr = ( roaddr & ~mask ) + align;
+		final long align = pageSize < requestedAlign ? pageSize : requestedAlign;
+		final long alignMask = align - 1;
+		long roAddr = this.roaddr;
+		if ( ( roAddr & alignMask ) != 0 ) {
+			roAddr = ( roAddr & ~alignMask ) + align;
 		}
-		if ( pageSize >= ( roaddr & ( pageSize - 1L ) ) + length ) {
-			roaddr = mem.allocate(length, 0L, flags);
+		if ( pageSize >= ( roAddr & ( pageSize - 1L ) ) + length || roAddr == 0L ) {
+			roAddr = mem.allocate(length, 0L, MemoryManager.FLAG_READ_ONLY);
 		}
-		return roaddr;
+		this.roaddr = roAddr + length;
+		return roAddr;
+	}
+	
+	private long allocStackData(SimpleType type) {
+		return allocStackData(type.align(), type.size());
+	}
+	
+	private long allocStackData(int align, long length) {
+		final MemoryManager mem = this.mm;
+		final long alignMask = Math.min(mem.pageSize(), align) - 1;
+		long stack = this.stack - length;
+		if ( ( stack & alignMask ) != 0 ) {
+			stack = ( stack & ~alignMask );
+		}
+		this.stack = stack;
+		return stack;
 	}
 	
 	private sealed interface ValueScope {
