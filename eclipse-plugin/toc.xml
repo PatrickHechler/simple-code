@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?NLS TYPE="org.eclipse.help.toc"?>
+
+<toc label="Simple Code Table of Contents">
+	<topic label="language definition" href="html/language.html"/>
+	<topic label="eclipse plugin" href="html/ecl-plugin.html"/>
+</toc>

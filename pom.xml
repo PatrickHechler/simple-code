@@ -10,7 +10,8 @@
 	<packaging>pom</packaging>
 
 	<modules>
-		<module>simple-compile</module>
+		<module>simple-parser</module>
+		<module>simple-interpreter</module>
 	</modules>
 	
 	<properties>

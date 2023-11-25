@@ -324,9 +324,13 @@ write to stdout:
 
 ### constants
 
-´const ubyte# NULL <-- (ubyte#) 0;´
+`const struct {}# NULL <-- (struct {}#) 0;`
 
 ### types
 
-* `typedef ? file_handle;`
-* `typedef ? fs_element_handle;`
+* `typedef [TYPE] file_handle;`
+    * the exact type is implementation specific
+    * the size and alingment will be at most the size and alignment of `unum`
+* `typedef [TYPE] fs_element_handle;`
+    * the exact type is implementation specific
+    * the size and alingment will be at most the size and alignment of `unum`

@@ -1,0 +1,572 @@
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title></title></head><body><h1>simple-code</h1>
+<p>simple-code is a simple programming language.</p>
+<h2>file</h2>
+<p><code>( [dependency] | [variable] | [typedef] | [function] )* EOF</code></p>
+<h3>simple-export-file</h3>
+<p><code>( [dependency] | [variable] | [typedef] | [dep-function] )* EOF</code></p>
+<ul>
+<li>note that simple-export-files are parsed with some special rules:
+<ul>
+<li>only <code>const</code> variables are allowed to have an initilizer
+<ul>
+<li>having a <code>const</code> variable without initilizer is still an error</li>
+</ul>
+</li>
+<li>dependencies must not use <code>&lt;ME&gt;</code> instead of a <code>NAME</code></li>
+</ul>
+</li>
+</ul>
+<h3>dependency</h3>
+<p><code>dep ( [NAME] | &lt;ME&gt; ) [STRING] ( [STRING] )? ;</code></p>
+<ul>
+<li>the first STRING is the path relative from a included source directory</li>
+<li>the second optional STRING is the path of the binary used at runtime
+<ul>
+<li>specifing the same export file with different runtime paths may be a compilation error</li>
+<li>if not set it will be the calculated from the first STRING
+<ul>
+<li>if the first STRING ends with <code>.sexp</code> the end will be discarded</li>
+<li>otherwise it will be the first STRING</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>to use a exprted symbol from a dependency use <code>dependency_name</code> <code>:</code> <code>import_name</code></li>
+<li>if instead of a dependency name <code>&lt;ME&gt;</code> is used:
+<ul>
+<li>no runtime path is allowed to be specified</li>
+<li>the exported symbols can directly be used</li>
+<li>it is be possible to define multiple (posssible different) <code>&lt;ME&gt;</code> dependencies, as long as these rules are satisfied</li>
+<li>if at the end of the parsing process there are symbols in the simple-export-file which are not declared in the translation unit the compilation fails</li>
+<li>if a symbol is declared and a incompatible symbol with the same name can be found in the simple-export-file the compilation fails
+<ul>
+<li>only the compatibility (and existence) of the symbols is checked, they are not forced to be exported by these rules</li>
+<li>incompatible means (here): different, but the names and the markings, except for <code>nopad</code> are ignored
+<ul>
+<li>note that the value is also compared if the symbol is a variable marked with <code>const</code></li>
+<li>for example <code>const num MAX_BUF_LEN &lt;-- 128;</code> is incompatible to <code>const num MAX_BUF_LEN &lt;-- 256;</code></li>
+<li>for example <code>add &lt;num result&gt; &lt;-- (num number_a, num number_b)</code> is compatible to <code>exp add &lt;num res&gt; &lt;-- (num a, num b)</code>, but incompatible to <code>add &lt;unum result&gt; &lt;-- (unum numberA, unum numberB)</code></li>
+<li>for example <code>typedef struct { num a; } num_wrapper;</code> is incompatible to <code>typedef struct nopad { num a; } num_wrapper;</code></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<h3>function</h3>
+<p><code>func [FUNC_MARKS_AND_NAME] [TYPE] [BLOCK]</code></p>
+<p>a function is a block of commands used to do something for example convert the argument parameters to result parameters</p>
+<ul>
+<li>marks:
+<ul>
+<li><code>exp</code>: the function will be exported to the symbol file</li>
+<li><code>init</code>: this function will be the initialisation function called when the file is loaded
+<ul>
+<li>note that the <code>init</code> function will be executed even before the <code>main</code> function (if the <code>main</code> gets executed)</li>
+<li>note that if a global variable has an initilizer the compiler may generate an implicit <code>init</code> function</li>
+<li>the <code>init</code> function has to have specific structure:
+<ul>
+<li><code>( ) --&gt; &lt; &gt;</code></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><code>main</code>: the file will be made executable and this function will be the main function.
+<ul>
+<li>the <code>main</code> function has to have specific structure:
+<ul>
+<li><code>( unum , char## ) --&gt; &lt; ubyte &gt;</code></li>
+<li>argument values:
+<ol>
+<li><code>num</code> argc: this will be set to the number of arguments passed to the program</li>
+<li><code>char##</code> argv: this will point the arguments passed to the program
+<ul>
+<li>the first argument will be the program itself</li>
+<li><code>argv[argc]</code> will be set to <code>(char#) 0</code></li>
+</ul>
+</li>
+</ol>
+</li>
+<li>return value:
+<ol>
+<li><code>ubyte</code> exitnum: the return number of the main function will be the exit number of the process</li>
+</ol>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>note that only one function can be marked with <code>init</code>/<code>main</code></li>
+<li>note that if a function is marked with <code>main</code> or <code>init</code> and has no name the function can not be called by any user generated program code</li>
+<li>the type <strong>must</strong> be a function address type (function structure types are <strong>not</strong> allowed)</li>
+</ul>
+<h3>dep-function</h3>
+<p><code>func (exp)? [NAME] [TYPE] ;</code></p>
+<ul>
+<li>like <code>[function]</code>, but there are no <code>main</code>/<code>init</code> marks allowed and the <code>[BLOCK]</code> is replaced by a <code>;</code>
+<ul>
+<li><code>[FUNC_MARKS_AND_NAME]</code> is replaced by <code>(exp)? [NAME]</code> replaces, because it allows anonymus functions when marked with <code>main</code>/<code>init</code></li>
+</ul>
+</li>
+</ul>
+<h3>variable</h3>
+<p><code>(const)? (exp)? [NAMED_TYPE] ( &lt;-- [VALUE] )? ;</code></p>
+<p>a variable can be used by all functions if declared in a file<br />
+if declared in a code block it can be used by the commands in the block after the declaration<br />
+if a non constant initial value is assigned and not declared in a code block the initilizing will be done at the start of the <code>init</code> function in the order of declaration<br />
+if a constant initial value is assigned and not declared in a code block the initilizing may (but does not need to) be done at compile time<br />
+if marked with <code>const</code> there must be a constant initial value</p>
+<ul>
+<li>marks:
+<ul>
+<li><code>const</code>: the variable can not be modified after initialisation</li>
+<li><code>exp</code>: the variable will be exported to the symbol file
+<ul>
+<li>only variables declared in a file and <strong>not</strong> in a code block can be marked with <code>exp</code></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<h3>typedef</h3>
+<p><code>typedef (exp)? [TYPE] [NAME] ;</code></p>
+<h3>FUNC_MARKS_AND_NAME</h3>
+<p><code>(exp)? (main | init)? [NAME] | (main | init) [NAME]?</code></p>
+<h3>NAME</h3>
+<p><code>[a-zA-Z][a-zA-Z_0-9]*</code></p>
+<h3>NAMED_TYPE_LIST</h3>
+<p><code>( [NAMED_TYPE] ( , [NAMED_TYPE] )* )?</code></p>
+<h3>NAMED_TYPE_LIST_SEMI_SEP</h3>
+<p><code>( [NAMED_TYPE] ; )*</code></p>
+<h3>NAMED_TYPE</h3>
+<p><code>[TYPE] [NAME]</code></p>
+<h3>TYPE</h3>
+<ul>
+<li>types:
+<ul>
+<li><code>num</code> : a signed 64-bit number</li>
+<li><code>unum</code> : an unsigned 64-bit number</li>
+<li><code>fpnum</code> : a 64-bit floating point number</li>
+<li><code>fpdword</code> : a 32-bit floating point number</li>
+<li><code>dword</code> : a signed 32-bit number</li>
+<li><code>udword</code> : an unsigned 32-bit number</li>
+<li><code>word</code> : a signed 16-bit number</li>
+<li><code>uword</code> : an unsigned 16-bit number</li>
+<li><code>byte</code> : a signed 8-bit number</li>
+<li><code>ubyte</code> : an unsigned 8-bit number/character</li>
+<li><code>char</code> : implicit <code>typedef ubyte char;</code></li>
+<li><code>[NAME] ( : [NAME] )*</code> : a type defined with <code>typedef</code></li>
+<li><code>struct (nopad)? { [NAMED_TYPE_LIST_SEMI_SEP] }</code> : a memory structure
+<ul>
+<li>marks:
+<ul>
+<li><code>nopad</code>: do not use padding
+<ul>
+<li>when using this some entries may not be aligned</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><code>[FUNC_TYPE]</code> : a function address</li>
+<li><code>fstuct ( [NAME] ( : [NAME] )* | [FUNC_TYPE0] )</code> : a function call structure</li>
+<li><code>[TYPE] #</code> : a pointer to a value of TYPE</li>
+<li><code>[TYPE] \[ [VALUE]? \]</code> : an array of values of TYPE</li>
+</ul>
+</li>
+</ul>
+<h3>FUNC_TYPE</h3>
+<p><code>func [NAME] ( : [NAME] )* | [FUNC_TYPE0]</code></p>
+<h3>FUNC_TYPE0</h3>
+<p><code>(nopad)? [FUNC_TYPE_RESULTS] \( ( [NAMED_TYPE_LIST] ) \)</code></p>
+<ul>
+<li>marks:
+<ul>
+<li><code>nopad</code>: do not use padding</li>
+</ul>
+</li>
+</ul>
+<h4>FUNC_TYPE_RESULTS</h4>
+<p><code>( &lt; [NAMED_TYPE_LIST] &gt; &lt;-- )?</code></p>
+<h3>COMMAND</h3>
+<ul>
+<li>BLOCK
+<ul>
+<li><code>{ ( [COMMAND] )* }</code></li>
+</ul>
+</li>
+<li>VAR_DECL
+<ul>
+<li><code>(const)? [NAMED_TYPE] ( &lt;-- [VALUE] )? ;</code></li>
+</ul>
+</li>
+<li>ASSIGN
+<ul>
+<li><code>[SHIFT_EXP] &lt;-- [VALUE] ;</code></li>
+</ul>
+</li>
+<li>FUNC_CALL
+<ul>
+<li><code>[SHIFT_EXP] [FUNC_CALL_RESULT] [FUNC_CALL_ARGS] ;</code>
+<ul>
+<li>FUNC_CALL_RESULT
+<ul>
+<li><code>( ( &lt; ( [IGNOREABLE_SHIFT_EXP] ( , [IGNOREABLE_SHIFT_EXP] )* )? &gt; ) &lt;-- )?</code></li>
+<li>IGNOREABLE_SHIFT_EXP
+<ul>
+<li><code>[SHIFT_EXP] | \?</code></li>
+</ul>
+</li>
+</ul>
+</li>
+<li>FUNC_CALL_ARGS
+<ul>
+<li><code>\( ([VALUE] ( , [VALUE] )* )? \)</code></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>FUNC_CALL_WITH_FUNCTION_STRUCTURE
+<ul>
+<li><code>call [SHIFT_EXP] [VALUE] ;</code>
+<ul>
+<li>the first value is the function address</li>
+<li>the second value is the function structure</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>WHILE
+<ul>
+<li><code>while \( [VALUE] \) [COMMAND]</code></li>
+</ul>
+</li>
+<li>IF
+<ul>
+<li><code>if \( [VALUE] \) [COMMAND] ( else [COMMAND] )?</code></li>
+</ul>
+</li>
+<li>ASSEMBLER
+<ul>
+<li><code>asm [ASM_PARAMS] [ASM_BLOCK] [ASM_RESULTS] ;</code>
+<ul>
+<li>ASM_PARAMS
+<ul>
+<li><code>( [STRING] &lt;-- [VALUE] ( , [STRING] &lt;-- [VALUE] )* )?</code></li>
+</ul>
+</li>
+<li>ASM_BLOCK
+<ul>
+<li><code>::: ( [^&gt;] | &gt; [^&gt;] | &gt;&gt; [^&gt;] )* &gt;&gt;&gt;</code></li>
+</ul>
+</li>
+<li>ASM_RESULTS
+<ul>
+<li><code>( [SINGLE_ASM_RESULT] ( , [SINGLE_ASM_RESULT] )* )?</code></li>
+<li>SINGLE_ASM_RESULT
+<ul>
+<li><code>[VALUE] &lt;-- [STRING] | [STRING] &lt;-- \?</code></li>
+</ul>
+</li>
+</ul>
+</li>
+<li>each STRING represents a native register or address supported by the assembler</li>
+<li>the <code>[STRING] &lt;-- [VALUE]</code> pairs represent the arguments to be passed to the asm code</li>
+<li>the <code>[POSTFIX_EXP] &lt;-- [STRING]</code> pairs represent the results of the asm code</li>
+<li>the <code>[STRING] &lt;-- \?</code> pairs represent the registers modified by the asm code
+<ul>
+<li>note that registers used as argument are <strong>not</strong> implicitly marked as modified</li>
+<li>registers used as result are implicitly marked as modified</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<h3>VALUE</h3>
+<ul>
+<li>VALUE
+<ul>
+<li><code>[COND_EXP]</code></li>
+</ul>
+</li>
+<li>COND_EXP
+<ul>
+<li><code>[LOR_EXP] ( \? [VALUE] ! [COND_EXP] )?</code></li>
+</ul>
+</li>
+<li>LOR_EXP
+<ul>
+<li><code>[LAND_EXP] ( ( \|\| ) [LAND_EXP] )*</code></li>
+</ul>
+</li>
+<li>LAND_EXP
+<ul>
+<li><code>[OR_EXP] ( ( &amp;&amp; ) [OR_EXP] )*</code></li>
+</ul>
+</li>
+<li>OR_EXP
+<ul>
+<li><code>[XOR_EXP] ( ( \| ) [XOR_EXP] )*</code></li>
+</ul>
+</li>
+<li>XOR_EXP
+<ul>
+<li><code>[AND_EXP] ( ( ^ ) [AND_EXP] )*</code></li>
+</ul>
+</li>
+<li>AND_EXP
+<ul>
+<li><code>[EQ_EXP] ( ( &amp; ) [EQ_EXP] )*</code></li>
+</ul>
+</li>
+<li>EQ_EXP
+<ul>
+<li><code>[REL_EXP] ( ( != | == ) [REL_EXP] )*</code></li>
+</ul>
+</li>
+<li>REL_EXP
+<ul>
+<li><code>[REL_EXP] ( ( &gt; | &gt;= | &lt;= | &lt; ) [REL_EXP] )*</code></li>
+</ul>
+</li>
+<li>SHIFT_EXP
+<ul>
+<li><code>[SHIFT_EXP] ( ( &lt;&lt; | &gt;&gt; ) [SHIFT_EXP] )*</code></li>
+</ul>
+</li>
+<li>ADD_EXP
+<ul>
+<li><code>[MUL_EXP] ( ( \+ | - ) [MUL_EXP] )*</code></li>
+</ul>
+</li>
+<li>MUL_EXP
+<ul>
+<li><code>[CAST_EXP] ( ( \* | / | % ) [CAST_EXP] )*</code></li>
+</ul>
+</li>
+<li>CAST_EXP
+<ul>
+<li><code>( &lt; [TYPE] &gt; )? [UNARY_EXP]</code></li>
+</ul>
+</li>
+<li>UNARY_EXP
+<ul>
+<li><code>( \+ | - | &amp; | ~ | ! )? [POSTFIX_EXP]</code></li>
+</ul>
+</li>
+<li>POSTFIX_EXP
+<ul>
+<li><code>[DIRECT_EXP] ( # | \[ [VALUE] \] | : [NAME] )*</code></li>
+</ul>
+</li>
+<li>DIRECT_EXP
+<ul>
+<li><code>[STRING]+</code></li>
+<li><code>[CHARACTER]</code></li>
+<li><code>[NUMBER]</code></li>
+<li><code>[NAME]</code></li>
+<li><code>\( [VALUE] \)</code></li>
+</ul>
+</li>
+<li>STRING
+<ul>
+<li><code>&quot;([^&quot;\\\r\n\0]|\\([&quot;rnt0\\]|u[0-9A-Fa-f]{4}))*&quot;</code></li>
+</ul>
+</li>
+<li>CHARACTER
+<ul>
+<li><code>'([^'\\\r\n\0]|\\(['rnt0\\]))'</code></li>
+</ul>
+</li>
+<li>NUMBER
+<ul>
+<li><code>[SCALAR_NUM]([Ss]|[Uu])?([QqNn]|[Dd]|[Ww]|[HhBb])?</code>
+<ul>
+<li>the sign (first) postfix:
+<ul>
+<li><code>U|u</code> is only allowed for positive numbers (zero is positive)</li>
+<li>if emited:
+<ul>
+<li>positive numbers are unsigned</li>
+<li>negative numbers are signed</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>if present, the size (second) postfix must not truncate the number (<code>DEC-256B</code> is disallowed)
+<ul>
+<li><code>Q|q|N|n</code>: <code>num</code>/<code>unum</code></li>
+<li><code>D|d</code>: <code>dword</code>/<code>udword</code></li>
+<li><code>W|w</code>: <code>word</code>/<code>uword</code></li>
+<li><code>H|h|B|b</code>: <code>byte</code>/<code>ubyte</code></li>
+</ul>
+</li>
+<li>if present, the sign (first) postfix must not truncate the number (<code>DEC-128sb</code> is disallowed)</li>
+</ul>
+</li>
+<li><code>[FPNUM]([QqNn]|[Dd])?</code>
+<ul>
+<li>the size postfix:
+<ul>
+<li><code>Q|q|N|n</code>: <code>fpnum</code></li>
+<li><code>D|d</code>: <code>fpdword</code></li>
+</ul>
+</li>
+</ul>
+</li>
+<li>SCALAR_NUM:
+<ul>
+<li><code>[0-9]+</code>
+<ul>
+<li>same as <code>DEC-[0-9]+</code></li>
+</ul>
+</li>
+<li><code>-[0-9]+</code>
+<ul>
+<li>same as <code>NDEC-[0-9]+</code></li>
+</ul>
+</li>
+<li><code>DEC-[0-9]+</code></li>
+<li><code>NDEC-[0-9]+</code></li>
+<li><code>HEX-[0-9A-F]+</code></li>
+<li><code>UHEX-[0-9A-F]+</code></li>
+<li><code>NHEX-[0-9A-F]+</code></li>
+<li><code>BIN-[01]+</code></li>
+<li><code>NBIN-[01]+</code></li>
+<li><code>OCT-[0-7]+</code></li>
+<li><code>NOCT-[0-7]+</code></li>
+</ul>
+</li>
+<li>FPNUM:
+<ul>
+<li><code>-?([0-9]*.[0-9]+|[0-9]+.[0-9]*)</code></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<h2>comments</h2>
+<p><code>// [^\n]* \n | /\* ( [^\*] | \* [^/] )* \*/</code></p>
+<p>comments are treated like whitespace, they are allowed everywhere exept in the middle of a token (but betwen any two tokens)</p>
+<h2>std</h2>
+<ul>
+<li>some symbols are already defined by the compiler</li>
+<li>these are from the automatically imported dependency <code>std</code></li>
+<li>the <code>std</code> dependency may be a compile time only dependency.
+<ul>
+<li>the `std:sys´ dependency <strong>must</strong> be a compile time only dependency.</li>
+</ul>
+</li>
+<li>if <code>std</code> has dependencies, which are not used the binary must not rely on these dependencies
+<ul>
+<li>the only exception is the `std:sys´ dependency</li>
+</ul>
+</li>
+<li>the <code>std</code> dependency <strong>must not</strong> define variables
+<ul>
+<li>the dependencies of <code>std</code> <strong>must not</strong> define variables
+<ul>
+<li>dependencies of the <code>std</code> dependency are dependencies of <code>std</code> or a dependency of a dependency of <code>std</code></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<h3>std:sys</h3>
+<p>this dependency interacts as a low level interface<br />
+this dependency may define additional symbols not mentioned here</p>
+<ul>
+<li><code>func pagesize &lt;unum result&gt; &lt;-- ();</code>
+<ul>
+<li>returns the size of a memory page (whatever this may be, it will always be a non zero power of two)</li>
+</ul>
+</li>
+<li><code>func pageshift &lt;unum result&gt; &lt;-- ();</code>
+<ul>
+<li>returns the shift of a memory page (whatever this may be)</li>
+<li>the page shift is defined as the bit count of <code>pagesize:result - 1</code> (or <code>pagesize:result = 1 &lt;&lt; pageshift:result</code>)</li>
+</ul>
+</li>
+</ul>
+<h3>functions</h3>
+<p>system functions;</p>
+<ul>
+<li><code>func exit &lt;&gt; &lt;-- (ubyte exitnum);</code>
+<ul>
+<li>terminates the process with the given exit number</li>
+<li>this function will never return to the caller</li>
+</ul>
+</li>
+</ul>
+<p>memory functions:</p>
+<ul>
+<li><code>func mem_alloc &lt;ubyte# addr&gt; &lt;-- (unum length, unum align);</code>
+<ul>
+<li>allocates <code>length</code> bytes, which are aligned to <code>align</code> bytes and stores the address of the allocated block in <code>addr</code></li>
+<li><code>align</code> must be a non zero power of two</li>
+</ul>
+</li>
+<li><code>func mem_realloc &lt;ubyte# new_addr&gt; &lt;-- (ubyte# old_addr, unum new_length, unum new_align);</code>
+<ul>
+<li>reallocates the memory block to now store <code>new_length</code> bytes aligned to <code>new_align</code></li>
+<li>the new address of the memory block is stored in <code>new_addr</code></li>
+<li><code>new_align</code> must be a non zero power of two</li>
+</ul>
+</li>
+<li><code>func mem_free &lt;&gt; &lt;-- (ubyte# addr);</code>
+<ul>
+<li>frees the given memory block</li>
+</ul>
+</li>
+<li><code>func mem_copy &lt;&gt; &lt;-- (ubyte# from, ubyte# to, unum length);</code>
+<ul>
+<li>copies <code>length</code> bytes from <code>from</code> to <code>to</code></li>
+<li>if the memory regiones <code>from..(from+length)</code> and <code>to..(to+length)</code> overlap the new content of <code>from..(from+length)</code> is undefined</li>
+<li>otherwise the new content of <code>from..(from+length)</code> is the old content of <code>to..(to+length)</code></li>
+</ul>
+</li>
+<li><code>func mem_move &lt;&gt; &lt;-- (ubyte# from, ubyte# to, unum length);</code>
+<ul>
+<li>copies <code>length</code> bytes from <code>from</code> to <code>to</code></li>
+<li>the new content of <code>from..(from+length)</code> is the old content of <code>to..(to+length)</code>
+<ul>
+<li>even if the memory regiones <code>from..(from+length)</code> and <code>to..(to+length)</code> overlap</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p>write to stdout:</p>
+<ul>
+<li><code>func puts &lt;unum wrote, unum errno&gt; &lt;-- (char# string);</code>
+<ul>
+<li>prints the given (<code>\0</code> terminated) string to stdout</li>
+</ul>
+</li>
+</ul>
+<h3>constants</h3>
+<p><code>const struct {}# NULL &lt;-- (struct {}#) 0;</code></p>
+<h3>types</h3>
+<ul>
+<li><code>typedef [TYPE] file_handle;</code>
+<ul>
+<li>the exact type is implementation specific</li>
+<li>the size and alingment will be at most the size and alignment of <code>unum</code></li>
+</ul>
+</li>
+<li><code>typedef [TYPE] fs_element_handle;</code>
+<ul>
+<li>the exact type is implementation specific</li>
+<li>the size and alingment will be at most the size and alignment of <code>unum</code></li>
+</ul>
+</li>
+</ul>
+</body></html>
