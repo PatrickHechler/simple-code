@@ -25,7 +25,6 @@ import java.util.Map.Entry;
 import de.hechler.patrick.code.simple.parser.error.CompileError;
 import de.hechler.patrick.code.simple.parser.error.ErrorContext;
 import de.hechler.patrick.code.simple.parser.objects.types.FuncType;
-import de.hechler.patrick.code.simple.parser.objects.types.NativeType;
 import de.hechler.patrick.code.simple.parser.objects.value.DependencyVal;
 import de.hechler.patrick.code.simple.parser.objects.value.FunctionVal;
 import de.hechler.patrick.code.simple.parser.objects.value.SimpleValue;
@@ -46,7 +45,6 @@ public class SimpleFile extends SimpleDependency {
 		this.typedefs = new LinkedHashMap<>();
 		this.variables = new LinkedHashMap<>();
 		this.functions = new LinkedHashMap<>();
-		typedef(new SimpleTypedef("char", 0, NativeType.UBYTE), ErrorContext.NO_CONTEXT);
 	}
 	
 	@Override

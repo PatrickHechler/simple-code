@@ -37,7 +37,8 @@ public record DataVal(byte[] value, SimpleType type, ErrorContext ctx, DataVal o
 	}
 	
 	public DataVal(DataVal orig, long off, boolean derefValue, SimpleType type, ErrorContext ctx) {
-		this(null, type, ctx, orig.orig == null ? orig : orig.orig, orig.orig == null ? off : off + orig.off, derefValue);
+		this(null, type, ctx, orig.orig == null ? orig : orig.orig, orig.orig == null ? off : off + orig.off,
+			derefValue);
 	}
 	
 	public static SimpleValue createString(String value, ErrorContext ctx) {
@@ -51,9 +52,11 @@ public record DataVal(byte[] value, SimpleType type, ErrorContext ctx, DataVal o
 		return new DataVal(val, stringType(val, ctx), ctx);
 	}
 	
-	public static SimpleValue create(List<SimpleValue> value, ErrorContext ctx) {
-		if ( value.isEmpty() ) return new DataVal(new byte[0],
-			ArrayType.create(StructType.create(List.of(), StructType.FLAG_NOUSE, ctx), 0, ctx), ctx);
+	private static SimpleValue create(List<SimpleValue> value, ErrorContext ctx) {
+		if ( value.isEmpty() ) {
+			return new DataVal(new byte[0],
+				ArrayType.create(StructType.create(List.of(), StructType.FLAG_NOUSE, ctx), 0, ctx), ctx);
+		}
 		SimpleValue val = value.get(0);
 		SimpleType t = val.type();
 		long len = t.size() * value.size();

@@ -1,4 +1,4 @@
-package de.hechler.patrick.code.simple.ecl.wizards.create;
+package de.hechler.patrick.code.simple.ecl.wizards.create.file;
 
 import org.eclipse.jface.viewers.IStructuredSelection;
 import org.eclipse.jface.wizard.Wizard;
@@ -26,14 +26,14 @@ import org.eclipse.ui.ide.IDE;
  * be able to open it.
  */
 
-public class SimpleCodeNewWizard extends Wizard implements INewWizard {
-	private SimpleCodeNewWizardPage page;
+public class SimpleCodeNewFile extends Wizard implements INewWizard {
+	private SimpleCodeNewFilePage page;
 	private ISelection selection;
 
 	/**
 	 * Constructor for SimpleCodeNewWizard.
 	 */
-	public SimpleCodeNewWizard() {
+	public SimpleCodeNewFile() {
 		super();
 		setNeedsProgressMonitor(true);
 	}
@@ -43,7 +43,7 @@ public class SimpleCodeNewWizard extends Wizard implements INewWizard {
 	 */
 	@Override
 	public void addPages() {
-		page = new SimpleCodeNewWizardPage(selection);
+		page = new SimpleCodeNewFilePage(selection);
 		addPage(page);
 	}
 

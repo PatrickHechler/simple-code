@@ -197,10 +197,18 @@
             id="de.hechler.patrick.code.simple.ecl.wizards.create">
       </category>
       <wizard
-            id="de.hechler.patrick.code.simple.ecl.wizards.create.SimpleCodeNewWizard"
+            id="de.hechler.patrick.code.simple.ecl.wizards.create.file.SimpleCodeNewFile"
             name="Create Simple Code file"
             icon="icons/sample.png"
-            class="de.hechler.patrick.code.simple.ecl.wizards.create.SimpleCodeNewWizard"
+            class="de.hechler.patrick.code.simple.ecl.wizards.create.file.SimpleCodeNewFile"
+            category="de.hechler.patrick.code.simple.ecl.wizards.create">
+      </wizard>
+      <wizard
+            id="de.hechler.patrick.code.simple.ecl.wizards.create.project.SimpleCodeNewProject"
+            name="Create Simple Code project"
+            project="true"
+            icon="icons/sample.png"
+            class="de.hechler.patrick.code.simple.ecl.wizards.create.project.SimpleCodeNewProject"
             category="de.hechler.patrick.code.simple.ecl.wizards.create">
       </wizard>
    </extension>

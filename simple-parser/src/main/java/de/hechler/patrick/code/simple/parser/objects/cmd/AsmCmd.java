@@ -36,7 +36,7 @@ public class AsmCmd extends SimpleCommand {
 	}
 	
 	public static AsmCmd create(SimpleScope parent, List<AsmParam> params, String asm, List<AsmResult> results,
-		@SuppressWarnings( "unused" ) ErrorContext ctx) {
+		@SuppressWarnings("unused") ErrorContext ctx) {
 		return new AsmCmd(parent, params, asm, results);
 	}
 	
@@ -75,6 +75,10 @@ public class AsmCmd extends SimpleCommand {
 			value.type().checkCastable(null, ctx, false);
 			value.checkAssignable(value.type(), ctx); // the special meaning of null in only guaranteed in checkCastable
 			return new AsmResult(value, target);
+		}
+		
+		public static AsmResult create(String ignore, @SuppressWarnings("unused") ErrorContext ctx) {
+			return new AsmResult(null, ignore);
 		}
 		
 	}

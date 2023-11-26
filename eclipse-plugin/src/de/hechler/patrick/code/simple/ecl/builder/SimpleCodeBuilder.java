@@ -1,10 +1,8 @@
 package de.hechler.patrick.code.simple.ecl.builder;
 
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.PrintStream;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -116,7 +114,7 @@ public class SimpleCodeBuilder extends IncrementalProjectBuilder {
 		
 	}
 	
-	record ProjectProps(IProject project, IFolder[] src, IProject[] deps, IFolder bin, IFolder exp,
+	public record ProjectProps(IProject project, IFolder[] src, IProject[] deps, IFolder bin, IFolder exp,
 		Map<IPath,SimpleDependency> laodedDeps) {
 		
 		public ProjectProps(IProject project, IFolder[] src, IProject[] deps, IFolder bin, IFolder exp) {
@@ -125,11 +123,12 @@ public class SimpleCodeBuilder extends IncrementalProjectBuilder {
 		
 	}
 	
-	private void addMarker(IFile file, String message, int lineNumber, int severity) {
+	private static void addMarker(IFile file, String message, int lineNumber, int severity) {
 		addMarker(file, message, lineNumber, -1, -1, severity);
 	}
 	
-	private void addMarker(IFile file, String message, int lineNumber, int charStart, int charEnd, int severity) {
+	private static void addMarker(IFile file, String message, int lineNumber, int charStart, int charEnd,
+		int severity) {
 		try {
 			IMarker marker = file.createMarker(MARKER_TYPE);
 			marker.setAttribute(IMarker.MESSAGE, message);
@@ -171,10 +170,19 @@ public class SimpleCodeBuilder extends IncrementalProjectBuilder {
 		return null;
 	}
 	
+	public static ProjectProps initilize(IProject project, IProgressMonitor monitor) throws CoreException {
+		return parseProps(project, monitor, true);
+	}
+	
 	private static final String BINARY_START  = "binary=";
 	private static final String EXPORTS_START = "exports=";
 	
-	private ProjectProps parseProps(IProject project, IProgressMonitor monitor) throws CoreException {
+	private static ProjectProps parseProps(IProject project, IProgressMonitor monitor) throws CoreException {
+		return parseProps(project, monitor, false);
+	}
+	
+	private static ProjectProps parseProps(IProject project, IProgressMonitor monitor, boolean createIfNotExists)
+		throws CoreException {
 		if ( Activator.doLog(LogLevel.DEBUG) ) {
 			log("parseProps( " + project + " , " + monitor + " ) called");
 		}
@@ -224,9 +232,13 @@ public class SimpleCodeBuilder extends IncrementalProjectBuilder {
 				case "source" -> {
 					IFolder folder = project.getFolder(line);
 					if ( !folder.exists() ) {
-						addMarker(confFile, "the folder '" + line + "' could not be found", lineNumber,
-							IMarker.SEVERITY_ERROR);
-						return null;
+						if ( createIfNotExists ) {
+							folder.create(0, false, monitor);
+						} else {
+							addMarker(confFile, "the folder '" + line + "' could not be found", lineNumber,
+								IMarker.SEVERITY_ERROR);
+							return null;
+						}
 					}
 					source.add(folder);
 				}
@@ -286,7 +298,7 @@ public class SimpleCodeBuilder extends IncrementalProjectBuilder {
 			return new ProjectProps(project, source.toArray(new IFolder[source.size()]),
 				dependencies.toArray(new IProject[dependencies.size()]), binary, exports);
 		} catch ( IOException e ) {
-			throw new CoreException(new Status(IStatus.ERROR, getClass(), e.toString()));
+			throw new CoreException(new Status(IStatus.ERROR, SimpleCodeBuilder.class, e.toString()));
 		}
 	}
 	
@@ -414,17 +426,14 @@ public class SimpleCodeBuilder extends IncrementalProjectBuilder {
 				IPath relTarget = relPath1.append(lastSeg.substring(0, lastSeg.length() - "ssf".length()) + "sexp");
 				IFile exportTarget = props.exp.getFile(relTarget);
 				SimpleFile sf = new SimpleFile(file.toString(), exportTarget.toString());
+				sf.typedef(new SimpleTypedef("char", 0, NativeType.UBYTE), ErrorContext.NO_CONTEXT);
 				sf.dependency(STDLIB, "std", ErrorContext.NO_CONTEXT);
 				ssfp.parse(sf);
 				String exportString = sf.toExportString();
 				if ( exportString.isEmpty() ) {
 					return;
 				}
-				ByteArrayOutputStream baos = new ByteArrayOutputStream();
-				try ( PrintStream out = new PrintStream(baos, false, StandardCharsets.UTF_8) ) {
-					out.print(exportString);
-				}
-				ByteArrayInputStream bais = new ByteArrayInputStream(baos.toByteArray());
+				ByteArrayInputStream bais = new ByteArrayInputStream(exportString.getBytes(StandardCharsets.UTF_8));
 				if ( !exportTarget.exists() ) {
 					IContainer parent = exportTarget.getParent();
 					if ( !parent.exists() ) {
@@ -497,7 +506,7 @@ public class SimpleCodeBuilder extends IncrementalProjectBuilder {
 		};
 	}
 	
-	private void deleteMarkers(IFile file) {
+	private static void deleteMarkers(IFile file) {
 		try {
 			file.deleteMarkers(MARKER_TYPE, false, IResource.DEPTH_ZERO);
 		} catch ( CoreException e ) {

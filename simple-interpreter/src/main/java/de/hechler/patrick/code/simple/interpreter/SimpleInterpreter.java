@@ -35,6 +35,7 @@ import de.hechler.patrick.code.simple.parser.objects.cmd.WhileCmd;
 import de.hechler.patrick.code.simple.parser.objects.simplefile.SimpleDependency;
 import de.hechler.patrick.code.simple.parser.objects.simplefile.SimpleFile;
 import de.hechler.patrick.code.simple.parser.objects.simplefile.SimpleFunction;
+import de.hechler.patrick.code.simple.parser.objects.simplefile.SimpleTypedef;
 import de.hechler.patrick.code.simple.parser.objects.simplefile.SimpleVariable;
 import de.hechler.patrick.code.simple.parser.objects.types.ArrayType;
 import de.hechler.patrick.code.simple.parser.objects.types.FuncType;
@@ -159,6 +160,7 @@ public class SimpleInterpreter {
 					});
 				SimpleFile sf = new SimpleFile(oldP.toString(), oldP.toString());
 				lsf = new LoadedSF(sf);
+				sf.typedef(new SimpleTypedef("char", 0, NativeType.UBYTE), ErrorContext.NO_CONTEXT);
 				sf.dependency(this.stdlib, "std", ErrorContext.NO_CONTEXT);
 				parser.parse(sf);
 				initilize(lsf);

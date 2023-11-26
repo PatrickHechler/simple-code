@@ -48,7 +48,7 @@ public class SsfContentAssistProcessor implements IContentAssistProcessor {
 
     @Override
     public char[] getCompletionProposalAutoActivationCharacters() {
-        return new char[] { '"' }; //NON-NLS-1
+        return new char[] { ':' }; //NON-NLS-1
     }
 
     @Override

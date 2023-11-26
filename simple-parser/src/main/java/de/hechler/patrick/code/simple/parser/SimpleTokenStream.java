@@ -274,6 +274,10 @@ public class SimpleTokenStream {
 		return t;
 	}
 	
+	public void tok(int t) {
+		this.tok = t;
+	}
+	
 	public void consume() {
 		assert this.tok != INVALID || this.dynTok != null;
 		this.tok = INVALID;

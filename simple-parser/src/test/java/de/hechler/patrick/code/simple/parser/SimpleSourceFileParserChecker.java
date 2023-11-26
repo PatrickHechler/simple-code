@@ -5,7 +5,10 @@ import static de.hechler.patrick.zeugs.check.Assert.assertEquals;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 
+import de.hechler.patrick.code.simple.parser.error.ErrorContext;
 import de.hechler.patrick.code.simple.parser.objects.simplefile.SimpleFile;
+import de.hechler.patrick.code.simple.parser.objects.simplefile.SimpleTypedef;
+import de.hechler.patrick.code.simple.parser.objects.types.NativeType;
 import de.hechler.patrick.zeugs.check.anotations.Check;
 import de.hechler.patrick.zeugs.check.anotations.CheckClass;
 
@@ -19,6 +22,7 @@ class SimpleSourceFileParserChecker {
 		InputStream in = SimpleSourceFileParser.class.getResourceAsStream("/programs/some-impl.ssf");
 		SimpleSourceFileParser ssp = new SimpleSourceFileParser(in, "some-impl.ssf", null);
 		SimpleFile sf = new SimpleFile("/src", "/bin");
+		sf.typedef(new SimpleTypedef("char", 0, NativeType.UBYTE), ErrorContext.NO_CONTEXT);
 		ssp.parse(sf);
 		assertEquals("""
 			typedef ubyte char;

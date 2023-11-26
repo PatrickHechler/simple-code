@@ -1,4 +1,4 @@
-package de.hechler.patrick.code.simple.ecl.wizards.create;
+package de.hechler.patrick.code.simple.ecl.wizards.create.file;
 
 import org.eclipse.core.resources.IContainer;
 import org.eclipse.core.resources.IResource;
@@ -24,7 +24,7 @@ import org.eclipse.ui.dialogs.ContainerSelectionDialog;
  * OR with the extension that matches the expected one (ssf).
  */
 
-public class SimpleCodeNewWizardPage extends WizardPage {
+public class SimpleCodeNewFilePage extends WizardPage {
 	private Text containerText;
 
 	private Text fileText;
@@ -36,7 +36,7 @@ public class SimpleCodeNewWizardPage extends WizardPage {
 	 *
 	 * @param pageName
 	 */
-	public SimpleCodeNewWizardPage(ISelection selection) {
+	public SimpleCodeNewFilePage(ISelection selection) {
 		super("wizardPage");
 		setTitle("Create Simple Code Editor");
 		setDescription("This wizard creates a new Simple-Code file with *.ssf extension that can be opened by a editor.");

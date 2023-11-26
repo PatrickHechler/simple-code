@@ -12,7 +12,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.List;
 
-import de.hechler.patrick.code.simple.interpreter.SimpleInterpreter;
 import de.hechler.patrick.code.simple.interpreter.memory.MemoryManager;
 import de.hechler.patrick.zeugs.check.anotations.Check;
 import de.hechler.patrick.zeugs.check.anotations.CheckClass;
