@@ -12,48 +12,54 @@ import org.eclipse.core.runtime.CoreException;
 import org.eclipse.jface.viewers.ISelection;
 import org.eclipse.jface.viewers.IStructuredSelection;
 import org.eclipse.ui.handlers.HandlerUtil;
+import org.osgi.service.log.LogLevel;
+
+import de.hechler.patrick.code.simple.ecl.Activator;
 
 public class AddRemoveSimpleCodeNatureHandler extends AbstractHandler {
-
+	
 	@Override
 	public Object execute(ExecutionEvent event) throws ExecutionException {
+		if ( Activator.doLog(LogLevel.TRACE) ) {
+			Activator.log("project-toggle", "execute( " + event + " ) called");
+		}
 		ISelection selection = HandlerUtil.getCurrentSelection(event);
-		if (selection instanceof IStructuredSelection) {
-			for (Iterator<?> it = ((IStructuredSelection) selection).iterator(); it
-					.hasNext();) {
+		if ( selection instanceof IStructuredSelection ) {
+			for (Iterator<?> it = ( (IStructuredSelection) selection ).iterator(); it.hasNext();) {
 				Object element = it.next();
 				IProject project = null;
-				if (element instanceof IProject) {
+				if ( element instanceof IProject ) {
 					project = (IProject) element;
 				} else {
 					project = Adapters.adapt(element, IProject.class);
 				}
-				if (project != null) {
+				if ( project != null ) {
 					try {
 						toggleNature(project);
-					} catch (CoreException e) {
-						throw new ExecutionException("Failed to toggle nature",
-								e);
+					} catch ( CoreException e ) {
+						throw new ExecutionException("Failed to toggle nature", e);
 					}
 				}
 			}
 		}
-
+		
 		return null;
 	}
-
+	
 	/**
-	 * Toggles sample nature on a project
+	 * Toggles Simple-Code nature on a project
 	 *
-	 * @param project
-	 *            to have sample nature added or removed
+	 * @param project to have Simple-Code nature added or removed
 	 */
 	private void toggleNature(IProject project) throws CoreException {
+		if ( Activator.doLog(LogLevel.DEBUG) ) {
+			Activator.log("project-toggle", "toggleNature( " + project + " ) called");
+		}
 		IProjectDescription description = project.getDescription();
 		String[] natures = description.getNatureIds();
-
+		
 		for (int i = 0; i < natures.length; ++i) {
-			if (SimpleCodeNature.NATURE_ID.equals(natures[i])) {
+			if ( SimpleCodeNature.NATURE_ID.equals(natures[i]) ) {
 				// Remove the nature
 				String[] newNatures = new String[natures.length - 1];
 				System.arraycopy(natures, 0, newNatures, 0, i);
@@ -63,7 +69,7 @@ public class AddRemoveSimpleCodeNatureHandler extends AbstractHandler {
 				return;
 			}
 		}
-
+		
 		// Add the nature
 		String[] newNatures = new String[natures.length + 1];
 		System.arraycopy(natures, 0, newNatures, 0, natures.length);
@@ -71,4 +77,5 @@ public class AddRemoveSimpleCodeNatureHandler extends AbstractHandler {
 		description.setNatureIds(newNatures);
 		project.setDescription(description, null);
 	}
+	
 }

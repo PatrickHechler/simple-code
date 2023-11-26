@@ -5,8 +5,7 @@ import static de.hechler.patrick.zeugs.check.Assert.assertEquals;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 
-import de.hechler.patrick.code.simple.parser.SimpleSourceFileParser;
-import de.hechler.patrick.code.simple.parser.objects.simplefile.SimpleDependency;
+import de.hechler.patrick.code.simple.parser.objects.simplefile.SimpleFile;
 import de.hechler.patrick.zeugs.check.anotations.Check;
 import de.hechler.patrick.zeugs.check.anotations.CheckClass;
 
@@ -19,7 +18,8 @@ class SimpleSourceFileParserChecker {
 	void checkParser() {
 		InputStream in = SimpleSourceFileParser.class.getResourceAsStream("/programs/some-impl.ssf");
 		SimpleSourceFileParser ssp = new SimpleSourceFileParser(in, "some-impl.ssf", null);
-		SimpleDependency sf = ssp.parse("/bin");
+		SimpleFile sf = new SimpleFile("/src", "/bin");
+		ssp.parse(sf);
 		assertEquals("""
 			typedef ubyte char;
 			func puts <unum wrote, unum errno> <-- ((ubyte)# string) {

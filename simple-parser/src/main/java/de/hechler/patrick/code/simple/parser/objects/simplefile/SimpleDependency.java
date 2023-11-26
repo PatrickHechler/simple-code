@@ -20,9 +20,11 @@ import de.hechler.patrick.code.simple.parser.objects.simplefile.scope.SimpleScop
 
 public abstract class SimpleDependency implements SimpleScope {
 	
+	public final String sourceFile;
 	public final String binaryTarget;
 	
-	public SimpleDependency(String binaryTarget) {// NOSONAR
+	public SimpleDependency(String sourceFile, String binaryTarget) {// NOSONAR
+		this.sourceFile = sourceFile;
 		this.binaryTarget = binaryTarget;
 	}
 	

@@ -3,7 +3,7 @@
 <plugin>
 
    <extension
-         id="de.hechler.patrick.code.simple.ecl.simpleCodeBuilder"
+         id="de.hechler.patrick.code.simple.ecl.project.builder"
          name="Simple Code Project Builder"
          point="org.eclipse.core.resources.builders">
       <builder
@@ -30,13 +30,13 @@
          point="org.eclipse.ui.commands">
       <category
             id="de.hechler.patrick.code.simple.ecl.project.nature.category"
-            name="Simple Cpde Project Nature commands">
+            name="Simple Code Project Nature commands">
       </category>
       <command
             categoryId="de.hechler.patrick.code.simple.ecl.project.nature.category"
             defaultHandler="de.hechler.patrick.code.simple.ecl.builder.AddRemoveSimpleCodeNatureHandler"
             id="de.hechler.patrick.code.simple.ecl.addRemoveSimpleCodeNature"
-            name="Add/RemoveSimple Cpde Project Nature">
+            name="Add/Remove Simple Code Project Nature">
       </command>
    </extension>
    <extension
@@ -94,8 +94,8 @@
       </menuContribution>
    </extension>
    <extension
-         id="xmlProblem"
-         name="XML Problem"
+         id="de.hechler.patrick.code.simple.ecl.problem"
+         name="Simple Code Problem"
          point="org.eclipse.core.resources.markers">
       <super
             type="org.eclipse.core.resources.problemmarker">
@@ -108,9 +108,9 @@
          point="org.eclipse.core.contenttype.contentTypes">
       <content-type
             id="de.hechler.patrick.code.simple.ecl.editor.ssf"
-            name="de.hechler.patrick.code.simple.ecl.editor.ssf"
+            name="Simple Code editor"
             base-type="org.eclipse.core.runtime.text"
-            file-extensions="ssf">
+            file-extensions="ssf, sexp">
       </content-type>
    </extension>
    <extension
@@ -173,7 +173,7 @@
             primary="true">
       </toc>
    </extension>
-   <extension
+<!--   <extension
          point="org.eclipse.ui.importWizards">
       <category
             id="de.hechler.patrick.code.simple.ecl.wizards.imports.simpleCodeCategory"
@@ -189,27 +189,27 @@
             Import a Simple-Code file from the local file system into the workspace.
          </description>
       </wizard>
-   </extension>
+   </extension> -->
    <extension
          point="org.eclipse.ui.newWizards">
       <category
-            name="Simple Code Wizards"
+            name="Simple Code"
             id="de.hechler.patrick.code.simple.ecl.wizards.create">
       </category>
       <wizard
             id="de.hechler.patrick.code.simple.ecl.wizards.create.SimpleCodeNewWizard"
-            name="Simple Code file Editor"
+            name="Create Simple Code file"
             icon="icons/sample.png"
             class="de.hechler.patrick.code.simple.ecl.wizards.create.SimpleCodeNewWizard"
             category="de.hechler.patrick.code.simple.ecl.wizards.create">
       </wizard>
    </extension>
-   <extension
+   <!-- <extension
          point="org.eclipse.ui.propertyPages">
       <page
-            id="de.hechler.patrick.code.simple.ecl.properties.simpleCodePropertyPage"
-            name="Simple Code Page"
-            class="de.hechler.patrick.code.simple.ecl.properties.SimpleCodePropertyPage"
+            id="de.hechler.patrick.code.simple.ecl.properties.file"
+            name="Simple Code File Properties"
+            class="de.hechler.patrick.code.simple.ecl.properties.SimpleCodeFileProperties"
             nameFilter="*.*">
          <enabledWhen>
             <instanceof
@@ -217,6 +217,6 @@
             </instanceof>
          </enabledWhen>
       </page>
-   </extension>
+   </extension> -->
 
 </plugin>

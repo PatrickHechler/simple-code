@@ -107,23 +107,16 @@ import de.hechler.patrick.code.simple.parser.objects.value.UnaryOpVal.UnaryOp;
 
 public class SimpleExportFileParser {
 	
-	protected final SimpleTokenStream                            in;
-	protected final BiFunction<String, String, SimpleDependency> dep;
+	protected final SimpleTokenStream                          in;
+	protected final BiFunction<String,String,SimpleDependency> dep;
 	
-	public SimpleExportFileParser(InputStream in, String file, BiFunction<String, String, SimpleDependency> dep) {
+	public SimpleExportFileParser(InputStream in, String file, BiFunction<String,String,SimpleDependency> dep) {
 		this(new SimpleTokenStream(in, file), dep);
 	}
 	
-	public SimpleExportFileParser(SimpleTokenStream in, BiFunction<String, String, SimpleDependency> dep) {
+	public SimpleExportFileParser(SimpleTokenStream in, BiFunction<String,String,SimpleDependency> dep) {
 		this.in = in;
 		this.dep = dep;
-	}
-	
-	
-	public SimpleDependency parse(String runtimePath, boolean isMeDep) {
-		SimpleFile sf = new SimpleFile(runtimePath);
-		parse(sf, isMeDep);
-		return sf;
 	}
 	
 	public void parse(SimpleFile sf, boolean isMeDep) {
@@ -154,7 +147,11 @@ public class SimpleExportFileParser {
 		expectToken(STRING, "expected to get `[STRING] ;´ after `dep [NAME]´");
 		String path = this.in.consumeDynTokSpecialText();
 		consumeToken(SEMI, "expected to get `;´ after `dep [NAME] [STRING]´");
-		sf.dependency(this.dep.apply(name, path), name, this.in.ctx());
+		SimpleDependency dependency = this.dep.apply(path, null);
+		if ( dependency == null ) {
+			throw new CompileError(this.in.ctx(), "could not find the dependency \"" + path + "\"");
+		}
+		sf.dependency(dependency, name, this.in.ctx());
 	}
 	
 	protected SimpleVariable parseSFScopeVariable(SimpleFile sf) {
@@ -618,14 +615,14 @@ public class SimpleExportFileParser {
 		return parseTypeNamedType(ctx, scope, SimpleType.class);
 	}
 	
-	private <T> T parseTypeNamedType(ErrorContext ctx, SimpleScope scope, Class<T> cls) {
+	private < T > T parseTypeNamedType(ErrorContext ctx, SimpleScope scope, Class<T> cls) {
 		while ( true ) {
 			Object obj = scope.nameTypeOrDepOrFuncOrNull(this.in.dynTokSpecialText(), ctx);
 			if ( cls.isInstance(obj) ) return cls.cast(obj);
 			if ( !( obj instanceof SimpleDependency nscope ) ) {
-				String simpleName =
-					cls.getSimpleName().startsWith("Simple") ? cls.getSimpleName().substring("Simple".length())
-						: cls.getSimpleName();
+				String simpleName = cls.getSimpleName().startsWith("Simple")
+					? cls.getSimpleName().substring("Simple".length())
+					: cls.getSimpleName();
 				if ( obj == null ) {
 					throw new CompileError(this.in.ctx(), "expected the `[NAME]´ to be the [NAME] of a " + simpleName
 						+ " or a dependency, but there is nothing with the given name");

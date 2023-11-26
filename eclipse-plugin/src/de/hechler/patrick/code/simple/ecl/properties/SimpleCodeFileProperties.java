@@ -12,7 +12,7 @@ import org.eclipse.swt.widgets.Label;
 import org.eclipse.swt.widgets.Text;
 import org.eclipse.ui.dialogs.PropertyPage;
 
-public class SimpleCodePropertyPage extends PropertyPage {
+public class SimpleCodeFileProperties extends PropertyPage {
 
 	private static final String PATH_TITLE = "Path:";
 	private static final String OWNER_TITLE = "&Owner:";
@@ -26,7 +26,7 @@ public class SimpleCodePropertyPage extends PropertyPage {
 	/**
 	 * Constructor for SamplePropertyPage.
 	 */
-	public SimpleCodePropertyPage() {
+	public SimpleCodeFileProperties() {
 		super();
 	}
 

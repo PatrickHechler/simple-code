@@ -17,7 +17,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
-import de.hechler.patrick.code.simple.parser.SimpleTokenStream;
 import de.hechler.patrick.code.simple.parser.error.ErrorContext;
 import de.hechler.patrick.zeugs.check.anotations.Check;
 import de.hechler.patrick.zeugs.check.anotations.CheckClass;

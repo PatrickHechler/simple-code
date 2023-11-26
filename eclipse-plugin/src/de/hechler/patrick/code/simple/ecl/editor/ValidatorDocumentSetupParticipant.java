@@ -41,6 +41,7 @@ public class ValidatorDocumentSetupParticipant implements IDocumentSetupParticip
 				this.marker = null;
 			}
 			try (StringReader reader = new StringReader(event.getDocument().get());) {
+				if (reader != null) return; // TODO 
 				DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
 				// completely disable DOCTYPE declaration:
 				try {

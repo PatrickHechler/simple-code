@@ -33,15 +33,15 @@ import de.hechler.patrick.code.simple.parser.objects.value.VariableVal;
 
 public class SimpleFile extends SimpleDependency {
 	
-	private Map<String, SimpleDependency> dependencies;
-	private Map<String, SimpleTypedef>    typedefs;
-	private Map<String, SimpleVariable>   variables;
-	private Map<String, SimpleFunction>   functions;
-	private SimpleFunction                main;
-	private SimpleFunction                init;
+	private Map<String,SimpleDependency> dependencies;
+	private Map<String,SimpleTypedef>    typedefs;
+	private Map<String,SimpleVariable>   variables;
+	private Map<String,SimpleFunction>   functions;
+	private SimpleFunction               main;
+	private SimpleFunction               init;
 	
-	public SimpleFile(String binaryTarget) {
-		super(binaryTarget);
+	public SimpleFile(String sourceFile, String binaryTarget) {
+		super(sourceFile, binaryTarget);
 		this.dependencies = new LinkedHashMap<>();
 		this.typedefs = new LinkedHashMap<>();
 		this.variables = new LinkedHashMap<>();
@@ -147,16 +147,20 @@ public class SimpleFile extends SimpleDependency {
 		}
 	}
 	
-	public Collection<SimpleDependency> dependencies() {
-		return Collections.unmodifiableCollection(this.dependencies.values());
-	}
-	
 	public SimpleDependency dependency(String name) {
 		return this.dependencies.get(name);
 	}
 	
+	public Collection<SimpleDependency> allDependencies() {
+		return Collections.unmodifiableCollection(this.dependencies.values());
+	}
+	
 	public SimpleTypedef typedef(String name) {
 		return this.typedefs.get(name);
+	}
+	
+	public Collection<SimpleTypedef> allTypedefs() {
+		return Collections.unmodifiableCollection(this.typedefs.values());
 	}
 	
 	public SimpleVariable variable(String name) {
@@ -171,6 +175,10 @@ public class SimpleFile extends SimpleDependency {
 		return this.functions.get(name);
 	}
 	
+	public Collection<SimpleFunction> allFunctions() {
+		return Collections.unmodifiableCollection(this.functions.values());
+	}
+	
 	public SimpleFunction init() {
 		return this.init;
 	}
@@ -182,7 +190,7 @@ public class SimpleFile extends SimpleDependency {
 	@Override
 	public String toString() {
 		StringBuilder b = new StringBuilder();
-		for (Entry<String, SimpleDependency> e : this.dependencies.entrySet()) {
+		for (Entry<String,SimpleDependency> e : this.dependencies.entrySet()) {
 			b.append("dep ").append(e.getKey()).append(" [PATH] \"").append(e.getValue().binaryTarget).append("\";\n");
 		}
 		for (SimpleTypedef t : this.typedefs.values()) {
@@ -223,6 +231,9 @@ public class SimpleFile extends SimpleDependency {
 			if ( sf.name() != null ) {
 				b.append(sf.name()).append(' ');
 			}
+			if ( ( sf.type().flags() & FuncType.FLAG_NOPAD ) != 0 ) {
+				b.append("nopad ");
+			}
 			sf.type().toStringNoFlags("", b);
 			if ( sf.block() != null ) {
 				b.append(' ');
@@ -230,6 +241,51 @@ public class SimpleFile extends SimpleDependency {
 				b.append('\n');
 			} else {
 				b.append(";\n");
+			}
+		}
+		return b.toString();
+	}
+	
+	public String toExportString() {
+		StringBuilder b = new StringBuilder();
+		for (Entry<String,SimpleDependency> e : this.dependencies.entrySet()) {
+			if (e.getValue().sourceFile != null) {
+				b.append("dep ").append(e.getKey()).append(" \"").append(e.getValue().sourceFile).append("\";\n");
+			} else if (!"std".equals(e.getKey())) {
+				b.append("dep ").append(e.getKey()).append(" NULL \"").append(e.getValue().binaryTarget).append("\";\n");
+			}
+		}
+		for (SimpleTypedef t : this.typedefs.values()) {
+			if ( ( t.flags() & SimpleTypedef.FLAG_EXPORT ) == 0 ) continue;
+			b.append("typedef exp ");
+			if ( ( t.flags() & SimpleTypedef.FLAG_FROM_ME_DEP ) != 0 ) {
+				b.append("<ERROR: THATS FROM A ME-DEPENDENCY> ");
+			}
+			b.append(t.type()).append(' ').append(t.name()).append(";\n");
+		}
+		for (SimpleVariable sv : this.variables.values()) {
+			if ( ( sv.flags() & SimpleVariable.FLAG_EXPORT ) == 0 ) continue;
+			if ( ( sv.flags() & SimpleVariable.FLAG_CONSTANT ) != 0 ) {
+				b.append("const ");
+			}
+			b.append("exp ");
+			b.append(sv.type()).append(' ').append(sv.name());
+			if ( sv.initialValue() != null ) {
+				b.append(" <-- ").append(sv.initialValue());
+			}
+			b.append(";\n");
+		}
+		for (SimpleFunction sf : this.functions.values()) {
+			if ( ( sf.type().flags() & FuncType.FLAG_EXPORT ) == 0 ) continue;
+			b.append("func exp ").append(sf.name()).append(' ');
+			if ( ( sf.type().flags() & FuncType.FLAG_NOPAD ) != 0 ) {
+				b.append("nopad ");
+			}
+			sf.type().toStringNoFlags("", b);
+			if ( sf.block() != null ) {
+				b.append(";\n");
+			} else {
+				b.append("{ ERROR: THERE IS NO BLOCK FOR THE EXPORTED FUNCTION }\n");
 			}
 		}
 		return b.toString();

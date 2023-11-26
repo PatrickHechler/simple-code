@@ -5,6 +5,7 @@ import org.eclipse.core.resources.IProject;
 import org.eclipse.core.resources.IProjectDescription;
 import org.eclipse.core.resources.IProjectNature;
 import org.eclipse.core.runtime.CoreException;
+import org.osgi.service.log.LogLevel;
 
 import de.hechler.patrick.code.simple.ecl.Activator;
 
@@ -19,6 +20,9 @@ public class SimpleCodeNature implements IProjectNature {
 
 	@Override
 	public void configure() throws CoreException {
+		if (Activator.doLog(LogLevel.DEBUG)) {
+			Activator.log("project-nature", "configure() called");
+		}
 		IProjectDescription desc = project.getDescription();
 		ICommand[] commands = desc.getBuildSpec();
 
@@ -39,6 +43,9 @@ public class SimpleCodeNature implements IProjectNature {
 
 	@Override
 	public void deconfigure() throws CoreException {
+		if (Activator.doLog(LogLevel.DEBUG)) {
+			Activator.log("project-nature", "deconfigure() called");
+		}
 		IProjectDescription description = getProject().getDescription();
 		ICommand[] commands = description.getBuildSpec();
 		for (int i = 0; i < commands.length; ++i) {

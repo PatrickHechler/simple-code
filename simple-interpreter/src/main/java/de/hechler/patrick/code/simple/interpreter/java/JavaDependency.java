@@ -20,8 +20,8 @@ import de.hechler.patrick.code.simple.parser.objects.types.SimpleType;
 
 public class JavaDependency extends SimpleFile {
 	
-	public JavaDependency(String binaryTarget) {
-		super(binaryTarget);
+	public JavaDependency(String sourceFile) {
+		super(sourceFile, sourceFile);
 	}
 	
 	public void function(String name, Object invoker, Method method) {

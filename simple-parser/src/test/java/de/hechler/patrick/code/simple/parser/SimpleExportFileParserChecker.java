@@ -4,8 +4,7 @@ import static de.hechler.patrick.zeugs.check.Assert.assertEquals;
 
 import java.io.InputStream;
 
-import de.hechler.patrick.code.simple.parser.SimpleExportFileParser;
-import de.hechler.patrick.code.simple.parser.objects.simplefile.SimpleDependency;
+import de.hechler.patrick.code.simple.parser.objects.simplefile.SimpleFile;
 import de.hechler.patrick.zeugs.check.anotations.Check;
 import de.hechler.patrick.zeugs.check.anotations.CheckClass;
 
@@ -14,9 +13,10 @@ class SimpleExportFileParserChecker {
 	
 	@Check
 	void checkParser() {
-		InputStream            in  = SimpleExportFileParser.class.getResourceAsStream("/programs/some-funcs.sexp");
+		InputStream in = SimpleExportFileParser.class.getResourceAsStream("/programs/some-funcs.sexp");
 		SimpleExportFileParser sep = new SimpleExportFileParser(in, "some-funcs.sexp", null);
-		SimpleDependency       sf  = sep.parse("/bin", false);
+		SimpleFile sf = new SimpleFile("/src", "/bin");
+		sep.parse(sf, false);
 		assertEquals("""
 			typedef ubyte char;
 			typedef struct {

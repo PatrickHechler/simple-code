@@ -85,20 +85,8 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 		super(in, dep);
 	}
 	
-	public SimpleFile parse(String runtimePath) {
-		SimpleFile sf = new SimpleFile(runtimePath);
-		parse(sf);
-		return sf;
-	}
-	
 	public void parse(SimpleFile sf) {
 		super.parse(sf, false);
-	}
-	
-	@Override
-	@SuppressWarnings("unused")
-	public SimpleDependency parse(String runtimePath, boolean isMeDep) {
-		throw new UnsupportedOperationException("parse(String,boolean)");
 	}
 	
 	@Override
@@ -126,7 +114,12 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 			binPath = this.in.consumeDynTokSpecialText();
 		}
 		consumeToken(SEMI, "expected to get `;´ after `dep [NAME] [STRING]´");
-		sf.dependency(this.dep.apply(srcPath, binPath), name, this.in.ctx());
+		SimpleDependency dependency = this.dep.apply(srcPath, binPath);
+		if ( dependency == null ) {
+			throw new CompileError(this.in.ctx(), "could not find the dependency \"" + srcPath + "\""
+				+ ( binPath == null ? "" : " \"" + binPath + "\"" ));
+		}
+		sf.dependency(dependency, name, this.in.ctx());
 	}
 	
 	@Override

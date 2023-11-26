@@ -99,7 +99,7 @@ public class SimpleInterpreter {
 	
 	private void putWithDependencies(SimpleFile putSf) {
 		this.loaded.put(putSf, new LoadedSF(putSf));
-		for (SimpleDependency sd : putSf.dependencies()) {
+		for (SimpleDependency sd : putSf.allDependencies()) {
 			putWithDependencies((SimpleFile) sd);
 		}
 	}
@@ -157,7 +157,7 @@ public class SimpleInterpreter {
 						Path relDir = realP.getParent();
 						return load(srcFile, relDir).sf;
 					});
-				SimpleFile sf = new SimpleFile(oldP.toString());
+				SimpleFile sf = new SimpleFile(oldP.toString(), oldP.toString());
 				lsf = new LoadedSF(sf);
 				sf.dependency(this.stdlib, "std", ErrorContext.NO_CONTEXT);
 				parser.parse(sf);
