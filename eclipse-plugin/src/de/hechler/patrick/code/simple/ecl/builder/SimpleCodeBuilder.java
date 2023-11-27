@@ -3,6 +3,7 @@ package de.hechler.patrick.code.simple.ecl.builder;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -33,6 +34,7 @@ import org.osgi.service.log.LogLevel;
 import de.hechler.patrick.code.simple.ecl.Activator;
 import de.hechler.patrick.code.simple.parser.SimpleExportFileParser;
 import de.hechler.patrick.code.simple.parser.SimpleSourceFileParser;
+import de.hechler.patrick.code.simple.parser.SimpleTokenStream;
 import de.hechler.patrick.code.simple.parser.error.CompileError;
 import de.hechler.patrick.code.simple.parser.error.ErrorContext;
 import de.hechler.patrick.code.simple.parser.objects.simplefile.SimpleDependency;
@@ -426,8 +428,7 @@ public class SimpleCodeBuilder extends IncrementalProjectBuilder {
 				IPath relTarget = relPath1.append(lastSeg.substring(0, lastSeg.length() - "ssf".length()) + "sexp");
 				IFile exportTarget = props.exp.getFile(relTarget);
 				SimpleFile sf = new SimpleFile(file.toString(), exportTarget.toString());
-				sf.typedef(new SimpleTypedef("char", 0, NativeType.UBYTE), ErrorContext.NO_CONTEXT);
-				sf.dependency(STDLIB, "std", ErrorContext.NO_CONTEXT);
+				initilizeSimpleFile(sf);
 				ssfp.parse(sf);
 				String exportString = sf.toExportString();
 				if ( exportString.isEmpty() ) {
@@ -492,11 +493,15 @@ public class SimpleCodeBuilder extends IncrementalProjectBuilder {
 				return null;
 			}
 			try ( InputStream in = f.getContents() ) {
-				BiFunction<String,String,SimpleDependency> dep = dep(fProps, null, f, monitor);
-				SimpleExportFileParser sefp = new SimpleExportFileParser(in, f.toString(), dep);
-				SimpleFile sf = new SimpleFile(f.toString(), f.toString());
-				sefp.parse(sf, false);
-				return sf;
+				Charset cs = Charset.forName(f.getCharset(), StandardCharsets.UTF_8);
+				try ( InputStreamReader reader = new InputStreamReader(in, cs) ) {
+					SimpleTokenStream sts = new SimpleTokenStream(reader, f.toString());
+					BiFunction<String,String,SimpleDependency> dep = dep(fProps, null, f, monitor);
+					SimpleExportFileParser sefp = new SimpleExportFileParser(sts, dep);
+					SimpleFile sf = new SimpleFile(f.toString(), f.toString());
+					sefp.parse(sf);
+					return sf;
+				}
 			} catch ( IOException | CoreException e ) {
 				if ( Activator.doLog(LogLevel.WARN) ) {
 					log("could not parse the dependency " + f + ": " + e.getLocalizedMessage());
@@ -537,6 +542,11 @@ public class SimpleCodeBuilder extends IncrementalProjectBuilder {
 	
 	private static void log(String msg) {
 		Activator.log("project-builder", msg);
+	}
+	
+	public static void initilizeSimpleFile(SimpleFile sf) {
+		sf.typedef(new SimpleTypedef("char", 0, NativeType.UBYTE), ErrorContext.NO_CONTEXT);
+		sf.dependency(STDLIB, "std", ErrorContext.NO_CONTEXT);
 	}
 	
 }

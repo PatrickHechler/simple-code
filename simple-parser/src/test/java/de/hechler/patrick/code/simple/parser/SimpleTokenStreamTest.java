@@ -41,7 +41,7 @@ class SimpleTokenStreamTest {
 		assertEquals(DEP, sts.tok());
 		assertThrows(AssertionError.class, () -> sts.dynTokSpecialText());
 		assertThrows(AssertionError.class, () -> sts.consumeDynTokSpecialText());
-		assertEquals(sts.ctx(), sts.ctx());
+		assertEquals(sts.ctx().copy(), sts.ctx());
 		assertEquals(ctx(1, 3, 3, "dep"), sts.ctx());
 		sts.consume();
 		assertEquals(NAME, sts.tok());
@@ -129,6 +129,9 @@ class SimpleTokenStreamTest {
 				continue;
 			}
 			String fname = f.getName();
+			if ( "EOF".equals(fname) || "INVALID".equals(fname) || "MAX_TOKEN".equals(fname) ) {
+				continue;
+			}
 			int fval = f.getInt(null);
 			String fvalName = name(fval);
 			if ( fvalName.startsWith("[") && fvalName.endsWith("]") ) {
@@ -138,8 +141,7 @@ class SimpleTokenStreamTest {
 					error = true;
 				}
 			} else if ( Character.isLetter(fvalName.charAt(0))
-				&& ( !fname.equals(fvalName.toUpperCase()) || !fvalName.equals(fname.toLowerCase()) )
-				&& !"EOF".equals(fvalName) && !"INVALID".equals(fname) ) {//@formatter:off
+				&& ( !fname.equals(fvalName.toUpperCase()) || !fvalName.equals(fname.toLowerCase()) ) ) {//@formatter:off
 				System.err.println("[ERROR]: " + fname + "                ".substring(fname.length()) + ": " + fval
 					+ " : " + fvalName);
 				error = true;

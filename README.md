@@ -121,6 +121,7 @@ if marked with `const` there must be a constant initial value
     * `byte` : a signed 8-bit number
     * `ubyte` : an unsigned 8-bit number/character
     * `char` : implicit `typedef ubyte char;`
+        * note that it is unspecified if `[DEPENDENCY] : char` is a valid type
     * `[NAME] ( : [NAME] )*` : a type defined with `typedef`
     * `struct (nopad)? { [NAMED_TYPE_LIST_SEMI_SEP] }` : a memory structure
         * marks:

@@ -157,7 +157,11 @@ if marked with <code>const</code> there must be a constant initial value</p>
 <li><code>uword</code> : an unsigned 16-bit number</li>
 <li><code>byte</code> : a signed 8-bit number</li>
 <li><code>ubyte</code> : an unsigned 8-bit number/character</li>
-<li><code>char</code> : implicit <code>typedef ubyte char;</code></li>
+<li><code>char</code> : implicit <code>typedef ubyte char;</code>
+<ul>
+<li>note that it is unspecified if <code>[DEPENDENCY] : char</code> is a valid type</li>
+</ul>
+</li>
 <li><code>[NAME] ( : [NAME] )*</code> : a type defined with <code>typedef</code></li>
 <li><code>struct (nopad)? { [NAMED_TYPE_LIST_SEMI_SEP] }</code> : a memory structure
 <ul>

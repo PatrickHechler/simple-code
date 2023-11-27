@@ -272,7 +272,7 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 		}
 		case NAME: {
 			final Object undecided = enterUnknownState();
-			Object middle = null;
+			Object firstEnd = null;
 			boolean hasMid = false;
 			while ( true ) {
 				String name = this.in.consumeDynTokSpecialText();
@@ -282,7 +282,7 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 					scope = dep;
 					if ( !hasMid ) {
 						hasMid = true;
-						middle = enterUnknownState();
+						firstEnd = maybeFinishUnknownState();
 					}
 					consumeToken(COLON, "expected `: [NAME]´ after the `[NAME]´ of a dependency");
 					expectToken(NAME, "expected `[NAME]´ after `[NAME] :´ where the [NAME] is of a dependency");
@@ -294,14 +294,14 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 					return parseTypePostfix(scope, type, enters == null ? null : enters[1]);
 				}
 				case null, default -> {
-					int[] decidedStates = new int[COND_MAGIC + 2];
-					for (int i = 0; i < COND_MAGIC + 2; i++) {
-						decidedStates[i] = STATE_VAL_CAST + i;
+					int[] decidedStates = new int[COND_MAGIC + 1];
+					for (int i = 0; i < COND_MAGIC + 1; i++) {
+						decidedStates[i] = STATE_VAL_DIRECT + i;
 					}
-					Object[] enters = decidedStates(decidedStates, scope);
+					Object[] enters = decidedStates(decidedStates, undecided);
 					SimpleValue value = scope.nameValueOrErr(name, this.in.ctx());
 					if ( hasMid ) {
-						remenberExitedState(STATE_VAL_DIRECT, enters == null ? null : enters[0], middle, value);
+						remenberExitedState(STATE_VAL_DIRECT, enters == null ? null : enters[0], firstEnd, value);
 					} else {
 						exitState(STATE_VAL_DIRECT, enters == null ? null : enters[0], value);
 					}
