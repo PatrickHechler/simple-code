@@ -37,7 +37,7 @@
 					<source>21</source>
 					<target>21</target>
 					<encoding>UTF-8</encoding>
-					<compilerArgs>--enable-preview</compilerArgs>
+					<compilerArgs>${pat.custom.args}</compilerArgs>
 				</configuration>
 			</plugin>
 			<plugin>
@@ -60,7 +60,7 @@
 				<configuration>
 					<source>21</source>
 					<encoding>UTF-8</encoding>
-					<additionalOptions>--enable-preview</additionalOptions>
+					<additionalOptions>${pat.custom.args}</additionalOptions>
 				</configuration>
 				<executions>
 					<execution>
@@ -76,7 +76,7 @@
 				<artifactId>maven-surefire-plugin</artifactId>
 				<version>3.0.0-M7</version>
 				<configuration>
-					<argLine>--enable-preview -p ${project.build.outputDirectory}</argLine>
+					<argLine>${pat.custom.args} -p ${project.build.outputDirectory}</argLine>
 				</configuration>
 			</plugin>
 			<plugin>
@@ -84,7 +84,7 @@
 				<artifactId>maven-failsafe-plugin</artifactId>
 				<version>3.0.0-M7</version>
 				<configuration>
-					<argLine>--enable-preview -p ${project.build.outputDirectory}</argLine>
+					<argLine>${pat.custom.args} -p ${project.build.outputDirectory}</argLine>
 				</configuration>
 			</plugin>
         </plugins>

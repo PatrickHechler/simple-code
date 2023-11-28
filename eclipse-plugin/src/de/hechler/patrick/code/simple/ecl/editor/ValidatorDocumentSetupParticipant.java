@@ -1,6 +1,5 @@
 package de.hechler.patrick.code.simple.ecl.editor;
 
-import java.io.IOException;
 import java.io.Reader;
 import java.io.StringReader;
 import java.util.ArrayList;
@@ -26,6 +25,7 @@ import de.hechler.patrick.code.simple.ecl.Activator;
 import de.hechler.patrick.code.simple.ecl.builder.SimpleCodeBuilder;
 import de.hechler.patrick.code.simple.ecl.builder.SimpleCodeBuilder.ProjectProps;
 import de.hechler.patrick.code.simple.ecl.builder.SimpleCodeNature;
+import de.hechler.patrick.code.simple.ecl.editor.FilePosition.FileToken;
 import de.hechler.patrick.code.simple.parser.SimpleExportFileParser;
 import de.hechler.patrick.code.simple.parser.SimpleSourceFileParser;
 import de.hechler.patrick.code.simple.parser.SimpleTokenStream;
@@ -81,15 +81,95 @@ public class ValidatorDocumentSetupParticipant
 			DocumentTree tree = new DocumentTree();
 			SimpleTokenStream sts = new SimpleTokenStream(reader, this.file.toString()) {
 				
+				private FileToken ftok;
+				private boolean   b;
+				
 				@Override
-				protected int findToken(int r) throws IOException {
+				public String consumeDynTokSpecialText() {
+					if ( this.b ) return super.consumeDynTokSpecialText();
+					try {
+						this.b = true;
+						FileToken ft = this.ftok;
+						if ( ft != null ) {
+							tree.parsedToken(ft);
+							this.ftok = null;
+						}// consumeTok() allows this method to be called, when the token is already consumed
+						return super.consumeDynTokSpecialText();
+					} finally {
+						this.b = false;
+					}
+				}
+				
+				@Override
+				public int consumeTok() {
+					if ( this.b ) return super.consumeTok();
+					try {
+						this.b = true;
+						FileToken ft = this.ftok;
+						if ( ft == null ) {
+							ft = nft();
+						} else {
+							this.ftok = null;
+						}
+						tree.parsedToken(ft);
+						return super.consumeTok();
+					} finally {
+						this.b = false;
+					}
+				}
+				
+				@Override
+				public void consume() {
+					if ( this.b ) { super.consume(); return; }
+					try {
+						this.b = true;
+						FileToken ft = this.ftok;
+						if ( ft == null ) {
+							ft = nfct();
+						} else {
+							this.ftok = null;
+							super.consumeTok();
+						}
+						tree.parsedToken(ft);
+					} finally {
+						this.b = false;
+					}
+				}
+				
+				@Override
+				public int tok() {
+					if ( this.b ) return super.tok();
+					try {
+						this.b = true;
+						FileToken ft = this.ftok;
+						if ( ft == null ) {
+							ft = nft();
+							this.ftok = ft;
+						}
+						return ft.token();
+					} finally {
+						this.b = false;
+					}
+				}
+				
+				private FileToken nft() {
+					FileToken ft;
 					FilePosition start = pos(this);
-					int tok = super.findToken(r);
+					int tok = super.tok();
 					FilePosition end = pos(this);
 					int token = tok == INVALID ? TOKEN_COMMENT : tok;
-					FilePosition.FileToken ftok = new FilePosition.FileToken(start, token, end);
-					tree.parsedToken(ftok);
-					return tok;
+					ft = new FilePosition.FileToken(start, token, end);
+					return ft;
+				}
+				
+				private FileToken nfct() {
+					FileToken ft;
+					FilePosition start = pos(this);
+					int tok = super.consumeTok();
+					FilePosition end = pos(this);
+					int token = tok == INVALID ? TOKEN_COMMENT : tok;
+					ft = new FilePosition.FileToken(start, token, end);
+					return ft;
 				}
 				
 			};
@@ -238,7 +318,7 @@ public class ValidatorDocumentSetupParticipant
 		
 		private static BiFunction<String, String, SimpleDependency> dep(IFile file, IProject p) throws CoreException {
 			ProjectProps props = SimpleCodeBuilder.parseProps(p, null);
-			
+			return null;
 		}
 		
 		@Override

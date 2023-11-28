@@ -26,14 +26,14 @@ class SimpleSourceFileParserChecker {
 		ssp.parse(sf);
 		assertEquals("""
 			typedef ubyte char;
-			func puts <unum wrote, unum errno> <-- ((ubyte)# string) {
+			func puts <unum wrote, unum errno> <-- (ubyte# string) {
 			    wrote <-- 0;
 			    errno <-- 1;
 			}
-			func main <ubyte exitnum> <-- (unum argc, ((ubyte)#)# argv) {
+			func main <ubyte exitnum> <-- (unum argc, ubyte## argv) {
 			    unum wrote;
 			    unum err;
-			    puts <wrote, err> <-- ((((ubyte)#) DataVal [value=%s, type=(ubyte)[%s]] ));
+			    puts <wrote, err> <-- (((ubyte#) DataVal [value=%s, type=ubyte[%s]] ));
 			    exitnum <-- (err != 0);
 			}
 			""".formatted(toCSVHexBytes(HELLO_WORLD), Integer.toString(HELLO_WORLD.length)), sf.toString());

@@ -248,11 +248,12 @@ public class SimpleExportFileParser {
 			handleError(this.in.ctx(), "a constant value must have a initial value set");
 		}
 		SimpleVariable result;
-		try  {
+		try {
 			result = new SimpleVariable(type, name, initialValue, flags);
 		} catch (NullPointerException npe) {
 			if ( name != null ) throw npe;
-			result = new SimpleVariable(StructType.create(List.of(), StructType.FLAG_NOUSE, ErrorContext.NO_CONTEXT), "invalid\0", initialValue, flags);
+			result = new SimpleVariable(StructType.create(List.of(), StructType.FLAG_NOUSE, ErrorContext.NO_CONTEXT),
+				"invalid\0", initialValue, flags);
 		}
 		exitState(STATE_VARIALBE, enter, result);
 		return result;
@@ -266,13 +267,14 @@ public class SimpleExportFileParser {
 		final Object enter;
 		if ( magic == 0 ) enter = enterState(STATE_VAL);
 		else enter = enterValues == null ? null : enterValues[COND_MAGIC + 1 - magic];
-  		SimpleValue result = parseValueCondExp(scope, magic, mvalue, enterValues);
+		SimpleValue result = parseValueCondExp(scope, magic, mvalue, enterValues);
 		exitState(STATE_VAL, enter, result);
 		return result;
 	}
 	
 	protected static final int COND_MAGIC = 15;
-	//TODO check for null values  when handleError returns normally
+	
+	// TODO check for null values when handleError returns normally
 	protected SimpleValue parseValueCondExp(SimpleScope scope, int magic, SimpleValue mvalue, Object[] enterValues) {
 		if ( magic == COND_MAGIC ) return mvalue;
 		final Object enter;
@@ -750,26 +752,34 @@ public class SimpleExportFileParser {
 		if ( sign ) {
 			switch ( bits ) {
 			case 64:
-				return ScalarNumericVal.create(NativeType.NUM, Long.parseLong(value.substring(off, len), sys), this.in.ctx());
+				return ScalarNumericVal.create(NativeType.NUM, Long.parseLong(value.substring(off, len), sys),
+					this.in.ctx());
 			case 32:
-				return ScalarNumericVal.create(NativeType.DWORD, Integer.parseInt(value.substring(off, len), sys), this.in.ctx());
+				return ScalarNumericVal.create(NativeType.DWORD, Integer.parseInt(value.substring(off, len), sys),
+					this.in.ctx());
 			case 16:
-				return ScalarNumericVal.create(NativeType.WORD, Short.parseShort(value.substring(off, len), sys), this.in.ctx());
+				return ScalarNumericVal.create(NativeType.WORD, Short.parseShort(value.substring(off, len), sys),
+					this.in.ctx());
 			case 8:
-				return ScalarNumericVal.create(NativeType.BYTE, Byte.parseByte(value.substring(off, len), sys), this.in.ctx());
+				return ScalarNumericVal.create(NativeType.BYTE, Byte.parseByte(value.substring(off, len), sys),
+					this.in.ctx());
 			default:
 				throw new AssertionError();
 			}
 		}
 		switch ( bits ) {
 		case 64:
-			return ScalarNumericVal.create(NativeType.UNUM, Long.parseUnsignedLong(value.substring(off, len), sys), this.in.ctx());
+			return ScalarNumericVal.create(NativeType.UNUM, Long.parseUnsignedLong(value.substring(off, len), sys),
+				this.in.ctx());
 		case 32:
-			return ScalarNumericVal.create(NativeType.UDWORD, Integer.parseUnsignedInt(value.substring(off, len), sys), this.in.ctx());
+			return ScalarNumericVal.create(NativeType.UDWORD, Integer.parseUnsignedInt(value.substring(off, len), sys),
+				this.in.ctx());
 		case 16:
-			return ScalarNumericVal.create(NativeType.UWORD, Integer.parseUnsignedInt(value.substring(off, len), sys), this.in.ctx());
+			return ScalarNumericVal.create(NativeType.UWORD, Integer.parseUnsignedInt(value.substring(off, len), sys),
+				this.in.ctx());
 		case 8:
-			return ScalarNumericVal.create(NativeType.UBYTE, Integer.parseUnsignedInt(value.substring(off, len), sys), this.in.ctx());
+			return ScalarNumericVal.create(NativeType.UBYTE, Integer.parseUnsignedInt(value.substring(off, len), sys),
+				this.in.ctx());
 		default:
 			throw new AssertionError();
 		}
@@ -852,8 +862,10 @@ public class SimpleExportFileParser {
 			type = parseTypeFuncType0(SMALL_OPEN, scope, FuncType.FLAG_FUNC_ADDRESS, subEnter);
 		}
 		default -> {
-			handleError(this.in.ctx(), List.of(name(NUM), name(UNUM), name(FPNUM), name(FPDWORD), name(DWORD), name(WORD), name(UWORD), name(BYTE), name(UBYTE),
-					name(STRUCT), name(FSTRUCT), name(NOPAD), name(LT), name(SMALL_OPEN), name(NAME)));
+			handleError(this.in.ctx(),
+				List.of(name(NUM), name(UNUM), name(FPNUM), name(FPDWORD), name(DWORD), name(WORD), name(UWORD),
+					name(BYTE), name(UBYTE), name(STRUCT), name(FSTRUCT), name(NOPAD), name(LT), name(SMALL_OPEN),
+					name(NAME)));
 			type = StructType.create(List.of(), 0, this.in.ctx());
 		}
 		}
@@ -902,29 +914,32 @@ public class SimpleExportFileParser {
 			Object obj = scope.nameTypeOrDepOrFuncOrNull(this.in.consumeDynTokSpecialText(), this.in.ctx());
 			if ( cls.isInstance(obj) ) return cls.cast(obj);
 			if ( !( obj instanceof SimpleDependency nscope ) ) {
-				String simpleName = cls.getSimpleName().startsWith("Simple") ? cls.getSimpleName().substring("Simple".length()) : cls.getSimpleName();
+				String simpleName =
+					cls.getSimpleName().startsWith("Simple") ? cls.getSimpleName().substring("Simple".length())
+						: cls.getSimpleName();
 				if ( obj == null ) {
-					handleError(this.in.ctx(),
-							"expected the `[NAME]´ to be the [NAME] of a " + simpleName + " or a dependency, but there is nothing with the given name");
+					handleError(this.in.ctx(), "expected the `[NAME]´ to be the [NAME] of a " + simpleName
+						+ " or a dependency, but there is nothing with the given name");
 					if ( cls == SimpleType.class ) {
 						return (T) StructType.create(List.of(), StructType.FLAG_NOUSE, this.in.ctx());
 					}
 					if ( cls == SimpleFunction.class ) {
 						return (T) new SimpleFunction(new SimpleFile("invalid\0", "invalid\0"), "<invalid>",
-								FuncType.create(List.of(), List.of(), 0, this.in.ctx()));
+							FuncType.create(List.of(), List.of(), 0, this.in.ctx()));
 					}
 					return null;
 				}
-				String objSimpleName = obj.getClass().getSimpleName().startsWith("Simple") ? obj.getClass().getSimpleName().substring("Simple".length())
-						: obj.getClass().getSimpleName();
-				handleError(this.in.ctx(),
-						"expected the `[NAME]´ to be the [NAME] of a " + simpleName + " or a dependency, but it is " + objSimpleName + " : " + obj);
+				String objSimpleName = obj.getClass().getSimpleName().startsWith("Simple")
+					? obj.getClass().getSimpleName().substring("Simple".length())
+					: obj.getClass().getSimpleName();
+				handleError(this.in.ctx(), "expected the `[NAME]´ to be the [NAME] of a " + simpleName
+					+ " or a dependency, but it is " + objSimpleName + " : " + obj);
 				if ( cls == SimpleType.class ) {
 					return (T) StructType.create(List.of(), StructType.FLAG_NOUSE, this.in.ctx());
 				}
 				if ( cls == SimpleFunction.class ) {
 					return (T) new SimpleFunction(new SimpleFile("invalid\0", "invalid\0"), "<invalid>",
-							FuncType.create(List.of(), List.of(), 0, this.in.ctx()));
+						FuncType.create(List.of(), List.of(), 0, this.in.ctx()));
 				}
 				return null;
 			}
@@ -948,13 +963,14 @@ public class SimpleExportFileParser {
 		return res;
 	}
 	
-	protected List<SimpleVariable> parseNamedTypeList(final int end, final int sep, final boolean sepBeforeEnd, SimpleScope scope) {
+	protected List<SimpleVariable> parseNamedTypeList(final int end, final int sep, final boolean sepBeforeEnd,
+		SimpleScope scope) {
 		final Object enter = enterState(STATE_NAMED_TYPE_LIST);
 		return parseNamedTypeList(end, sep, sepBeforeEnd, scope, null, enter);
 	}
 	
-	protected List<SimpleVariable> parseNamedTypeList(final int end, final int sep, final boolean sepBeforeEnd, SimpleScope scope, List<SimpleVariable> add,
-			final Object enter) {
+	protected List<SimpleVariable> parseNamedTypeList(final int end, final int sep, final boolean sepBeforeEnd,
+		SimpleScope scope, List<SimpleVariable> add, final Object enter) {
 		if ( this.in.tok() == end ) {
 			exitState(STATE_NAMED_TYPE_LIST, enter, add == null ? List.of() : add);
 			this.in.consume();
@@ -980,7 +996,8 @@ public class SimpleExportFileParser {
 						msg = "expected `" + name(sep) + "´ after `[NAMED_TYPE]´";
 					} else {
 						list = List.of(name(sep), name(end));
-						msg = "expected to end the [NAMED_TYPE_LIST] with `" + name(end) + "´ or seperate two named types with `" + name(sep) + "´";
+						msg = "expected to end the [NAMED_TYPE_LIST] with `" + name(end)
+							+ "´ or seperate two named types with `" + name(sep) + "´";
 					}
 					handleError(this.in.ctx(), list, msg);
 					exitState(STATE_NAMED_TYPE_LIST, enter, add);
@@ -989,14 +1006,13 @@ public class SimpleExportFileParser {
 				exitState(STATE_NAMED_TYPE_LIST, enter, add);
 				this.in.consume();
 				return members;
-			} else {
-				this.in.consume();
-				if ( sepBeforeEnd ) {
-					if ( this.in.tok() == end ) {
-						exitState(STATE_NAMED_TYPE_LIST, enter, add);
-						this.in.consume();
-						return members;
-					}
+			}
+			this.in.consume();
+			if ( sepBeforeEnd ) {
+				if ( this.in.tok() == end ) {
+					exitState(STATE_NAMED_TYPE_LIST, enter, add);
+					this.in.consume();
+					return members;
 				}
 			}
 			type = parseType(scope);
@@ -1031,13 +1047,14 @@ public class SimpleExportFileParser {
 			if ( t != LT ) {
 				if ( t == SMALL_OPEN ) break;
 				handleError(this.in.ctx(), List.of(name(LT), name(SMALL_OPEN)),
-						"expected `< [NAMED_TYPE_LIST] > <--´ or `\\( [NAMED_TYPE_LIST] \\)´ after `nopad´");
+					"expected `< [NAMED_TYPE_LIST] > <--´ or `\\( [NAMED_TYPE_LIST] \\)´ after `nopad´");
 			}
 			//$FALL-THROUGH$
 		case LT:
 			results = parseNamedTypeList(GT, COMMA, false, scope);
 			consumeToken(LARROW, "expectedd `<-- \\( [NAMED_TYPE_LIST] \\)´ after `(nopad)? < [NAMED_TYPE_LIST] >´");
-			consumeToken(SMALL_OPEN, "expectedd `\\( [NAMED_TYPE_LIST] \\)´ after `(nopad)? < [NAMED_TYPE_LIST] > <--´");
+			consumeToken(SMALL_OPEN,
+				"expectedd `\\( [NAMED_TYPE_LIST] \\)´ after `(nopad)? < [NAMED_TYPE_LIST] > <--´");
 			//$FALL-THROUGH$
 		case SMALL_OPEN:
 			break;
@@ -1074,11 +1091,11 @@ public class SimpleExportFileParser {
 	protected void parseFunction(SimpleFile sf) {
 		final Object enter = enterState(STATE_FUNCTION);
 		this.in.consume();
-		int flags = 0;
+		int flags = FuncType.FLAG_FUNC_ADDRESS;
 		if ( this.in.tok() != NAME ) {
 			consumeToken(EXP, "expected `[NAME]´ or `exp [NAME]´ after `func´");
 			expectToken(NAME, "expected `[NAME]´ after `func exp´");
-			flags = FuncType.FLAG_EXPORT;
+			flags |= FuncType.FLAG_EXPORT;
 		}
 		String name = this.in.consumeDynTokSpecialText();
 		ErrorContext ctx = this.in.ctx();
@@ -1092,13 +1109,10 @@ public class SimpleExportFileParser {
 			}
 			exitState(STATE_FUNCTION, enter, null);
 			return;
-		} else {
-			ftype = ftype0;
 		}
+		ftype = ftype0;
 		consumeToken(SEMI, "expected `;´ after `(exp)? [NAME] [TYPE]´");
-		if ( flags != 0 ) {
-			ftype = FuncType.create(ftype.resMembers(), ftype.argMembers(), flags, ctx);
-		}
+		ftype = FuncType.create(ftype.resMembers(), ftype.argMembers(), flags, ctx);
 		SimpleFunction func = new SimpleFunction(sf, name, ftype);
 		sf.function(func, ctx);
 		exitState(STATE_FUNCTION, enter, func);
@@ -1161,16 +1175,20 @@ public class SimpleExportFileParser {
 	}
 	
 	/**
-	 * this method can be overwritten to be notified when the parser stars to read more input to know to which state it should go
+	 * this method can be overwritten to be notified when the parser stars to read more input to know to which state it
+	 * should go
 	 * <ul>
-	 * <li>if multiple states start at the current token the result of this method MUST NOT be passed multiple times to {@link #decidedState(int, Object)} or
-	 * {@link #decidedStates(int[], Object)}</li>
-	 * <li>if multiple states start at the current token the result of this method may be passed to {@link #decidedStates(int[], Object)} with an array which
-	 * contains the states that are now decided</li>
+	 * <li>if multiple states start at the current token the result of this method MUST NOT be passed multiple times to
+	 * {@link #decidedState(int, Object)} or {@link #decidedStates(int[], Object)}</li>
+	 * <li>if multiple states start at the current token the result of this method may be passed to
+	 * {@link #decidedStates(int[], Object)} with an array which contains the states that are now decided</li>
 	 * <li>it is guaranteed that at least one state starts at the current position when this method is called</li>
-	 * <li>note that by the time {@link #decidedState(int, Object)} is called various sub-states may have already been processed</li>
-	 * <li>if some states are decided at different times {@link #enterUnknownState()} is called multiple times (or both)</li>
-	 * <li>additional the result of this call may be used for {@link #remenberExitedState(int, Object, Object, Object)}.<br>
+	 * <li>note that by the time {@link #decidedState(int, Object)} is called various sub-states may have already been
+	 * processed</li>
+	 * <li>if some states are decided at different times {@link #enterUnknownState()} is called multiple times (or
+	 * both)</li>
+	 * <li>additional the result of this call may be used for
+	 * {@link #remenberExitedState(int, Object, Object, Object)}.<br>
 	 * the parser may do this multiple times with the same end marker (which is the result of this call)</li>
 	 * </ul>
 	 * 
@@ -1183,7 +1201,8 @@ public class SimpleExportFileParser {
 	/**
 	 * this method is simmilar to {@link #enterUnknownState()}, but it <b>not</b> allowed to be passed to
 	 * {@link #decidedState(int, Object)}/{@link #decidedStates(int[], Object)}.<br>
-	 * the result of this method will only be passed to {@link #remenberExitedState(int, Object, Object, Object)} as end marker<br>
+	 * the result of this method will only be passed to {@link #remenberExitedState(int, Object, Object, Object)} as end
+	 * marker<br>
 	 * also no state needs to start at the current position and also no
 	 * 
 	 * @return an end marker suitable to be passed to {@link #remenberExitedState(int, Object, Object, Object)} as such
@@ -1193,12 +1212,14 @@ public class SimpleExportFileParser {
 	}
 	
 	/**
-	 * this method can be overwritten to be notified when the parser previously was not sure which state it should be in but now decided its state.
+	 * this method can be overwritten to be notified when the parser previously was not sure which state it should be in
+	 * but now decided its state.
 	 * <p>
 	 * note that if this method is overwritten {@link #decidedStates(int[], Object)} should also be overwritten
 	 * <p>
 	 * the default implementation just returns {@code unknownStateResult}<br>
-	 * if this is enough only {@link #enterState(int)}, {@link #enterUnknownState()} and {@link #exitState(int, Object, Object)} needs to be implemented.
+	 * if this is enough only {@link #enterState(int)}, {@link #enterUnknownState()} and
+	 * {@link #exitState(int, Object, Object)} needs to be implemented.
 	 * 
 	 * @param state              the state of the parser
 	 * @param unknownStateResult the result of {@link #enterUnknownState()}
@@ -1211,7 +1232,8 @@ public class SimpleExportFileParser {
 	}
 	
 	/**
-	 * this method can be overwritten to be notified when the parser previously was not sure which state it should be in but now decided its state.
+	 * this method can be overwritten to be notified when the parser previously was not sure which state it should be in
+	 * but now decided its state.
 	 * <p>
 	 * the states are ordered by their nesting:<br>
 	 * the innermost state has the lowest index ({@code 0})<br>
@@ -1223,7 +1245,7 @@ public class SimpleExportFileParser {
 	 * @param states             the decided states
 	 * @param unknownStateResult the result of {@link #enterUnknownState()}
 	 * 
-	 * @return
+	 * @return the values to be passed to {@link #exitState(int, Object, Object)} when the states are exited
 	 */
 	protected Object[] decidedStates(int[] states, Object unknownStateResult) {
 		if ( unknownStateResult == null ) {
@@ -1237,13 +1259,16 @@ public class SimpleExportFileParser {
 	/**
 	 * this method can be overwritten to be notified when the parser exits a state
 	 * <p>
-	 * if {@code additionalData} has a nun-{@code null} value, it describes the result of the sub parsing process done while in the given state
+	 * if {@code additionalData} has a nun-{@code null} value, it describes the result of the sub parsing process done
+	 * while in the given state
 	 * <p>
-	 * note that if this method is overwritten, {@link #remenberExitedState(int, Object, Object, Object)} should also be overwritten
+	 * note that if this method is overwritten, {@link #remenberExitedState(int, Object, Object, Object)} should also be
+	 * overwritten
 	 * 
 	 * @param state          the state which is finished now
 	 * @param enterResult    the result of {@link #enterState(int)} when the parser entered the state
-	 * @param additionalData some additional data, potentially <code>null</code> if the state does not support additional data
+	 * @param additionalData some additional data, potentially <code>null</code> if the state does not support
+	 *                           additional data
 	 */
 	@SuppressWarnings("unused")
 	protected void exitState(int state, Object enterResult, Object additionalData) {}
@@ -1251,19 +1276,23 @@ public class SimpleExportFileParser {
 	/**
 	 * this method can be overwritten to be notified when the parser exits a state
 	 * <p>
-	 * this method is like {@link #exitState(int, Object, Object)}, but instead of using the current state of the parser this method should use the end marker
-	 * {@code enterUnknownEndMarker}, which was obtained by calling {@link #enterUnknownState()}
+	 * this method is like {@link #exitState(int, Object, Object)}, but instead of using the current state of the parser
+	 * this method should use the end marker {@code enterUnknownEndMarker}, which was obtained by calling
+	 * {@link #enterUnknownState()}
 	 * <p>
-	 * if {@code additionalData} has a nun-{@code null} value,it describes the result of the sub parsing process done while in the given state
+	 * if {@code additionalData} has a nun-{@code null} value,it describes the result of the sub parsing process done
+	 * while in the given state
 	 * <p>
 	 * note that if this method is overwritten, {@link #exitState(int, Object, Object)} should also be overwritten
 	 * 
 	 * @param state                 the state which is finished now
 	 * @param enterResult           the result of {@link #enterState(int)} when the parser entered the state
 	 * @param enterUnknownEndMarker the end marker of the already previously state
-	 * @param additionalData        some additional data, potentially <code>null</code> if the state does not support additional data
+	 * @param additionalData        some additional data, potentially <code>null</code> if the state does not support
+	 *                                  additional data
 	 */
 	@SuppressWarnings("unused")
-	protected void remenberExitedState(int state, Object enterResult, Object enterUnknownEndMarker, Object additionalData) {}
+	protected void remenberExitedState(int state, Object enterResult, Object enterUnknownEndMarker,
+		Object additionalData) {}
 	
 }

@@ -317,7 +317,7 @@ public class SimpleTokenStream {
 		}
 	}
 	
-	protected int findToken(int r) throws IOException {
+	private int findToken(int r) throws IOException {
 		int low = 0;
 		int high = FIRST_DYN - 1;
 		int depth = 0;

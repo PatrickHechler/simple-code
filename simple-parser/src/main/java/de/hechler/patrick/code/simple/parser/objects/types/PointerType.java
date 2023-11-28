@@ -83,17 +83,17 @@ public record PointerType(SimpleType target) implements SimpleType {
 
 	@Override
 	public String toString() {
-		return "(" + this.target + ")#";
+		return this.target.toString() + '#';
 	}
 
 	@Override
 	public String toString(String idention) {
-		return "(" + this.target.toString(idention) + ")#";
+		return this.target.toString(idention) + '#';
 	}
 	
 	@Override
 	public String toStringSingleLine() {
-		return "(" + this.target.toStringSingleLine() + ")#";
+		return this.target.toStringSingleLine() + '#';
 	}
 	
 }

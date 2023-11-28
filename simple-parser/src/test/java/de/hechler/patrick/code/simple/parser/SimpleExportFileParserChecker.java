@@ -24,19 +24,19 @@ class SimpleExportFileParserChecker {
 		assertEquals("""
 			typedef ubyte char;
 			typedef struct {
-			  (ubyte)[16] bytes;
+			  ubyte[16] bytes;
 			} uuid;
 			typedef struct {
 			  struct {
-			    (ubyte)[16] bytes;
+			    ubyte[16] bytes;
 			  } uuid;
 			  unum name_length;
-			  (ubyte)# name;
+			  ubyte# name;
 			} my_custom_type;
 			func add <num result> <-- (num a, num b);
-			func deref <num value> <-- ((num)# addr);
+			func deref <num value> <-- (num# addr);
 			func addu <unum result> <-- (unum a, unum b);
-			func derefu <unum value> <-- ((unum)# addr);
+			func derefu <unum value> <-- (unum# addr);
 			""", sf.toString());
 	}
 	

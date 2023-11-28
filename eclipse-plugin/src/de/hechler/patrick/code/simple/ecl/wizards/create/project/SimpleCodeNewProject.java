@@ -3,6 +3,7 @@ package de.hechler.patrick.code.simple.ecl.wizards.create.project;
 import java.io.ByteArrayInputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 
 import org.eclipse.core.resources.IFile;
 import org.eclipse.core.resources.IProject;
@@ -65,7 +66,7 @@ public class SimpleCodeNewProject extends Wizard implements INewWizard {
 		IRunnableWithProgress op = monitor -> {
 			try {
 				doFinish(projectName, monitor);
-			} catch ( CoreException e ) {
+			} catch (CoreException e) {
 				throw new InvocationTargetException(e);
 			} finally {
 				monitor.done();
@@ -73,9 +74,9 @@ public class SimpleCodeNewProject extends Wizard implements INewWizard {
 		};
 		try {
 			getContainer().run(true, false, op);
-		} catch ( InterruptedException e ) {
+		} catch (InterruptedException e) {
 			return false;
-		} catch ( InvocationTargetException e ) {
+		} catch (InvocationTargetException e) {
 			Throwable realException = e.getTargetException();
 			MessageDialog.openError(getShell(), "Error", realException.getMessage());
 			return false;
@@ -100,7 +101,11 @@ public class SimpleCodeNewProject extends Wizard implements INewWizard {
 			monitor.done();
 			return;
 		}
-		SimpleCodeNature.configureDesc(desc);
+		String[] defNatures = desc.getNatureIds();
+		String[] descNatures = Arrays.copyOf(defNatures, defNatures.length + 1);
+		descNatures[defNatures.length] = SimpleCodeNature.NATURE_ID;
+		desc.setNatureIds(descNatures);
+		SimpleCodeNature.configure(desc);
 		monitor.worked(1);
 		if ( monitor.isCanceled() ) {
 			monitor.done();
@@ -131,8 +136,7 @@ public class SimpleCodeNewProject extends Wizard implements INewWizard {
 				""".getBytes(StandardCharsets.UTF_8));
 			hw.create(bais, 0, monitor);
 			getShell().getDisplay().asyncExec(() -> {
-				IWorkbenchPage page =
-					PlatformUI.getWorkbench().getActiveWorkbenchWindow().getActivePage();
+				IWorkbenchPage page = PlatformUI.getWorkbench().getActiveWorkbenchWindow().getActivePage();
 				try {
 					IDE.openEditor(page, hw, true);
 				} catch (PartInitException e) {

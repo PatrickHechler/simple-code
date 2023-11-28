@@ -37,31 +37,31 @@ public class SsfReconcilerStrategy implements IReconcilingStrategy, IReconciling
 
     @Override
     public void initialReconcile() {
-		if(document.get().equals(oldDocument)) return;
-		oldDocument = document.get();
+		if(this.document.get().equals(this.oldDocument)) return;
+		this.oldDocument = this.document.get();
 
 		List<Position> positions = getNewPositionsOfAnnotations();
 
 		List<Position> positionsToRemove = new ArrayList<>();
 		List<Annotation> annotationToRemove = new ArrayList<>();
 
-		for (Position position : oldPositions) {
+		for (Position position : this.oldPositions) {
 			if(!positions.contains(position)) {
-				projectionViewer.getProjectionAnnotationModel().removeAnnotation(oldAnnotations.get(oldPositions.indexOf(position)));
+				this.projectionViewer.getProjectionAnnotationModel().removeAnnotation(this.oldAnnotations.get(this.oldPositions.indexOf(position)));
 				positionsToRemove.add(position);
-				annotationToRemove.add(oldAnnotations.get(oldPositions.indexOf(position)));
+				annotationToRemove.add(this.oldAnnotations.get(this.oldPositions.indexOf(position)));
 			}else {
 				positions.remove(position);
 			}
 		}
-		oldPositions.removeAll(positionsToRemove);
-		oldAnnotations.removeAll(annotationToRemove);
+		this.oldPositions.removeAll(positionsToRemove);
+		this.oldAnnotations.removeAll(annotationToRemove);
 
 		for (Position position : positions) {
 			Annotation annotation = new ProjectionAnnotation();
-			projectionViewer.getProjectionAnnotationModel().addAnnotation(annotation, position);
-			oldPositions.add(position);
-			oldAnnotations.add(annotation);
+			this.projectionViewer.getProjectionAnnotationModel().addAnnotation(annotation, position);
+			this.oldPositions.add(position);
+			this.oldAnnotations.add(annotation);
 		}
     }
 
@@ -74,7 +74,7 @@ public class SsfReconcilerStrategy implements IReconcilingStrategy, IReconciling
         Map<String, Integer> startOfAnnotation = new HashMap<>();
         SearchingFor searchingFor = SearchingFor.START_OF_TAG;
 
-        int characters = document.getLength();
+        int characters = this.document.getLength();
         int currentCharIndex = 0;
 
         int wordStartIndex = 0;
@@ -83,11 +83,11 @@ public class SsfReconcilerStrategy implements IReconcilingStrategy, IReconciling
 
         try {
             while (currentCharIndex < characters) {
-                char currentChar = document.getChar(currentCharIndex);
+                char currentChar = this.document.getChar(currentCharIndex);
                 switch (searchingFor) {
                 case START_OF_TAG:
                     if(currentChar == '<') {
-                        char nextChar = document.getChar(currentCharIndex+1);
+                        char nextChar = this.document.getChar(currentCharIndex+1);
                         if(nextChar != '?') {
                             sectionStartIndex = currentCharIndex;
                             searchingFor = SearchingFor.START_OF_WORD;
@@ -102,7 +102,7 @@ public class SsfReconcilerStrategy implements IReconcilingStrategy, IReconciling
                     break;
                 case END_OF_WORD:
                     if(!Character.isLetter(currentChar)) {
-                        word = document.get(wordStartIndex, currentCharIndex - wordStartIndex);
+                        word = this.document.get(wordStartIndex, currentCharIndex - wordStartIndex);
                         if(startOfAnnotation.containsKey(word)) {
                             searchingFor = SearchingFor.END_OF_LINE;
                         }else {
@@ -114,7 +114,7 @@ public class SsfReconcilerStrategy implements IReconcilingStrategy, IReconciling
                 case END_OF_LINE:
                     if(currentChar == '\n') {
                         int start = startOfAnnotation.get(word);
-                        if(document.getLineOfOffset(start) != document.getLineOfOffset(currentCharIndex)) {
+                        if(this.document.getLineOfOffset(start) != this.document.getLineOfOffset(currentCharIndex)) {
                             positions.add(new Position(start,currentCharIndex + 1 - start));
                         }
                         startOfAnnotation.remove(word);

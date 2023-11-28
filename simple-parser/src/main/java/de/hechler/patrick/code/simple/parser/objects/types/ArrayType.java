@@ -99,25 +99,25 @@ public record ArrayType(SimpleType target, long elementCount) implements SimpleT
 	@Override
 	public String toString() {
 		if ( this.elementCount == -1 ) {
-			return "(" + this.target + ")[]";
+			return this.target + "[]";
 		}
-		return "(" + this.target + ")[" + this.elementCount + "]";
+		return this.target + "[" + this.elementCount + "]";
 	}
 	
 	@Override
 	public String toString(String idention) {
 		if ( this.elementCount == -1 ) {
-			return "(" + this.target.toString(idention) + ")[]";
+			return this.target.toString(idention) + "[]";
 		}
-		return "(" + this.target.toString(idention) + ")[" + this.elementCount + "]";
+		return this.target.toString(idention) + "[" + this.elementCount + "]";
 	}
 	
 	@Override
 	public String toStringSingleLine() {
 		if ( this.elementCount == -1 ) {
-			return "(" + this.target.toStringSingleLine() + ")[]";
+			return this.target.toStringSingleLine() + "[]";
 		}
-		return "(" + this.target.toStringSingleLine() + ")[" + this.elementCount + "]";
+		return this.target.toStringSingleLine() + "[" + this.elementCount + "]";
 	}
 	
 }

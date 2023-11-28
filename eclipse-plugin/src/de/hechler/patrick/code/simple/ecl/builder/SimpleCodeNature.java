@@ -23,13 +23,13 @@ public class SimpleCodeNature implements IProjectNature {
 		if ( Activator.doLog(LogLevel.DEBUG) ) {
 			Activator.log("project-nature", "configure() called");
 		}
-		IProjectDescription desc = project.getDescription();
+		IProjectDescription desc = this.project.getDescription();
 		
-		configureDesc(desc);
-		project.setDescription(desc, null);
+		configure(desc);
+		this.project.setDescription(desc, null);
 	}
 	
-	public static void configureDesc(IProjectDescription desc) {
+	public static void configure(IProjectDescription desc) {
 		ICommand[] commands = desc.getBuildSpec();
 		for (int i = 0; i < commands.length; ++i) {
 			if ( commands[i].getBuilderName().equals(SimpleCodeBuilder.BUILDER_ID) ) {
@@ -60,7 +60,7 @@ public class SimpleCodeNature implements IProjectNature {
 				System.arraycopy(commands, 0, newCommands, 0, i);
 				System.arraycopy(commands, i + 1, newCommands, i, commands.length - i - 1);
 				description.setBuildSpec(newCommands);
-				project.setDescription(description, null);
+				this.project.setDescription(description, null);
 				return;
 			}
 		}
@@ -68,7 +68,7 @@ public class SimpleCodeNature implements IProjectNature {
 	
 	@Override
 	public IProject getProject() {
-		return project;
+		return this.project;
 	}
 	
 	@Override

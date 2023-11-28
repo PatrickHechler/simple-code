@@ -204,7 +204,7 @@ public record StructType(List<SimpleVariable> members, int flags) implements Sim
 	public long offset(String name) {
 		long off = 0L;
 		for (SimpleVariable sv : this.members) {
-			if ( ( flags & FLAG_NOPAD ) == 0 ) {
+			if ( ( this.flags & FLAG_NOPAD ) == 0 ) {
 				int alignment = sv.type().align();
 				int missAlign = (int) ( off % alignment );
 				if ( missAlign != 0 ) {
