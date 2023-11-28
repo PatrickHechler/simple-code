@@ -2,17 +2,17 @@ package de.hechler.patrick.code.simple.ecl.editor;
 
 import java.io.Reader;
 import java.io.StringReader;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.function.BiFunction;
 
 import org.eclipse.core.filebuffers.IDocumentSetupParticipant;
 import org.eclipse.core.filebuffers.IDocumentSetupParticipantExtension;
 import org.eclipse.core.filebuffers.LocationKind;
 import org.eclipse.core.resources.IFile;
+import org.eclipse.core.resources.IFolder;
 import org.eclipse.core.resources.IMarker;
 import org.eclipse.core.resources.IProject;
 import org.eclipse.core.resources.IProjectDescription;
+import org.eclipse.core.resources.IResource;
 import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IPath;
@@ -43,7 +43,6 @@ public class ValidatorDocumentSetupParticipant
 		private final IFile    file;
 		private final IProject p;
 		private final boolean  ssfMode;
-		private List<IMarker>  marker = new ArrayList<>();
 		private DocumentTree   tree;
 		
 		private DocumentValidator(IFile file, IProject p) {
@@ -58,17 +57,8 @@ public class ValidatorDocumentSetupParticipant
 		
 		@Override
 		public void documentChanged(DocumentEvent event) {
-			for (IMarker m : this.marker) {
-				try {
-					m.delete();
-				} catch (CoreException e) {
-					if ( Activator.doLog(LogLevel.ERROR) ) {
-						Activator.log("editor.ssf : " + DocumentValidator.this.file, "could not delete a marker: " + e);
-					}
-				}
-			}
-			this.marker.clear();
 			try (StringReader reader = new StringReader(event.getDocument().get())) {
+				this.file.deleteMarkers(SimpleCodeBuilder.VOLATILE_MARKER_TYPE, false, IResource.DEPTH_ZERO);
 				buildTree(reader);
 			} catch (CoreException e) {
 				if ( Activator.doLog(LogLevel.ERROR) ) {
@@ -174,6 +164,10 @@ public class ValidatorDocumentSetupParticipant
 				
 			};
 			BiFunction<String, String, SimpleDependency> dep = dep(this.file, this.p);
+			if ( dep == null ) {
+				this.tree = null;
+				return;
+			}
 			SimpleExportFileParser sp = createParser(tree, sts, dep);
 			SimpleFile sf = new SimpleFile(this.file.toString(), this.file.toString());
 			SimpleCodeBuilder.initilizeSimpleFile(sf);
@@ -233,18 +227,8 @@ public class ValidatorDocumentSetupParticipant
 					
 					@Override
 					protected void handleError(CompileError err) {
-						try {
-							IMarker m = DocumentValidator.this.file.createMarker(IMarker.PROBLEM);
-							DocumentValidator.this.marker.add(m);
-							m.setAttribute(IMarker.SEVERITY, IMarker.SEVERITY_ERROR);
-							m.setAttribute(IMarker.MESSAGE, err.getMessage());
-							m.setAttribute(IMarker.LINE_NUMBER, err.line);
-						} catch (CoreException e) {
-							if ( Activator.doLog(LogLevel.ERROR) ) {
-								Activator.log("editor.ssf : " + DocumentValidator.this.file,
-									"could not set a marker: " + e);
-							}
-						}
+						addMarker(DocumentValidator.this.file, err.getLocalizedMessage(), err.line,
+							IMarker.SEVERITY_ERROR);
 					}
 					
 				};
@@ -297,18 +281,8 @@ public class ValidatorDocumentSetupParticipant
 					
 					@Override
 					protected void handleError(CompileError err) {
-						try {
-							IMarker m = DocumentValidator.this.file.createMarker(IMarker.PROBLEM);
-							DocumentValidator.this.marker.add(m);
-							m.setAttribute(IMarker.SEVERITY, IMarker.SEVERITY_ERROR);
-							m.setAttribute(IMarker.MESSAGE, err.getMessage());
-							m.setAttribute(IMarker.LINE_NUMBER, err.line);
-						} catch (CoreException e) {
-							if ( Activator.doLog(LogLevel.ERROR) ) {
-								Activator.log("editor.ssf : " + DocumentValidator.this.file,
-									"could not set a marker: " + e);
-							}
-						}
+						addMarker(DocumentValidator.this.file, err.getLocalizedMessage(), err.line,
+							IMarker.SEVERITY_ERROR);
 					}
 					
 				};
@@ -318,17 +292,64 @@ public class ValidatorDocumentSetupParticipant
 		
 		private static BiFunction<String, String, SimpleDependency> dep(IFile file, IProject p) throws CoreException {
 			ProjectProps props = SimpleCodeBuilder.parseProps(p, null);
+			if ( props == null ) return null;
+			IPath fp = file.getFullPath();
+			for (IFolder src : props.src()) {
+				BiFunction<String, String, SimpleDependency> d = dep0(file, props, fp, src);
+				if ( d != null ) return d;
+			}
+			if ( file.getName().endsWith(".sexp") ) {
+				return dep0(file, props, fp, props.exp());
+			}
+			return null;
+		}
+		
+		private static BiFunction<String, String, SimpleDependency> dep0(IFile file, ProjectProps props, IPath fp,
+			IFolder src) {
+			IPath sfp = src.getFullPath();
+			if ( sfp.isPrefixOf(fp) ) {
+				IFile exportFile = src.getFile(fp.makeRelativeTo(sfp));
+				BiFunction<String, String, SimpleDependency> result =
+					SimpleCodeBuilder.dep(props, sfp, exportFile, null);
+				return (source, runtime) -> {
+					try {
+						return result.apply(source, runtime);
+					} catch (CompileError ce) {
+						addMarker(exportFile, ce.getLocalizedMessage(), ce.line, IMarker.SEVERITY_ERROR);
+						addMarker(file,
+							"the dependency " + source + " could not be parsed: " + ce.getLocalizedMessage(), -1,
+							IMarker.SEVERITY_ERROR);
+						return null;
+					}
+				};
+			}
 			return null;
 		}
 		
 		@Override
-		public void documentAboutToBeChanged(DocumentEvent event) {
+		public void documentAboutToBeChanged(@SuppressWarnings("unused") DocumentEvent event) {
 		}
 		
 	}
 	
+	private static void addMarker(IFile file, String msg, int line, int severity) {
+		try {
+			IMarker m = file.createMarker(SimpleCodeBuilder.VOLATILE_MARKER_TYPE);
+			m.setAttribute(IMarker.SEVERITY, severity);
+			m.setAttribute(IMarker.MESSAGE, msg);
+			if ( line == -1 ) {
+				line = 1;
+			}
+			m.setAttribute(IMarker.LINE_NUMBER, line);
+		} catch (CoreException e) {
+			if ( Activator.doLog(LogLevel.ERROR) ) {
+				Activator.log("editor.ssf : " + file, "could not set a marker: " + e);
+			}
+		}
+	}
+	
 	@Override
-	public void setup(IDocument document) {
+	public void setup(@SuppressWarnings("unused") IDocument document) {
 	}
 	
 	@Override
@@ -336,12 +357,16 @@ public class ValidatorDocumentSetupParticipant
 		if ( locationKind == LocationKind.IFILE ) {
 			IFile file = ResourcesPlugin.getWorkspace().getRoot().getFile(location);
 			IProject p = file.getProject();
+			DocumentValidator docVal = new DocumentValidator(file, p);
 			try {
 				IProjectDescription desc = p.getDescription();
 				if ( !desc.hasNature(SimpleCodeNature.NATURE_ID) ) {
 					return;
 				}
-				document.addDocumentListener(new DocumentValidator(file, p));
+				document.addDocumentListener(docVal);
+			} catch (UnsupportedClassVersionError e) {
+				addMarker(file, "are you running eclipse with JavaSE21 with --enable-preview? " + e, -1,
+					IMarker.SEVERITY_ERROR);
 			} catch (CoreException e) {
 				if ( Activator.doLog(LogLevel.ERROR) ) {
 					Activator.log("editor.setup", "could not initilize the editor: " + e);

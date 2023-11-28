@@ -105,6 +105,17 @@
       </persistent>
    </extension>
    <extension
+         id="de.hechler.patrick.code.simple.ecl.problem.volatile"
+         name="Simple Code Problem (volatile)"
+         point="org.eclipse.core.resources.markers">
+      <super
+            type="de.hechler.patrick.code.simple.ecl.problem">
+      </super>
+      <persistent
+            value="false">
+      </persistent>
+   </extension>
+   <extension
          point="org.eclipse.core.contenttype.contentTypes">
       <content-type
             id="de.hechler.patrick.code.simple.ecl.editor.ssf"
