@@ -139,14 +139,14 @@ public class SimpleExportFileParser {
 	public static final int STATE_TYPE_FUNC_ADDR       = 28;
 	public static final int STATE_TYPE_POSTFIX         = 29;
 	
-	protected final SimpleTokenStream                          in;
-	protected final BiFunction<String,String,SimpleDependency> dep;
+	protected final SimpleTokenStream                            in;
+	protected final BiFunction<String, String, SimpleDependency> dep;
 	
-	public SimpleExportFileParser(InputStream in, String file, BiFunction<String,String,SimpleDependency> dep) {
+	public SimpleExportFileParser(InputStream in, String file, BiFunction<String, String, SimpleDependency> dep) {
 		this(new SimpleTokenStream(in, file), dep);
 	}
 	
-	public SimpleExportFileParser(SimpleTokenStream in, BiFunction<String,String,SimpleDependency> dep) {
+	public SimpleExportFileParser(SimpleTokenStream in, BiFunction<String, String, SimpleDependency> dep) {
 		this.in = in;
 		this.dep = dep;
 	}
@@ -181,18 +181,18 @@ public class SimpleExportFileParser {
 		String name;
 		try {
 			name = this.in.consumeDynTokSpecialText();
-		} catch ( @SuppressWarnings("unused") AssertionError ae ) {
+		} catch (@SuppressWarnings("unused") AssertionError ae) {
 			// assertion enabled (for token stream)
 			// expectToken() failed
 			// handleError() overwritten & returned normally
 			// if parsing is only allowed to fail if handleError fails
-			name = name(this.in.consumeTok());// maybe a token like 'main'
+			name = null;
 		}
 		expectToken(STRING, "expected to get `[STRING] ;´ after `dep [NAME]´");
 		String path;
 		try {
 			path = this.in.consumeDynTokSpecialText();
-		} catch ( @SuppressWarnings("unused") AssertionError ae ) {
+		} catch (@SuppressWarnings("unused") AssertionError ae) {
 			path = "invalid path\0";
 		}
 		consumeToken(SEMI, "expected to get `;´ after `dep [NAME] [STRING]´");
@@ -201,7 +201,11 @@ public class SimpleExportFileParser {
 			handleError(this.in.ctx(), "could not find the dependency \"" + path + "\"");
 			dependency = new SimpleFile(path, null);
 		}
-		sf.dependency(dependency, name, this.in.ctx());
+		try {
+			sf.dependency(dependency, name, this.in.ctx());
+		} catch (NullPointerException npe) {
+			if ( name != null ) throw npe;
+		}
 		exitState(STATE_DEPENDENCY, enter, name);
 	}
 	
@@ -233,8 +237,8 @@ public class SimpleExportFileParser {
 		String name;
 		try {
 			name = this.in.consumeDynTokSpecialText();
-		} catch ( @SuppressWarnings("unused") AssertionError ae ) {
-			name = name(this.in.consumeTok());
+		} catch (@SuppressWarnings("unused") AssertionError ae) {
+			name = null;
 		}
 		SimpleValue initialValue = null;
 		if ( this.in.tok() == LARROW ) {
@@ -243,7 +247,13 @@ public class SimpleExportFileParser {
 		} else if ( ( flags & SimpleVariable.FLAG_CONSTANT ) != 0 ) {
 			handleError(this.in.ctx(), "a constant value must have a initial value set");
 		}
-		SimpleVariable result = new SimpleVariable(type, name, initialValue, flags);
+		SimpleVariable result;
+		try  {
+			result = new SimpleVariable(type, name, initialValue, flags);
+		} catch (NullPointerException npe) {
+			if ( name != null ) throw npe;
+			result = new SimpleVariable(StructType.create(List.of(), StructType.FLAG_NOUSE, ErrorContext.NO_CONTEXT), "invalid\0", initialValue, flags);
+		}
 		exitState(STATE_VARIALBE, enter, result);
 		return result;
 	}
@@ -256,13 +266,13 @@ public class SimpleExportFileParser {
 		final Object enter;
 		if ( magic == 0 ) enter = enterState(STATE_VAL);
 		else enter = enterValues == null ? null : enterValues[COND_MAGIC + 1 - magic];
-		SimpleValue result = parseValueCondExp(scope, magic, mvalue, enterValues);
+  		SimpleValue result = parseValueCondExp(scope, magic, mvalue, enterValues);
 		exitState(STATE_VAL, enter, result);
 		return result;
 	}
 	
 	protected static final int COND_MAGIC = 15;
-	
+	//TODO check for null values  when handleError returns normally
 	protected SimpleValue parseValueCondExp(SimpleScope scope, int magic, SimpleValue mvalue, Object[] enterValues) {
 		if ( magic == COND_MAGIC ) return mvalue;
 		final Object enter;
@@ -276,11 +286,11 @@ public class SimpleExportFileParser {
 			SimpleValue c = parseValueCondExp(scope, 0, null, null);
 			try {
 				a = CondVal.create(a, b, c, this.in.ctx());
-			} catch ( CompileError ce ) {
+			} catch (CompileError ce) {
 				handleError(ce);
 			}
 		}
-		exitState(magic, enter, a);
+		exitState(STATE_VAL_COND, enter, a);
 		return a;
 	}
 	
@@ -297,7 +307,7 @@ public class SimpleExportFileParser {
 			SimpleValue b = parseValueLAndExp(scope, 0, null, null);
 			try {
 				a = BinaryOpVal.create(a, BinaryOp.BOOL_OR, b, this.in.ctx());
-			} catch ( CompileError ce ) {
+			} catch (CompileError ce) {
 				handleError(ce);
 			}
 		}
@@ -318,7 +328,7 @@ public class SimpleExportFileParser {
 			SimpleValue b = parseValueOrExp(scope, 0, null, null);
 			try {
 				a = BinaryOpVal.create(a, BinaryOp.BOOL_AND, b, this.in.ctx());
-			} catch ( CompileError ce ) {
+			} catch (CompileError ce) {
 				handleError(ce);
 			}
 		}
@@ -339,7 +349,7 @@ public class SimpleExportFileParser {
 			SimpleValue b = parseValueXOrExp(scope, 0, null, null);
 			try {
 				a = BinaryOpVal.create(a, BinaryOp.BIT_OR, b, this.in.ctx());
-			} catch ( CompileError ce ) {
+			} catch (CompileError ce) {
 				handleError(ce);
 			}
 		}
@@ -360,7 +370,7 @@ public class SimpleExportFileParser {
 			SimpleValue b = parseValueAndExp(scope, 0, null, null);
 			try {
 				a = BinaryOpVal.create(a, BinaryOp.BIT_XOR, b, this.in.ctx());
-			} catch ( CompileError ce ) {
+			} catch (CompileError ce) {
 				handleError(ce);
 			}
 		}
@@ -381,7 +391,7 @@ public class SimpleExportFileParser {
 			SimpleValue b = parseValueEqExp(scope, 0, null, null);
 			try {
 				a = BinaryOpVal.create(a, BinaryOp.BIT_AND, b, this.in.ctx());
-			} catch ( CompileError ce ) {
+			} catch (CompileError ce) {
 				handleError(ce);
 			}
 		}
@@ -403,7 +413,7 @@ public class SimpleExportFileParser {
 			SimpleValue b = parseValueRelExp(scope, 0, null, null);
 			try {
 				a = BinaryOpVal.create(a, t == EQ ? BinaryOp.CMP_EQ : BinaryOp.CMP_NEQ, b, this.in.ctx());
-			} catch ( CompileError ce ) {
+			} catch (CompileError ce) {
 				handleError(ce);
 			}
 			t = this.in.tok();
@@ -432,7 +442,7 @@ public class SimpleExportFileParser {
 				case LT -> BinaryOp.CMP_LT;
 				default -> throw new AssertionError();
 				}, b, this.in.ctx());
-			} catch ( CompileError ce ) {
+			} catch (CompileError ce) {
 				handleError(ce);
 			}
 			t = this.in.tok();
@@ -447,7 +457,7 @@ public class SimpleExportFileParser {
 		if ( magic == SHIFT_MAGIC ) return mvalue;
 		final Object enter;
 		if ( magic == 0 ) enter = enterState(STATE_VAL_SHIFT);
-		else enter = enterValues == null ? null : enterValues[REL_MAGIC - magic];
+		else enter = enterValues == null ? null : enterValues[SHIFT_MAGIC - magic];
 		SimpleValue a = parseValueAddExp(scope, magic, mvalue, enterValues);
 		int t = this.in.tok();
 		while ( t == SHIFT_LEFT || t == SHIFT_RIGTH ) {
@@ -459,7 +469,7 @@ public class SimpleExportFileParser {
 				case SHIFT_RIGTH -> BinaryOp.SHIFT_RIGTH;
 				default -> throw new AssertionError();
 				}, b, this.in.ctx());
-			} catch ( CompileError ce ) {
+			} catch (CompileError ce) {
 				handleError(ce);
 			}
 			t = this.in.tok();
@@ -474,7 +484,7 @@ public class SimpleExportFileParser {
 		if ( magic == ADD_MAGIC ) return mvalue;
 		final Object enter;
 		if ( magic == 0 ) enter = enterState(STATE_VAL_ADD);
-		else enter = enterValues == null ? null : enterValues[REL_MAGIC - magic];
+		else enter = enterValues == null ? null : enterValues[ADD_MAGIC - magic];
 		SimpleValue a = parseValueMulExp(scope, magic, mvalue, enterValues);
 		int t = this.in.tok();
 		while ( t == PLUS || t == MINUS ) {
@@ -482,7 +492,7 @@ public class SimpleExportFileParser {
 			SimpleValue b = parseValueMulExp(scope, 0, null, null);
 			try {
 				a = BinaryOpVal.create(a, t == PLUS ? BinaryOp.MATH_ADD : BinaryOp.MATH_SUB, b, this.in.ctx());
-			} catch ( CompileError ce ) {
+			} catch (CompileError ce) {
 				handleError(ce);
 			}
 			t = this.in.tok();
@@ -497,7 +507,7 @@ public class SimpleExportFileParser {
 		if ( magic == MUL_MAGIC ) return mvalue;
 		final Object enter;
 		if ( magic == 0 ) enter = enterState(STATE_VAL_MUL);
-		else enter = enterValues == null ? null : enterValues[REL_MAGIC - magic];
+		else enter = enterValues == null ? null : enterValues[MUL_MAGIC - magic];
 		SimpleValue a = parseValueCastExp(scope, magic, mvalue, enterValues);
 		int t = this.in.tok();
 		while ( t == STAR || t == DIV || t == MOD ) {
@@ -510,7 +520,7 @@ public class SimpleExportFileParser {
 				case MOD -> BinaryOp.MATH_MOD;
 				default -> throw new AssertionError();
 				}, b, this.in.ctx());
-			} catch ( CompileError ce ) {
+			} catch (CompileError ce) {
 				handleError(ce);
 			}
 			t = this.in.tok();
@@ -526,7 +536,7 @@ public class SimpleExportFileParser {
 		final Object enter;
 		if ( magic == 0 ) enter = enterState(STATE_VAL_CAST);
 		else {
-			enter = enterValues == null ? null : enterValues[REL_MAGIC - magic];
+			enter = enterValues == null ? null : enterValues[CAST_MAGIC - magic];
 			SimpleValue res = parseValueUnaryExp(scope, magic, mvalue, enterValues);
 			exitState(STATE_VAL_CAST, enter, res);
 			return res;
@@ -538,7 +548,7 @@ public class SimpleExportFileParser {
 			SimpleValue a = parseValueUnaryExp(scope, 0, null, null);
 			try {
 				a = CastVal.create(a, t, this.in.ctx());
-			} catch ( CompileError ce ) {
+			} catch (CompileError ce) {
 				handleError(ce);
 			}
 			exitState(STATE_VAL_CAST, enter, a);
@@ -556,7 +566,7 @@ public class SimpleExportFileParser {
 		final Object enter;
 		if ( magic == 0 ) enter = enterState(STATE_VAL_UNARY);
 		else {
-			enter = enterValues == null ? null : enterValues[REL_MAGIC - magic];
+			enter = enterValues == null ? null : enterValues[UNARY_MAGIC - magic];
 			SimpleValue res = parseValuePostfixExp(scope, magic, mvalue, enterValues);
 			exitState(STATE_VAL_UNARY, enter, res);
 			return res;
@@ -578,7 +588,7 @@ public class SimpleExportFileParser {
 		SimpleValue a = parseValuePostfixExp(scope, 0, null, null);
 		try {
 			a = UnaryOpVal.create(op, a, this.in.ctx());
-		} catch ( CompileError ce ) {
+		} catch (CompileError ce) {
 			handleError(ce);
 		}
 		exitState(STATE_VAL_UNARY, enter, a);
@@ -591,7 +601,7 @@ public class SimpleExportFileParser {
 		if ( magic == POSTFIX_MAGIC ) return mvalue;
 		final Object enter;
 		if ( magic == 0 ) enter = enterState(STATE_VAL_POSTFIX);
-		else enter = enterValues == null ? null : enterValues[REL_MAGIC - magic];
+		else enter = enterValues == null ? null : enterValues[POSTFIX_MAGIC - magic];
 		SimpleValue a = parseValueDirectExp(scope, magic, mvalue);
 		while ( true ) {
 			switch ( this.in.tok() ) {
@@ -599,7 +609,7 @@ public class SimpleExportFileParser {
 				this.in.consume();
 				try {
 					a = UnaryOpVal.create(UnaryOp.DEREF_PNTR, a, this.in.ctx());
-				} catch ( CompileError ce ) {
+				} catch (CompileError ce) {
 					handleError(ce);
 				}
 			}
@@ -609,7 +619,7 @@ public class SimpleExportFileParser {
 				consumeToken(ARR_CLOSE, "expected `\\]´ after `\\[ [VALUE]´");
 				try {
 					a = BinaryOpVal.create(a, BinaryOp.ARR_PNTR_INDEX, b, this.in.ctx());
-				} catch ( CompileError ce ) {
+				} catch (CompileError ce) {
 					handleError(ce);
 				}
 			}
@@ -619,13 +629,13 @@ public class SimpleExportFileParser {
 				String name;
 				try {
 					name = this.in.consumeDynTokSpecialText();
-				} catch ( @SuppressWarnings("unused") AssertionError ae ) {
+				} catch (@SuppressWarnings("unused") AssertionError ae) {
 					name = name(this.in.consumeTok());
 				}
 				NameVal b = new NameVal(name);
 				try {
 					a = BinaryOpVal.create(a, BinaryOp.DEREF_BY_NAME, b, this.in.ctx());
-				} catch ( CompileError ce ) {
+				} catch (CompileError ce) {
 					handleError(ce);
 				}
 			}
@@ -740,34 +750,26 @@ public class SimpleExportFileParser {
 		if ( sign ) {
 			switch ( bits ) {
 			case 64:
-				return ScalarNumericVal.create(NativeType.NUM, Long.parseLong(value.substring(off, len), sys),
-					this.in.ctx());
+				return ScalarNumericVal.create(NativeType.NUM, Long.parseLong(value.substring(off, len), sys), this.in.ctx());
 			case 32:
-				return ScalarNumericVal.create(NativeType.DWORD, Integer.parseInt(value.substring(off, len), sys),
-					this.in.ctx());
+				return ScalarNumericVal.create(NativeType.DWORD, Integer.parseInt(value.substring(off, len), sys), this.in.ctx());
 			case 16:
-				return ScalarNumericVal.create(NativeType.WORD, Short.parseShort(value.substring(off, len), sys),
-					this.in.ctx());
+				return ScalarNumericVal.create(NativeType.WORD, Short.parseShort(value.substring(off, len), sys), this.in.ctx());
 			case 8:
-				return ScalarNumericVal.create(NativeType.BYTE, Byte.parseByte(value.substring(off, len), sys),
-					this.in.ctx());
+				return ScalarNumericVal.create(NativeType.BYTE, Byte.parseByte(value.substring(off, len), sys), this.in.ctx());
 			default:
 				throw new AssertionError();
 			}
 		}
 		switch ( bits ) {
 		case 64:
-			return ScalarNumericVal.create(NativeType.UNUM, Long.parseUnsignedLong(value.substring(off, len), sys),
-				this.in.ctx());
+			return ScalarNumericVal.create(NativeType.UNUM, Long.parseUnsignedLong(value.substring(off, len), sys), this.in.ctx());
 		case 32:
-			return ScalarNumericVal.create(NativeType.UDWORD, Integer.parseUnsignedInt(value.substring(off, len), sys),
-				this.in.ctx());
+			return ScalarNumericVal.create(NativeType.UDWORD, Integer.parseUnsignedInt(value.substring(off, len), sys), this.in.ctx());
 		case 16:
-			return ScalarNumericVal.create(NativeType.UWORD, Integer.parseUnsignedInt(value.substring(off, len), sys),
-				this.in.ctx());
+			return ScalarNumericVal.create(NativeType.UWORD, Integer.parseUnsignedInt(value.substring(off, len), sys), this.in.ctx());
 		case 8:
-			return ScalarNumericVal.create(NativeType.UBYTE, Integer.parseUnsignedInt(value.substring(off, len), sys),
-				this.in.ctx());
+			return ScalarNumericVal.create(NativeType.UBYTE, Integer.parseUnsignedInt(value.substring(off, len), sys), this.in.ctx());
 		default:
 			throw new AssertionError();
 		}
@@ -777,16 +779,46 @@ public class SimpleExportFileParser {
 		final Object enter = enterState(STATE_TYPE);
 		SimpleType type;
 		switch ( this.in.tok() ) {
-		case NUM -> { this.in.consume(); type = NativeType.NUM; }
-		case UNUM -> { this.in.consume(); type = NativeType.UNUM; }
-		case FPNUM -> { this.in.consume(); type = NativeType.FPNUM; }
-		case FPDWORD -> { this.in.consume(); type = NativeType.FPDWORD; }
-		case DWORD -> { this.in.consume(); type = NativeType.DWORD; }
-		case UDWORD -> { this.in.consume(); type = NativeType.UDWORD; }
-		case WORD -> { this.in.consume(); type = NativeType.WORD; }
-		case UWORD -> { this.in.consume(); type = NativeType.UWORD; }
-		case BYTE -> { this.in.consume(); type = NativeType.BYTE; }
-		case UBYTE -> { this.in.consume(); type = NativeType.UBYTE; }
+		case NUM -> {
+			this.in.consume();
+			type = NativeType.NUM;
+		}
+		case UNUM -> {
+			this.in.consume();
+			type = NativeType.UNUM;
+		}
+		case FPNUM -> {
+			this.in.consume();
+			type = NativeType.FPNUM;
+		}
+		case FPDWORD -> {
+			this.in.consume();
+			type = NativeType.FPDWORD;
+		}
+		case DWORD -> {
+			this.in.consume();
+			type = NativeType.DWORD;
+		}
+		case UDWORD -> {
+			this.in.consume();
+			type = NativeType.UDWORD;
+		}
+		case WORD -> {
+			this.in.consume();
+			type = NativeType.WORD;
+		}
+		case UWORD -> {
+			this.in.consume();
+			type = NativeType.UWORD;
+		}
+		case BYTE -> {
+			this.in.consume();
+			type = NativeType.BYTE;
+		}
+		case UBYTE -> {
+			this.in.consume();
+			type = NativeType.UBYTE;
+		}
 		case NAME -> type = parseTypeTypedef(scope);
 		case STRUCT -> type = parseTypeStruct(scope);
 		case FSTRUCT -> {
@@ -820,10 +852,8 @@ public class SimpleExportFileParser {
 			type = parseTypeFuncType0(SMALL_OPEN, scope, FuncType.FLAG_FUNC_ADDRESS, subEnter);
 		}
 		default -> {
-			handleError(this.in.ctx(),
-				List.of(name(NUM), name(UNUM), name(FPNUM), name(FPDWORD), name(DWORD), name(WORD), name(UWORD),
-					name(BYTE), name(UBYTE), name(STRUCT), name(FSTRUCT), name(NOPAD), name(LT), name(SMALL_OPEN),
-					name(NAME)));
+			handleError(this.in.ctx(), List.of(name(NUM), name(UNUM), name(FPNUM), name(FPDWORD), name(DWORD), name(WORD), name(UWORD), name(BYTE), name(UBYTE),
+					name(STRUCT), name(FSTRUCT), name(NOPAD), name(LT), name(SMALL_OPEN), name(NAME)));
 			type = StructType.create(List.of(), 0, this.in.ctx());
 		}
 		}
@@ -867,37 +897,34 @@ public class SimpleExportFileParser {
 	}
 	
 	@SuppressWarnings("unchecked")
-	private < T > T parseTypeNamedType(SimpleScope scope, Class<T> cls) {
+	private <T> T parseTypeNamedType(SimpleScope scope, Class<T> cls) {
 		while ( true ) {
 			Object obj = scope.nameTypeOrDepOrFuncOrNull(this.in.consumeDynTokSpecialText(), this.in.ctx());
 			if ( cls.isInstance(obj) ) return cls.cast(obj);
 			if ( !( obj instanceof SimpleDependency nscope ) ) {
-				String simpleName = cls.getSimpleName().startsWith("Simple")
-					? cls.getSimpleName().substring("Simple".length())
-					: cls.getSimpleName();
+				String simpleName = cls.getSimpleName().startsWith("Simple") ? cls.getSimpleName().substring("Simple".length()) : cls.getSimpleName();
 				if ( obj == null ) {
-					handleError(this.in.ctx(), "expected the `[NAME]´ to be the [NAME] of a " + simpleName
-						+ " or a dependency, but there is nothing with the given name");
+					handleError(this.in.ctx(),
+							"expected the `[NAME]´ to be the [NAME] of a " + simpleName + " or a dependency, but there is nothing with the given name");
 					if ( cls == SimpleType.class ) {
 						return (T) StructType.create(List.of(), StructType.FLAG_NOUSE, this.in.ctx());
 					}
 					if ( cls == SimpleFunction.class ) {
 						return (T) new SimpleFunction(new SimpleFile("invalid\0", "invalid\0"), "<invalid>",
-							FuncType.create(List.of(), List.of(), 0, this.in.ctx()));
+								FuncType.create(List.of(), List.of(), 0, this.in.ctx()));
 					}
 					return null;
 				}
-				String objSimpleName = obj.getClass().getSimpleName().startsWith("Simple")
-					? obj.getClass().getSimpleName().substring("Simple".length())
-					: obj.getClass().getSimpleName();
-				handleError(this.in.ctx(), "expected the `[NAME]´ to be the [NAME] of a " + simpleName
-					+ " or a dependency, but it is " + objSimpleName + " : " + obj);
+				String objSimpleName = obj.getClass().getSimpleName().startsWith("Simple") ? obj.getClass().getSimpleName().substring("Simple".length())
+						: obj.getClass().getSimpleName();
+				handleError(this.in.ctx(),
+						"expected the `[NAME]´ to be the [NAME] of a " + simpleName + " or a dependency, but it is " + objSimpleName + " : " + obj);
 				if ( cls == SimpleType.class ) {
 					return (T) StructType.create(List.of(), StructType.FLAG_NOUSE, this.in.ctx());
 				}
 				if ( cls == SimpleFunction.class ) {
 					return (T) new SimpleFunction(new SimpleFile("invalid\0", "invalid\0"), "<invalid>",
-						FuncType.create(List.of(), List.of(), 0, this.in.ctx()));
+							FuncType.create(List.of(), List.of(), 0, this.in.ctx()));
 				}
 				return null;
 			}
@@ -921,14 +948,13 @@ public class SimpleExportFileParser {
 		return res;
 	}
 	
-	protected List<SimpleVariable> parseNamedTypeList(final int end, final int sep, final boolean sepBeforeEnd,
-		SimpleScope scope) {
+	protected List<SimpleVariable> parseNamedTypeList(final int end, final int sep, final boolean sepBeforeEnd, SimpleScope scope) {
 		final Object enter = enterState(STATE_NAMED_TYPE_LIST);
 		return parseNamedTypeList(end, sep, sepBeforeEnd, scope, null, enter);
 	}
 	
-	protected List<SimpleVariable> parseNamedTypeList(final int end, final int sep, final boolean sepBeforeEnd,
-		SimpleScope scope, List<SimpleVariable> add, final Object enter) {
+	protected List<SimpleVariable> parseNamedTypeList(final int end, final int sep, final boolean sepBeforeEnd, SimpleScope scope, List<SimpleVariable> add,
+			final Object enter) {
 		if ( this.in.tok() == end ) {
 			exitState(STATE_NAMED_TYPE_LIST, enter, add == null ? List.of() : add);
 			this.in.consume();
@@ -940,7 +966,7 @@ public class SimpleExportFileParser {
 		String name;
 		try {
 			name = this.in.consumeDynTokSpecialText();
-		} catch ( @SuppressWarnings("unused") AssertionError ae ) {
+		} catch (@SuppressWarnings("unused") AssertionError ae) {
 			name = name(this.in.consumeTok());
 		}
 		members.add(new SimpleVariable(type, name, null, 0));
@@ -954,8 +980,7 @@ public class SimpleExportFileParser {
 						msg = "expected `" + name(sep) + "´ after `[NAMED_TYPE]´";
 					} else {
 						list = List.of(name(sep), name(end));
-						msg = "expected to end the [NAMED_TYPE_LIST] with `" + name(end)
-							+ "´ or seperate two named types with `" + name(sep) + "´";
+						msg = "expected to end the [NAMED_TYPE_LIST] with `" + name(end) + "´ or seperate two named types with `" + name(sep) + "´";
 					}
 					handleError(this.in.ctx(), list, msg);
 					exitState(STATE_NAMED_TYPE_LIST, enter, add);
@@ -978,7 +1003,7 @@ public class SimpleExportFileParser {
 			expectToken(NAME, "expected `[NAME]´ after `[TYPE]´");
 			try {
 				name = this.in.consumeDynTokSpecialText();
-			} catch ( @SuppressWarnings("unused") AssertionError ae ) {
+			} catch (@SuppressWarnings("unused") AssertionError ae) {
 				name = name(this.in.consumeTok());
 			}
 			members.add(new SimpleVariable(type, name, null, 0));
@@ -1006,14 +1031,13 @@ public class SimpleExportFileParser {
 			if ( t != LT ) {
 				if ( t == SMALL_OPEN ) break;
 				handleError(this.in.ctx(), List.of(name(LT), name(SMALL_OPEN)),
-					"expected `< [NAMED_TYPE_LIST] > <--´ or `\\( [NAMED_TYPE_LIST] \\)´ after `nopad´");
+						"expected `< [NAMED_TYPE_LIST] > <--´ or `\\( [NAMED_TYPE_LIST] \\)´ after `nopad´");
 			}
 			//$FALL-THROUGH$
 		case LT:
 			results = parseNamedTypeList(GT, COMMA, false, scope);
 			consumeToken(LARROW, "expectedd `<-- \\( [NAMED_TYPE_LIST] \\)´ after `(nopad)? < [NAMED_TYPE_LIST] >´");
-			consumeToken(SMALL_OPEN,
-				"expectedd `\\( [NAMED_TYPE_LIST] \\)´ after `(nopad)? < [NAMED_TYPE_LIST] > <--´");
+			consumeToken(SMALL_OPEN, "expectedd `\\( [NAMED_TYPE_LIST] \\)´ after `(nopad)? < [NAMED_TYPE_LIST] > <--´");
 			//$FALL-THROUGH$
 		case SMALL_OPEN:
 			break;
@@ -1137,19 +1161,16 @@ public class SimpleExportFileParser {
 	}
 	
 	/**
-	 * this method can be overwritten to be notified when the parser stars to read more input to know to which state it
-	 * should go
+	 * this method can be overwritten to be notified when the parser stars to read more input to know to which state it should go
 	 * <ul>
-	 * <li>if multiple states start at the current token the result of this method MUST NOT be passed multiple times to
-	 * {@link #decidedState(int, Object)} or {@link #decidedStates(int[], Object)}</li>
-	 * <li>if multiple states start at the current token the result of this method may be passed to
-	 * {@link #decidedStates(int[], Object)} with an array which contains the states that are now decided</li>
+	 * <li>if multiple states start at the current token the result of this method MUST NOT be passed multiple times to {@link #decidedState(int, Object)} or
+	 * {@link #decidedStates(int[], Object)}</li>
+	 * <li>if multiple states start at the current token the result of this method may be passed to {@link #decidedStates(int[], Object)} with an array which
+	 * contains the states that are now decided</li>
 	 * <li>it is guaranteed that at least one state starts at the current position when this method is called</li>
-	 * <li>note that by the time {@link #decidedState(int, Object)} is called various sub-states may have already been
-	 * processed</li>
+	 * <li>note that by the time {@link #decidedState(int, Object)} is called various sub-states may have already been processed</li>
 	 * <li>if some states are decided at different times {@link #enterUnknownState()} is called multiple times (or both)</li>
-	 * <li>additional the result of this call may be used for
-	 * {@link #remenberExitedState(int, Object, Object, Object)}.<br>
+	 * <li>additional the result of this call may be used for {@link #remenberExitedState(int, Object, Object, Object)}.<br>
 	 * the parser may do this multiple times with the same end marker (which is the result of this call)</li>
 	 * </ul>
 	 * 
@@ -1162,9 +1183,8 @@ public class SimpleExportFileParser {
 	/**
 	 * this method is simmilar to {@link #enterUnknownState()}, but it <b>not</b> allowed to be passed to
 	 * {@link #decidedState(int, Object)}/{@link #decidedStates(int[], Object)}.<br>
-	 * the result of this method will only be passed to {@link #remenberExitedState(int, Object, Object, Object)} as end
-	 * marker<br>
-	 * also no state needs to start at the current position and also no 
+	 * the result of this method will only be passed to {@link #remenberExitedState(int, Object, Object, Object)} as end marker<br>
+	 * also no state needs to start at the current position and also no
 	 * 
 	 * @return an end marker suitable to be passed to {@link #remenberExitedState(int, Object, Object, Object)} as such
 	 */
@@ -1173,14 +1193,12 @@ public class SimpleExportFileParser {
 	}
 	
 	/**
-	 * this method can be overwritten to be notified when the parser previously was not sure which state it should be in
-	 * but now decided its state.
+	 * this method can be overwritten to be notified when the parser previously was not sure which state it should be in but now decided its state.
 	 * <p>
 	 * note that if this method is overwritten {@link #decidedStates(int[], Object)} should also be overwritten
 	 * <p>
 	 * the default implementation just returns {@code unknownStateResult}<br>
-	 * if this is enough only {@link #enterState(int)}, {@link #enterUnknownState()} and
-	 * {@link #exitState(int, Object, Object)} needs to be implemented.
+	 * if this is enough only {@link #enterState(int)}, {@link #enterUnknownState()} and {@link #exitState(int, Object, Object)} needs to be implemented.
 	 * 
 	 * @param state              the state of the parser
 	 * @param unknownStateResult the result of {@link #enterUnknownState()}
@@ -1193,8 +1211,7 @@ public class SimpleExportFileParser {
 	}
 	
 	/**
-	 * this method can be overwritten to be notified when the parser previously was not sure which state it should be in
-	 * but now decided its state.
+	 * this method can be overwritten to be notified when the parser previously was not sure which state it should be in but now decided its state.
 	 * <p>
 	 * the states are ordered by their nesting:<br>
 	 * the innermost state has the lowest index ({@code 0})<br>
@@ -1220,42 +1237,33 @@ public class SimpleExportFileParser {
 	/**
 	 * this method can be overwritten to be notified when the parser exits a state
 	 * <p>
-	 * if {@code additionalData} has a nun-{@code null} value, it describes the result of the sub parsing process done
-	 * while in the given state
+	 * if {@code additionalData} has a nun-{@code null} value, it describes the result of the sub parsing process done while in the given state
 	 * <p>
-	 * note that if this method is overwritten, {@link #remenberExitedState(int, Object, Object, Object)} should also be
-	 * overwritten
+	 * note that if this method is overwritten, {@link #remenberExitedState(int, Object, Object, Object)} should also be overwritten
 	 * 
 	 * @param state          the state which is finished now
 	 * @param enterResult    the result of {@link #enterState(int)} when the parser entered the state
-	 * @param additionalData some additional data, potentially <code>null</code> if the state does not support
-	 *                           additional data
+	 * @param additionalData some additional data, potentially <code>null</code> if the state does not support additional data
 	 */
 	@SuppressWarnings("unused")
-	protected void exitState(int state, Object enterResult, Object additionalData) {
-	}
+	protected void exitState(int state, Object enterResult, Object additionalData) {}
 	
 	/**
 	 * this method can be overwritten to be notified when the parser exits a state
 	 * <p>
-	 * this method is like {@link #exitState(int, Object, Object)}, but instead of using the current state of the parser
-	 * this method should use the end marker {@code enterUnknownEndMarker}, which was obtained by calling
-	 * {@link #enterUnknownState()}
+	 * this method is like {@link #exitState(int, Object, Object)}, but instead of using the current state of the parser this method should use the end marker
+	 * {@code enterUnknownEndMarker}, which was obtained by calling {@link #enterUnknownState()}
 	 * <p>
-	 * if {@code additionalData} has a nun-{@code null} value,it describes the result of the sub parsing process done
-	 * while in the given state
+	 * if {@code additionalData} has a nun-{@code null} value,it describes the result of the sub parsing process done while in the given state
 	 * <p>
 	 * note that if this method is overwritten, {@link #exitState(int, Object, Object)} should also be overwritten
 	 * 
 	 * @param state                 the state which is finished now
 	 * @param enterResult           the result of {@link #enterState(int)} when the parser entered the state
 	 * @param enterUnknownEndMarker the end marker of the already previously state
-	 * @param additionalData        some additional data, potentially <code>null</code> if the state does not support
-	 *                                  additional data
+	 * @param additionalData        some additional data, potentially <code>null</code> if the state does not support additional data
 	 */
 	@SuppressWarnings("unused")
-	protected void remenberExitedState(int state, Object enterResult, Object enterUnknownEndMarker,
-		Object additionalData) {
-	}
+	protected void remenberExitedState(int state, Object enterResult, Object enterUnknownEndMarker, Object additionalData) {}
 	
 }

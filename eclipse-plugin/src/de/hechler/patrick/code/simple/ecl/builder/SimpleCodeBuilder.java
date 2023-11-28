@@ -158,7 +158,7 @@ public class SimpleCodeBuilder extends IncrementalProjectBuilder {
 		if ( props == null ) return null;// if the .sc-conf file is invalid do not try to build
 		IProjectDescription desc = project.getDescription();
 		desc.setReferencedProjects(props.deps);
-		project.setDescription(desc, IProject.KEEP_HISTORY | IProject.AVOID_NATURE_CONFIG, monitor);
+		project.setDescription(desc, IResource.KEEP_HISTORY | IResource.AVOID_NATURE_CONFIG, monitor);
 		if ( kind == FULL_BUILD ) {
 			fullBuild(monitor, props);
 		} else {

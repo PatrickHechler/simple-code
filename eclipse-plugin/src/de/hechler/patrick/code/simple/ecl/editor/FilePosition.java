@@ -19,7 +19,7 @@ public record FilePosition(int totalChar, int line, int charInLine) {
 			b.append(tokenName(this.token));
 			b.append(") from ");
 			b.append(this.start);
-			b.append(" to");
+			b.append(" to ");
 			b.append(this.end);
 			b.append(']');
 			return b.toString();

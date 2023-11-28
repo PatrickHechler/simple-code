@@ -39,7 +39,7 @@ public class DocumentTree {
 			this.entries = dt.entries;
 			dt.entries = entries;
 			for (int i = 0; i < result.length - 1; i++) {
-				dt.enterState(undecidedState.start(), states[i]);
+				dt.enterState(result[i]);
 				DocumentTree parent = i == result.length - 2 ? this : new DocumentTree();
 				parent.entries.add(dt);
 				dt.parent = parent;
@@ -85,22 +85,21 @@ public class DocumentTree {
 	public void exitState(FilePosition pos, int state, Object info, FileState enterResult) {
 		int size = this.entries.size();
 		if ( size == 0 ) {
-			this.global = this.global.finish(pos, state, info);
+			finishGlobal(pos, state, info, enterResult);
 			return;
 		}
 		Object last = this.entries.get(size - 1);
 		switch ( last ) {
 		case DocumentTree dt when dt.global.end() == null -> dt.exitState(pos, state, info, enterResult);
-		case DocumentTree dt -> {
-			if ( this.global != enterResult ) throw new AssertionError();
-			this.global = this.global.finish(pos, state, info);
-		}
-		case FilePosition.FileToken ft -> {
-			if ( this.global != enterResult ) throw new AssertionError();
-			this.global = this.global.finish(pos, state, info);
-		}
+		case DocumentTree dt -> finishGlobal(pos, state, info, enterResult);
+		case FilePosition.FileToken ft -> finishGlobal(pos, state, info, enterResult);
 		default -> throw new AssertionError(last.getClass());
 		}
+	}
+	
+	private void finishGlobal(FilePosition pos, int state, Object info, FileState enterResult) throws AssertionError {
+		if ( this.global != enterResult ) throw new AssertionError();
+		this.global = this.global.finish(pos, state, info);
 	}
 	
 	public void rememberExitedState(FilePosition.FileState start, FilePosition pos, int state, Object info) {
@@ -115,6 +114,7 @@ public class DocumentTree {
 			if ( obj instanceof DocumentTree dt ) {
 				if ( dt.global.start().totalChar() <= stc ) {
 					dt.rememberExitedState(start, pos, state, info);
+					return;
 				}
 			} // else its a token, we want a state
 		}

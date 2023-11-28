@@ -100,11 +100,6 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 	}
 	
 	@Override
-	public void parse(SimpleFile sf) {
-		super.parse(sf);
-	}
-	
-	@Override
 	protected void parseDependency(SimpleFile sf) {
 		final Object enter = enterState(STATE_DEPENDENCY);
 		this.in.consume();
@@ -294,8 +289,8 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 					return parseTypePostfix(scope, type, enters == null ? null : enters[1]);
 				}
 				case null, default -> {
-					int[] decidedStates = new int[COND_MAGIC + 1];
-					for (int i = 0; i < COND_MAGIC + 1; i++) {
+					int[] decidedStates = new int[SHIFT_MAGIC];
+					for (int i = 0; i < SHIFT_MAGIC; i++) {
 						decidedStates[i] = STATE_VAL_DIRECT + i;
 					}
 					Object[] enters = decidedStates(decidedStates, undecided);
@@ -348,8 +343,8 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 				results = parseCommaSepValues(scope, true);
 			}
 			consumeToken(GT,
-				"expected `> <-- \\( ( [VALUE] ( , [VALUE] )* )? \\)´ after `call < ( [VALUE] ( , [VALUE] )* )?´");
-			consumeToken(LARROW, "expected `<-- \\( ( [VALUE] ( , [VALUE] )* )? \\)´ after `call [FUNC_CALL_RESULT]´");
+				"expected `> <-- \\( ( [VALUE] ( , [VALUE] )* )? \\)´ after `[SHIFT_EXP] < ( [VALUE] ( , [VALUE] )* )?´");
+			consumeToken(LARROW, "expected `<-- \\( ( [VALUE] ( , [VALUE] )* )? \\)´ after `[SHIFT_EXP] [FUNC_CALL_RESULT]´");
 			consumeToken(SMALL_OPEN,
 				"expected `\\( ( [VALUE] ( , [VALUE] )* )? \\)´ after `call [FUNC_CALL_RESULT] <--´");
 		}
@@ -358,7 +353,7 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 			args = parseCommaSepValues(scope, false);
 		}
 		consumeToken(SMALL_CLOSE,
-			"expected `\\)´ after `call ( [FUNC_CALL_RESULT] <-- )? \\( ( [VALUE] ( , [VALUE] )* )?´");
+			"expected `\\)´ after `[SHIFT_EXP] ( [FUNC_CALL_RESULT] <-- )? \\( ( [VALUE] ( , [VALUE] )* )?´");
 		consumeToken(SEMI, "expected `;´ after `call [VALUE]  ( [FUNC_CALL_RESULT] <-- )? [FUNC_CALL_ARGS]´");
 		FuncCallCmd res = FuncCallCmd.create(scope, func, results, args, this.in.ctx());
 		exitState(STATE_EX_CODE_CALL_FUNC, enter, res);
