@@ -88,6 +88,7 @@ public class SimpleCodeBuilder extends IncrementalProjectBuilder {
 				// handle changed resource
 				checkSSF(resource, this.props, this.curSrc, this.monitor);
 				break;
+			default:
 			}
 			// return true to continue visiting children.
 			return true;
@@ -176,14 +177,14 @@ public class SimpleCodeBuilder extends IncrementalProjectBuilder {
 		return parseProps(project, monitor, true);
 	}
 	
-	private static final String BINARY_START  = "binary=";
-	private static final String EXPORTS_START = "exports=";
-	
-	private static ProjectProps parseProps(IProject project, IProgressMonitor monitor) throws CoreException {
+	public static ProjectProps parseProps(IProject project, IProgressMonitor monitor) throws CoreException {
 		return parseProps(project, monitor, false);
 	}
 	
-	private static ProjectProps parseProps(IProject project, IProgressMonitor monitor, boolean createIfNotExists)
+	private static final String BINARY_START  = "binary=";
+	private static final String EXPORTS_START = "exports=";
+	
+	private static ProjectProps parseProps(IProject project, IProgressMonitor monitor, boolean createSoruceDirIfNotExists)
 		throws CoreException {
 		if ( Activator.doLog(LogLevel.DEBUG) ) {
 			log("parseProps( " + project + " , " + monitor + " ) called");
@@ -234,7 +235,7 @@ public class SimpleCodeBuilder extends IncrementalProjectBuilder {
 				case "source" -> {
 					IFolder folder = project.getFolder(line);
 					if ( !folder.exists() ) {
-						if ( createIfNotExists ) {
+						if ( createSoruceDirIfNotExists ) {
 							folder.create(0, false, monitor);
 						} else {
 							addMarker(confFile, "the folder '" + line + "' could not be found", lineNumber,
@@ -318,7 +319,7 @@ public class SimpleCodeBuilder extends IncrementalProjectBuilder {
 		}
 	}
 	
-	private void deletedSSF(IResource resource, IPath curSrc, IProgressMonitor monitor) {
+	private static void deletedSSF(IResource resource, IPath curSrc, IProgressMonitor monitor) {
 		if ( Activator.doLog(LogLevel.INFO) ) {
 			log("deletedSSF( " + resource + " , " + curSrc + " , " + monitor + " ) called");
 		}

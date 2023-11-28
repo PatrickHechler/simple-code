@@ -24,12 +24,10 @@ public class SimpleCodeNewProjectPage extends WizardPage {
 	
 	/**
 	 * Constructor for SampleNewWizardPage.
-	 *
-	 * @param pageName
 	 */
 	public SimpleCodeNewProjectPage() {
-		super("wizardPage");
-		setTitle("Create Simple Code Project");
+		super("Create Simpel-Code Project");
+		setTitle("Create Simple-Code Project");
 		setDescription("This wizard creates a new Simple-Code Project.");
 	}
 	
@@ -47,12 +45,12 @@ public class SimpleCodeNewProjectPage extends WizardPage {
 		projectLabel.setFont(parent.getFont());
 		
 		// new project name entry field
-		projectNameField = new Text(composite, SWT.BORDER);
-		projectNameField.setFont(parent.getFont());
+		this.projectNameField = new Text(composite, SWT.BORDER);
+		this.projectNameField.setFont(parent.getFont());
 		
 		// Set the initial value first before listener
 		// to avoid handling an event during the creation.
-		projectNameField.addListener(SWT.Modify, this::nameModifyListener);
+		this.projectNameField.addListener(SWT.Modify, this::nameModifyListener);
 		
 		setPageComplete(false);
 		// Show description on opening
@@ -106,7 +104,7 @@ public class SimpleCodeNewProjectPage extends WizardPage {
 	}
 	
 	public String getProjectName() {
-		return projectNameField.getText();
+		return this.projectNameField.getText();
 	}
 	
 }

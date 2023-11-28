@@ -12,6 +12,8 @@ import org.eclipse.core.filebuffers.IDocumentSetupParticipantExtension;
 import org.eclipse.core.filebuffers.LocationKind;
 import org.eclipse.core.resources.IFile;
 import org.eclipse.core.resources.IMarker;
+import org.eclipse.core.resources.IProject;
+import org.eclipse.core.resources.IProjectDescription;
 import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IPath;
@@ -22,6 +24,8 @@ import org.osgi.service.log.LogLevel;
 
 import de.hechler.patrick.code.simple.ecl.Activator;
 import de.hechler.patrick.code.simple.ecl.builder.SimpleCodeBuilder;
+import de.hechler.patrick.code.simple.ecl.builder.SimpleCodeBuilder.ProjectProps;
+import de.hechler.patrick.code.simple.ecl.builder.SimpleCodeNature;
 import de.hechler.patrick.code.simple.parser.SimpleExportFileParser;
 import de.hechler.patrick.code.simple.parser.SimpleSourceFileParser;
 import de.hechler.patrick.code.simple.parser.SimpleTokenStream;
@@ -36,13 +40,15 @@ public class ValidatorDocumentSetupParticipant
 	
 	private final class DocumentValidator implements IDocumentListener {
 		
-		private final IFile   file;
-		private final boolean ssfMode;
-		private List<IMarker> marker = new ArrayList<>();
-		private DocumentTree  tree;
+		private final IFile    file;
+		private final IProject p;
+		private final boolean  ssfMode;
+		private List<IMarker>  marker = new ArrayList<>();
+		private DocumentTree   tree;
 		
-		private DocumentValidator(IFile file) {
+		private DocumentValidator(IFile file, IProject p) {
 			this.file = file;
+			this.p = p;
 			this.ssfMode = file.getName().endsWith(".ssf");
 		}
 		
@@ -55,19 +61,23 @@ public class ValidatorDocumentSetupParticipant
 			for (IMarker m : this.marker) {
 				try {
 					m.delete();
-				} catch ( CoreException e ) {
+				} catch (CoreException e) {
 					if ( Activator.doLog(LogLevel.ERROR) ) {
 						Activator.log("editor.ssf : " + DocumentValidator.this.file, "could not delete a marker: " + e);
 					}
 				}
 			}
 			this.marker.clear();
-			try ( StringReader reader = new StringReader(event.getDocument().get()) ) {
+			try (StringReader reader = new StringReader(event.getDocument().get())) {
 				buildTree(reader);
+			} catch (CoreException e) {
+				if ( Activator.doLog(LogLevel.ERROR) ) {
+					Activator.log("editor.validator", "validation crashed: " + e);
+				}
 			}
 		}
 		
-		private void buildTree(Reader reader) {
+		private void buildTree(Reader reader) throws CoreException {
 			DocumentTree tree = new DocumentTree();
 			SimpleTokenStream sts = new SimpleTokenStream(reader, this.file.toString()) {
 				
@@ -83,7 +93,7 @@ public class ValidatorDocumentSetupParticipant
 				}
 				
 			};
-			BiFunction<String,String,SimpleDependency> dep = dep(this.file);
+			BiFunction<String, String, SimpleDependency> dep = dep(this.file, this.p);
 			SimpleExportFileParser sp = createParser(tree, sts, dep);
 			SimpleFile sf = new SimpleFile(this.file.toString(), this.file.toString());
 			SimpleCodeBuilder.initilizeSimpleFile(sf);
@@ -92,7 +102,7 @@ public class ValidatorDocumentSetupParticipant
 		}
 		
 		private SimpleExportFileParser createParser(DocumentTree tree, SimpleTokenStream sts,
-			BiFunction<String,String,SimpleDependency> dep) {
+			BiFunction<String, String, SimpleDependency> dep) {
 			SimpleExportFileParser sp;
 			if ( this.ssfMode ) {
 				sp = new SimpleSourceFileParser(sts, dep) {
@@ -144,12 +154,12 @@ public class ValidatorDocumentSetupParticipant
 					@Override
 					protected void handleError(CompileError err) {
 						try {
-							IMarker m = file.createMarker(IMarker.PROBLEM);
+							IMarker m = DocumentValidator.this.file.createMarker(IMarker.PROBLEM);
 							DocumentValidator.this.marker.add(m);
 							m.setAttribute(IMarker.SEVERITY, IMarker.SEVERITY_ERROR);
 							m.setAttribute(IMarker.MESSAGE, err.getMessage());
 							m.setAttribute(IMarker.LINE_NUMBER, err.line);
-						} catch ( CoreException e ) {
+						} catch (CoreException e) {
 							if ( Activator.doLog(LogLevel.ERROR) ) {
 								Activator.log("editor.ssf : " + DocumentValidator.this.file,
 									"could not set a marker: " + e);
@@ -208,12 +218,12 @@ public class ValidatorDocumentSetupParticipant
 					@Override
 					protected void handleError(CompileError err) {
 						try {
-							IMarker m = file.createMarker(IMarker.PROBLEM);
+							IMarker m = DocumentValidator.this.file.createMarker(IMarker.PROBLEM);
 							DocumentValidator.this.marker.add(m);
 							m.setAttribute(IMarker.SEVERITY, IMarker.SEVERITY_ERROR);
 							m.setAttribute(IMarker.MESSAGE, err.getMessage());
 							m.setAttribute(IMarker.LINE_NUMBER, err.line);
-						} catch ( CoreException e ) {
+						} catch (CoreException e) {
 							if ( Activator.doLog(LogLevel.ERROR) ) {
 								Activator.log("editor.ssf : " + DocumentValidator.this.file,
 									"could not set a marker: " + e);
@@ -226,8 +236,9 @@ public class ValidatorDocumentSetupParticipant
 			return sp;
 		}
 		
-		private BiFunction<String,String,SimpleDependency> dep(IFile file2) { // TODO Auto-generated method stub
-			return null;
+		private static BiFunction<String, String, SimpleDependency> dep(IFile file, IProject p) throws CoreException {
+			ProjectProps props = SimpleCodeBuilder.parseProps(p, null);
+			
 		}
 		
 		@Override
@@ -244,7 +255,18 @@ public class ValidatorDocumentSetupParticipant
 	public void setup(IDocument document, IPath location, LocationKind locationKind) {
 		if ( locationKind == LocationKind.IFILE ) {
 			IFile file = ResourcesPlugin.getWorkspace().getRoot().getFile(location);
-			document.addDocumentListener(new DocumentValidator(file));
+			IProject p = file.getProject();
+			try {
+				IProjectDescription desc = p.getDescription();
+				if ( !desc.hasNature(SimpleCodeNature.NATURE_ID) ) {
+					return;
+				}
+				document.addDocumentListener(new DocumentValidator(file, p));
+			} catch (CoreException e) {
+				if ( Activator.doLog(LogLevel.ERROR) ) {
+					Activator.log("editor.setup", "could not initilize the editor: " + e);
+				}
+			}
 		}
 	}
 	

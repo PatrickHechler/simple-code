@@ -46,12 +46,7 @@ public class AddRemoveSimpleCodeNatureHandler extends AbstractHandler {
 		return null;
 	}
 	
-	/**
-	 * Toggles Simple-Code nature on a project
-	 *
-	 * @param project to have Simple-Code nature added or removed
-	 */
-	private void toggleNature(IProject project) throws CoreException {
+	private static void toggleNature(IProject project) throws CoreException {
 		if ( Activator.doLog(LogLevel.DEBUG) ) {
 			Activator.log("project-toggle", "toggleNature( " + project + " ) called");
 		}

@@ -51,8 +51,8 @@ public class SimpleCodeNewProject extends Wizard implements INewWizard {
 	 */
 	@Override
 	public void addPages() {
-		page = new SimpleCodeNewProjectPage();
-		addPage(page);
+		this.page = new SimpleCodeNewProjectPage();
+		addPage(this.page);
 	}
 	
 	/**
@@ -61,7 +61,7 @@ public class SimpleCodeNewProject extends Wizard implements INewWizard {
 	 */
 	@Override
 	public boolean performFinish() {
-		final String projectName = page.getProjectName();
+		final String projectName = this.page.getProjectName();
 		IRunnableWithProgress op = monitor -> {
 			try {
 				doFinish(projectName, monitor);
@@ -121,9 +121,8 @@ public class SimpleCodeNewProject extends Wizard implements INewWizard {
 		}
 		ProjectProps props = SimpleCodeBuilder.initilize(project, monitor);
 		if ( props.src().length == 1 && props.src()[0].members().length == 0 ) {
-			IFile hw = props.src()[0].getFile("hello_world.ssf");
+			IFile hw = props.src()[0].getFile("main.ssf");
 			ByteArrayInputStream bais = new ByteArrayInputStream("""
-				// This file prints 'hello world\\n' to stdout and then exits with zero on success
 				func main <ubyte exitnum> <-- (unum argc, char## argv) {
 					unum err;
 					std:puts<?,err> <-- ("hello world\\n");
