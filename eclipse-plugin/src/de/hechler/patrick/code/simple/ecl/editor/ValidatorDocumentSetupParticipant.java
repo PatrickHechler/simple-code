@@ -33,17 +33,17 @@ import de.hechler.patrick.code.simple.parser.error.CompileError;
 import de.hechler.patrick.code.simple.parser.objects.simplefile.SimpleDependency;
 import de.hechler.patrick.code.simple.parser.objects.simplefile.SimpleFile;
 
-public class ValidatorDocumentSetupParticipant
-	implements IDocumentSetupParticipant, IDocumentSetupParticipantExtension {
+public class ValidatorDocumentSetupParticipant implements IDocumentSetupParticipant, IDocumentSetupParticipantExtension {
 	
 	public static final int TOKEN_COMMENT = SimpleTokenStream.MAX_TOKEN + 1;
+	
+	private DocumentTree tree;
 	
 	private final class DocumentValidator implements IDocumentListener {
 		
 		private final IFile    file;
 		private final IProject p;
 		private final boolean  ssfMode;
-		private DocumentTree   tree;
 		
 		private DocumentValidator(IFile file, IProject p) {
 			this.file = file;
@@ -62,7 +62,7 @@ public class ValidatorDocumentSetupParticipant
 				buildTree(reader);
 			} catch (CoreException e) {
 				if ( Activator.doLog(LogLevel.ERROR) ) {
-					Activator.log("editor.validator", "validation crashed: " + e);
+					log("validation crashed: " + e);
 				}
 			}
 		}
@@ -83,7 +83,7 @@ public class ValidatorDocumentSetupParticipant
 						if ( ft != null ) {
 							tree.parsedToken(ft);
 							this.ftok = null;
-						}// consumeTok() allows this method to be called, when the token is already consumed
+						} // consumeTok() allows this method to be called, when the token is already consumed
 						return super.consumeDynTokSpecialText();
 					} finally {
 						this.b = false;
@@ -110,7 +110,10 @@ public class ValidatorDocumentSetupParticipant
 				
 				@Override
 				public void consume() {
-					if ( this.b ) { super.consume(); return; }
+					if ( this.b ) {
+						super.consume();
+						return;
+					}
 					try {
 						this.b = true;
 						FileToken ft = this.ftok;
@@ -165,18 +168,17 @@ public class ValidatorDocumentSetupParticipant
 			};
 			BiFunction<String, String, SimpleDependency> dep = dep(this.file, this.p);
 			if ( dep == null ) {
-				this.tree = null;
+				ValidatorDocumentSetupParticipant.this.tree = null;
 				return;
 			}
 			SimpleExportFileParser sp = createParser(tree, sts, dep);
 			SimpleFile sf = new SimpleFile(this.file.toString(), this.file.toString());
 			SimpleCodeBuilder.initilizeSimpleFile(sf);
 			sp.parse(sf);
-			this.tree = tree;
+			ValidatorDocumentSetupParticipant.this.tree = tree;
 		}
 		
-		private SimpleExportFileParser createParser(DocumentTree tree, SimpleTokenStream sts,
-			BiFunction<String, String, SimpleDependency> dep) {
+		private SimpleExportFileParser createParser(DocumentTree tree, SimpleTokenStream sts, BiFunction<String, String, SimpleDependency> dep) {
 			SimpleExportFileParser sp;
 			if ( this.ssfMode ) {
 				sp = new SimpleSourceFileParser(sts, dep) {
@@ -205,13 +207,12 @@ public class ValidatorDocumentSetupParticipant
 					}
 					
 					@Override
-					protected void remenberExitedState(int state, Object enterResult, Object enterUnknownEndMarker,
-						Object additionalData) {
+					protected void remenberExitedState(int state, Object enterResult, Object enterUnknownEndMarker, Object additionalData) {
 						if ( enterUnknownEndMarker instanceof FilePosition fp ) {
 							tree.rememberExitedState((FilePosition.FileState) enterResult, fp, state, additionalData);
 						} else {
-							tree.rememberExitedState((FilePosition.FileState) enterResult,
-								( (FilePosition.FileState) enterUnknownEndMarker ).start(), state, additionalData);
+							tree.rememberExitedState((FilePosition.FileState) enterResult, ( (FilePosition.FileState) enterUnknownEndMarker ).start(), state,
+									additionalData);
 						}
 					}
 					
@@ -227,8 +228,7 @@ public class ValidatorDocumentSetupParticipant
 					
 					@Override
 					protected void handleError(CompileError err) {
-						addMarker(DocumentValidator.this.file, err.getLocalizedMessage(), err.line,
-							IMarker.SEVERITY_ERROR);
+						addMarker(DocumentValidator.this.file, err.getLocalizedMessage(), err.line, IMarker.SEVERITY_ERROR);
 					}
 					
 				};
@@ -259,13 +259,12 @@ public class ValidatorDocumentSetupParticipant
 					}
 					
 					@Override
-					protected void remenberExitedState(int state, Object enterResult, Object enterUnknownEndMarker,
-						Object additionalData) {
+					protected void remenberExitedState(int state, Object enterResult, Object enterUnknownEndMarker, Object additionalData) {
 						if ( enterUnknownEndMarker instanceof FilePosition fp ) {
 							tree.rememberExitedState((FilePosition.FileState) enterResult, fp, state, additionalData);
 						} else {
-							tree.rememberExitedState((FilePosition.FileState) enterResult,
-								( (FilePosition.FileState) enterUnknownEndMarker ).start(), state, additionalData);
+							tree.rememberExitedState((FilePosition.FileState) enterResult, ( (FilePosition.FileState) enterUnknownEndMarker ).start(), state,
+									additionalData);
 						}
 					}
 					
@@ -281,8 +280,7 @@ public class ValidatorDocumentSetupParticipant
 					
 					@Override
 					protected void handleError(CompileError err) {
-						addMarker(DocumentValidator.this.file, err.getLocalizedMessage(), err.line,
-							IMarker.SEVERITY_ERROR);
+						addMarker(DocumentValidator.this.file, err.getLocalizedMessage(), err.line, IMarker.SEVERITY_ERROR);
 					}
 					
 				};
@@ -304,21 +302,17 @@ public class ValidatorDocumentSetupParticipant
 			return null;
 		}
 		
-		private static BiFunction<String, String, SimpleDependency> dep0(IFile file, ProjectProps props, IPath fp,
-			IFolder src) {
+		private static BiFunction<String, String, SimpleDependency> dep0(IFile file, ProjectProps props, IPath fp, IFolder src) {
 			IPath sfp = src.getFullPath();
 			if ( sfp.isPrefixOf(fp) ) {
 				IFile exportFile = src.getFile(fp.makeRelativeTo(sfp));
-				BiFunction<String, String, SimpleDependency> result =
-					SimpleCodeBuilder.dep(props, sfp, exportFile, null);
+				BiFunction<String, String, SimpleDependency> result = SimpleCodeBuilder.dep(props, sfp, exportFile, null);
 				return (source, runtime) -> {
 					try {
 						return result.apply(source, runtime);
 					} catch (CompileError ce) {
 						addMarker(exportFile, ce.getLocalizedMessage(), ce.line, IMarker.SEVERITY_ERROR);
-						addMarker(file,
-							"the dependency " + source + " could not be parsed: " + ce.getLocalizedMessage(), -1,
-							IMarker.SEVERITY_ERROR);
+						addMarker(file, "the dependency " + source + " could not be parsed: " + ce.getLocalizedMessage(), -1, IMarker.SEVERITY_ERROR);
 						return null;
 					}
 				};
@@ -327,8 +321,7 @@ public class ValidatorDocumentSetupParticipant
 		}
 		
 		@Override
-		public void documentAboutToBeChanged(@SuppressWarnings("unused") DocumentEvent event) {
-		}
+		public void documentAboutToBeChanged(@SuppressWarnings("unused") DocumentEvent event) {}
 		
 	}
 	
@@ -343,14 +336,13 @@ public class ValidatorDocumentSetupParticipant
 			m.setAttribute(IMarker.LINE_NUMBER, line);
 		} catch (CoreException e) {
 			if ( Activator.doLog(LogLevel.ERROR) ) {
-				Activator.log("editor.ssf : " + file, "could not set a marker: " + e);
+				log("could not set a marker: " + e);
 			}
 		}
 	}
 	
 	@Override
-	public void setup(@SuppressWarnings("unused") IDocument document) {
-	}
+	public void setup(@SuppressWarnings("unused") IDocument document) {}
 	
 	@Override
 	public void setup(IDocument document, IPath location, LocationKind locationKind) {
@@ -365,14 +357,21 @@ public class ValidatorDocumentSetupParticipant
 				}
 				document.addDocumentListener(docVal);
 			} catch (UnsupportedClassVersionError e) {
-				addMarker(file, "are you running eclipse with JavaSE21 with --enable-preview? " + e, -1,
-					IMarker.SEVERITY_ERROR);
+				addMarker(file, "are you running eclipse with JavaSE21 with --enable-preview? " + e, -1, IMarker.SEVERITY_ERROR);
 			} catch (CoreException e) {
 				if ( Activator.doLog(LogLevel.ERROR) ) {
-					Activator.log("editor.setup", "could not initilize the editor: " + e);
+					log("could not initilize the editor: " + e);
 				}
 			}
 		}
+	}
+	
+	public DocumentTree tree() {
+		return this.tree;
+	}
+	
+	public static void log(String msg) {
+		Activator.log("editor.validator", msg);
 	}
 	
 }
