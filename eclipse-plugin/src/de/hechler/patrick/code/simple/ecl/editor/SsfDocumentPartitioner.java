@@ -2,6 +2,9 @@ package de.hechler.patrick.code.simple.ecl.editor;
 
 import java.io.Reader;
 import java.io.StringReader;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.function.BiFunction;
 
 import org.eclipse.core.resources.IFile;
@@ -32,35 +35,35 @@ public class SsfDocumentPartitioner implements IDocumentPartitioner {
 	
 	private static final int TOKEN_COMMENT = SimpleTokenStream.MAX_TOKEN + 1;
 	
-	private static final String[] LEGAL = new String[] {
-		"whitespace",
-		"comment",
-		"seperator/math/other-symbol",
-		"ref: global variable/function/dependency",
-		"ref: local variable",
-		"ref: value reference name",
-		"decl: global variable name",
-		"decl: local variable name",
-		"decl: param/result variable name",
-		"decl: typedef name",
-		"keyword: primitive type",
-		"keyword: typedefed type",
-		"keyword: typedef",
-		"keyword: dep",
-		"keyword: func",
-		"keyword: func (as function address type)",
-		"keyword: exp",
-		"keyword: main/init",
-		"keyword: const",
-		"keyword: fstruct/struct",
-		"keyword: call",
-		"keyword: while/if",
-		"keyword: asm",
-		"type",
-		"number",
-		"string",
-		"character",
-		"asm block",
+	private static final String[] LEGAL = new String[]{ //
+		"whitespace", //
+		"comment", //
+		"ref: global variable/function/dependency", //
+		"ref: local variable", //
+		"ref: value reference name", //
+		"decl: global variable name", //
+		"decl: local variable name", //
+		"decl: param/result variable name", //
+		"decl: typedef name", //
+		"keyword: primitive type", //
+		"keyword: typedefed type", //
+		"keyword: typedef", //
+		"keyword: dep", //
+		"keyword: func", //
+		"keyword: func (as function address type)", //
+		"keyword: exp", //
+		"keyword: main/init", //
+		"keyword: const", //
+		"keyword: fstruct/struct", //
+		"keyword: call", //
+		"keyword: while/if", //
+		"keyword: asm", //
+		"token: type", //
+		"token: number", //
+		"token: string", //
+		"token: character", //
+		"token: asm block", //
+		"token: seperator/math/other-symbol", //
 	};
 	
 	private final IFile    file;
@@ -68,6 +71,7 @@ public class SsfDocumentPartitioner implements IDocumentPartitioner {
 	private final boolean  ssfMode;
 	private DocumentTree   tree;
 	private String         last;
+	private ITypedRegion[] regions;
 	
 	public SsfDocumentPartitioner(IFile file) {
 		this(file, file.getName().endsWith(".ssf"));
@@ -95,8 +99,7 @@ public class SsfDocumentPartitioner implements IDocumentPartitioner {
 	
 	@Override
 	public String getContentType(int offset) {
-		// TODO Auto-generated method stub
-		return null;
+		return getPartition(offset).getType();
 	}
 	
 	@Override
@@ -107,8 +110,31 @@ public class SsfDocumentPartitioner implements IDocumentPartitioner {
 	
 	@Override
 	public ITypedRegion getPartition(int offset) {
-		// TODO Auto-generated method stub
-		return null;
+		ITypedRegion[] regs = this.regions;
+		int low = 0;
+		int high = regs.length - 1;
+		if ( low == high ) {
+			return regs[low];
+		}
+		while ( true ) {
+			int mid = ( low + high ) >>> 1;
+			ITypedRegion reg = regs[mid];
+			int off = reg.getOffset();
+			if ( off > offset ) {
+				high = mid - 1;
+				if ( low > high ) {
+					return regs[high];
+				}
+			}
+			int end = off + reg.getLength();
+			if ( end > offset ) {
+				return reg;
+			}
+			low = mid + 1;
+			if ( low > high ) {
+				return regs[low];
+			}
+		}
 	}
 	
 	@Override
@@ -120,6 +146,7 @@ public class SsfDocumentPartitioner implements IDocumentPartitioner {
 		try ( StringReader reader = new StringReader(event.getDocument().get()) ) {
 			this.file.deleteMarkers(SimpleCodeBuilder.VOLATILE_MARKER_TYPE, false, IResource.DEPTH_ZERO);
 			buildTree(reader);
+			rebuildPartitions();
 			return true;
 		} catch ( CoreException e ) {
 			if ( Activator.doLog(LogLevel.ERROR) ) {
@@ -127,6 +154,12 @@ public class SsfDocumentPartitioner implements IDocumentPartitioner {
 			}
 			return false;
 		}
+	}
+	
+	private void rebuildPartitions() {
+		List<ITypedRegion> regions = new ArrayList<>();
+		
+		this.regions = regions.toArray(new ITypedRegion[regions.size()]);
 	}
 	
 	private static void addMarker(IFile file, String msg, int line, int severity) {

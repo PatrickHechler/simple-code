@@ -5,7 +5,7 @@ import java.util.List;
 
 import de.hechler.patrick.code.simple.ecl.editor.FilePosition.FileState;
 
-public class DocumentTree {
+public class DocumentTree implements FileRegion {
 	
 	private DocumentTree           parent;
 	private FilePosition.FileState global;

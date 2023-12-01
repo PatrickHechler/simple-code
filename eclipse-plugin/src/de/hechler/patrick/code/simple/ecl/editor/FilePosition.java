@@ -8,6 +8,8 @@ import de.hechler.patrick.code.simple.parser.SimpleTokenStream;
 
 public record FilePosition(int totalChar, int line, int charInLine) {
 	
+	
+	
 	public record FileToken(FilePosition start, int token, FilePosition end) {
 		
 		@Override
@@ -28,7 +30,7 @@ public record FilePosition(int totalChar, int line, int charInLine) {
 	}
 	
 	private static Object tokenName(int token) {
-		if ( token == ValidatorDocumentSetupParticipant.TOKEN_COMMENT ) {
+		if ( token == SimpleTokenStream.INVALID ) {
 			return "COMMENT";
 		}
 		return SimpleTokenStream.name(token);
