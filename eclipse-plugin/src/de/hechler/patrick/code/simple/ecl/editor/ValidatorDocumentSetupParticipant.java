@@ -35,7 +35,7 @@ import de.hechler.patrick.code.simple.parser.objects.simplefile.SimpleFile;
 
 public class ValidatorDocumentSetupParticipant implements IDocumentSetupParticipant, IDocumentSetupParticipantExtension {
 	
-	public static final int TOKEN_COMMENT = SimpleTokenStream.MAX_TOKEN + 1;
+	private static final int TOKEN_COMMENT = SimpleTokenStream.MAX_TOKEN + 1;
 	
 	private DocumentTree tree;
 	
@@ -357,7 +357,7 @@ public class ValidatorDocumentSetupParticipant implements IDocumentSetupParticip
 				}
 				document.addDocumentListener(docVal);
 			} catch (UnsupportedClassVersionError e) {
-				addMarker(file, "are you running eclipse with JavaSE21 with --enable-preview? " + e, -1, IMarker.SEVERITY_ERROR);
+				addMarker(file, "are you running eclipse with JavaSE21 with preview enabled? " + e, -1, IMarker.SEVERITY_ERROR);
 			} catch (CoreException e) {
 				if ( Activator.doLog(LogLevel.ERROR) ) {
 					log("could not initilize the editor: " + e);
@@ -370,7 +370,7 @@ public class ValidatorDocumentSetupParticipant implements IDocumentSetupParticip
 		return this.tree;
 	}
 	
-	public static void log(String msg) {
+	private static void log(String msg) {
 		Activator.log("editor.validator", msg);
 	}
 	
