@@ -162,7 +162,7 @@ public class SsfDocumentPartitioner implements IDocumentPartitioner {
 		this.regions = regions.toArray(new ITypedRegion[regions.size()]);
 	}
 	
-	private static void addMarker(IFile file, String msg, int line, int severity) {
+	static void addMarker(IFile file, String msg, int line, int severity) {
 		try {
 			IMarker m = file.createMarker(SimpleCodeBuilder.VOLATILE_MARKER_TYPE);
 			m.setAttribute(IMarker.SEVERITY, severity);
