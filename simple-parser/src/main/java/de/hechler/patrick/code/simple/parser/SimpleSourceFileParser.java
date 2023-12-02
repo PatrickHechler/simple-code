@@ -114,7 +114,7 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 	public SimpleSourceFileParser(SimpleTokenStream in, BiFunction<String,String,SimpleDependency> dep) {
 		super(in, dep);
 	}
-	
+	//TODO: catch CompileError, let handleError handle that
 	@Override
 	protected void parseDependency(SimpleFile sf) {
 		final Object enter = enterState(STATE_DEPENDENCY);
