@@ -1,15 +1,18 @@
 package de.hechler.patrick.code.simple.ecl.editor;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 
+import de.hechler.patrick.code.simple.ecl.editor.FilePosition.FileRegion;
 import de.hechler.patrick.code.simple.ecl.editor.FilePosition.FileState;
 
-public class DocumentTree implements FileRegion {
+public final class DocumentTree implements FilePosition.FileRegion, Iterable<FilePosition.FileRegion> {
 	
-	private DocumentTree           parent;
-	private FilePosition.FileState global;
-	private List<Object>           entries = new ArrayList<>();
+	private DocumentTree                  parent;
+	private int                           parentIndex;
+	private FilePosition.FileState        global;
+	private List<FilePosition.FileRegion> entries = new ArrayList<>();
 	
 	public FilePosition.FileState enterState(FilePosition pos, int state) {
 		FilePosition.FileState posState = new FilePosition.FileState(pos, state, null, null);
@@ -29,7 +32,7 @@ public class DocumentTree implements FileRegion {
 	}
 	
 	public FilePosition.FileState[] decideStates(FilePosition.FileState undecidedState, int[] states) {
-		List<Object> entries = this.entries;
+		List<FilePosition.FileRegion> entries = this.entries;
 		if ( undecidedState == this.global ) {
 			FilePosition.FileState[] result = new FilePosition.FileState[states.length];
 			for (int i = 0; i < result.length; i++) {
@@ -41,8 +44,9 @@ public class DocumentTree implements FileRegion {
 			for (int i = 0; i < result.length - 1; i++) {
 				dt.enterState(result[i]);
 				DocumentTree parent = i == result.length - 2 ? this : new DocumentTree();
-				parent.entries.add(dt);
 				dt.parent = parent;
+				dt.parentIndex = parent.entries.size();
+				parent.entries.add(dt);
 				dt = parent;
 			}
 			this.global = result[result.length - 1];
@@ -78,7 +82,8 @@ public class DocumentTree implements FileRegion {
 	private void addNewSubTree(FilePosition.FileState posState) {
 		DocumentTree subDt = new DocumentTree();
 		subDt.parent = this;
-		subDt.enterState(posState);
+		subDt.parentIndex = this.entries.size();
+		subDt.global = posState;
 		this.entries.add(subDt);
 	}
 	
@@ -129,11 +134,28 @@ public class DocumentTree implements FileRegion {
 				throw new AssertionError("size < minRetain");
 			}
 			if ( size != this.entries.size() ) {
-				List<Object> subList = this.entries.subList(size, this.entries.size());
-				int minParentRetain = this.parent.entries.size();
-				this.parent.entries.addAll(subList);
+				List<FilePosition.FileRegion> subList = this.entries.subList(size, this.entries.size());
+				DocumentTree p = this.parent;
+				int oldParentSize = p.entries.size();
+				for (int i = 0; i < subList.size(); i++) {
+					int pi = oldParentSize + i;
+					p.entries.add(switch ( subList.get(i) ) {
+					case FilePosition.FileToken tok -> {
+						FilePosition s = tok.start();
+						int t = tok.token();
+						FilePosition e = tok.end();
+						FilePosition.FileToken ntok = new FilePosition.FileToken(s, t, e, p, pi);
+						yield ntok;
+					}
+					case DocumentTree dt -> {
+						dt.parent = parent;
+						dt.parentIndex = pi;
+						yield dt;
+					}
+					});
+				}
 				subList.clear();
-				this.parent.correctEntryPositions(pos, minParentRetain);
+				p.correctEntryPositions(pos, oldParentSize);
 			}
 		}
 	}
@@ -160,14 +182,14 @@ public class DocumentTree implements FileRegion {
 	public void parsedToken(FilePosition.FileToken token) {
 		int size = this.entries.size();
 		if ( size == 0 ) {
-			this.entries.add(token);
+			this.entries.add(token.initParent(this, size));
 			return;
 		}
 		Object last = this.entries.get(size - 1);
 		switch ( last ) {
 		case DocumentTree dt when dt.global.end() == null -> dt.parsedToken(token);
-		case DocumentTree dt -> this.entries.add(token);
-		case FilePosition.FileToken ft -> this.entries.add(token);
+		case DocumentTree dt -> this.entries.add(token.initParent(this, size));
+		case FilePosition.FileToken ft -> this.entries.add(token.initParent(this, size));
 		default -> throw new AssertionError(last.getClass());
 		}
 	}
@@ -191,6 +213,35 @@ public class DocumentTree implements FileRegion {
 		}
 		indent.replace(indent.length() - 2, indent.length(), "");
 		sb.append(indent).append("}\n");
+	}
+	
+	@Override
+	public DocumentTree parent() {
+		return this.parent;
+	}
+	
+	@Override
+	public int parentIndex() {
+		return parentIndex;
+	}
+	
+	public FilePosition.FileState global() {
+		return global;
+	}
+	
+	@Override
+	public FilePosition start() {
+		return this.global.start();
+	}
+	
+	@Override
+	public FilePosition end() {
+		return this.global.end();
+	}
+	
+	@Override
+	public Iterator<FileRegion> iterator() {
+		return this.entries.iterator();
 	}
 	
 }

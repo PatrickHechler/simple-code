@@ -40,22 +40,22 @@ public class VarDeclCmd extends SimpleCommand {
 	
 	@Override
 	public SimpleValue directNameValueOrNull(String name, ErrorContext ctx) {
-		if ( sv.name().equals(name) ) {
-			return VariableVal.create(sv, ctx);
+		if ( this.sv.name().equals(name) ) {
+			return VariableVal.create(this.sv, ctx);
 		}
 		return null;
 	}
 	
 	@Override
-	public void toString(StringBuilder append, @SuppressWarnings( "unused" ) StringBuilder indent) {
-		if ( ( sv.flags() & SimpleVariable.FLAG_CONSTANT ) != 0 ) {
+	public void toString(StringBuilder append, @SuppressWarnings("unused") StringBuilder indent) {
+		if ( ( this.sv.flags() & SimpleVariable.FLAG_CONSTANT ) != 0 ) {
 			append.append("const ");
 		}
-		if ( ( sv.flags() & SimpleVariable.FLAG_EXPORT ) != 0 ) {
+		if ( ( this.sv.flags() & SimpleVariable.FLAG_EXPORT ) != 0 ) {
 			append.append("exp ");
 		}
-		append.append(sv.type()).append(' ').append(sv.name());
-		if ( sv.initialValue() != null ) {
+		append.append(this.sv.type()).append(' ').append(sv.name());
+		if ( this.sv.initialValue() != null ) {
 			append.append(" <-- ").append(sv.initialValue());
 		}
 		append.append(';');

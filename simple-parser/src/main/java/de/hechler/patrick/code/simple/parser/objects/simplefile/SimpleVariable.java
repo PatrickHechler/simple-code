@@ -25,6 +25,7 @@ public record SimpleVariable(SimpleType type, String name, SimpleValue initialVa
 	
 	public static final int FLAG_CONSTANT = 0x0001;
 	public static final int FLAG_EXPORT = 0x0002;
+	public static final int FLAG_GLOBAL = 0x0004;
 	public static final int ALL_FLAGS = FLAG_CONSTANT | FLAG_EXPORT;
 	
 	public SimpleVariable(SimpleType type, String name, SimpleValue initialValue, int flags) {

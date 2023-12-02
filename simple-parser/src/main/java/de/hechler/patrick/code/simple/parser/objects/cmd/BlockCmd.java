@@ -67,8 +67,9 @@ public class BlockCmd extends SimpleCommand {
 	}
 	
 	public SimpleScope currentAsParent() {
-		final int blkLen = this.cmds.size();
 		return new SimpleScope() {
+			
+			private final int blkLen = BlockCmd.this.cmds.size();
 			
 			@Override
 			public SimpleValue nameValueOrNull(String name, ErrorContext ctx) {
@@ -85,7 +86,7 @@ public class BlockCmd extends SimpleCommand {
 	
 	private SimpleValue nameValueOrNull(String name, ErrorContext ctx, int blockLength) {
 		for (int i = 0; i < blockLength; i++) {
-			SimpleValue val = cmds.get(i).directNameValueOrNull(name, ctx);
+			SimpleValue val = this.cmds.get(i).directNameValueOrNull(name, ctx);
 			if ( val != null ) return val;
 		}
 		return super.parent.nameValueOrNull(name, ctx);

@@ -8,9 +8,38 @@ import de.hechler.patrick.code.simple.parser.SimpleTokenStream;
 
 public record FilePosition(int totalChar, int line, int charInLine) {
 	
+	public sealed interface FileRegion permits FileToken, DocumentTree {
+		
+		FilePosition start();
+		
+		FilePosition end();
+		
+		DocumentTree parent();
+		
+		int parentIndex();
+		
+	}
 	
-	
-	public record FileToken(FilePosition start, int token, FilePosition end) {
+	public record FileToken(FilePosition start, int token, FilePosition end, DocumentTree parent, int parentIndex)
+		implements FileRegion {
+		
+		
+		public FileToken(FilePosition start, int token, FilePosition end) {
+			this(start, token, end, null, -1);
+		}
+		
+		public FileToken initParent(DocumentTree parent, int parentIndex) {
+			if ( this.parent != null ) {
+				throw new IllegalStateException("parent already initilized");
+			}
+			if ( parent == null ) {
+				throw new NullPointerException("can't initilize a null parent");
+			}
+			if ( parentIndex < 0 ) {
+				throw new IllegalArgumentException("can't initilized a negative parent index");
+			}
+			return new FileToken(this.start, this.token, this.end, parent, parentIndex);
+		}
 		
 		@Override
 		public String toString() {

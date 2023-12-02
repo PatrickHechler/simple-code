@@ -27,12 +27,13 @@ public class SsfReconcilerStrategy implements IReconcilingStrategy, IReconciling
 	}
 	
 	@Override
-	public void reconcile(DirtyRegion dirtyRegion, IRegion subRegion) {
+	public void reconcile(@SuppressWarnings("unused") DirtyRegion dirtyRegion,
+		@SuppressWarnings("unused") IRegion subRegion) {
 		initialReconcile();
 	}
 	
 	@Override
-	public void reconcile(IRegion partition) {
+	public void reconcile(@SuppressWarnings("unused") IRegion partition) {
 		initialReconcile();
 	}
 	
@@ -41,6 +42,7 @@ public class SsfReconcilerStrategy implements IReconcilingStrategy, IReconciling
 		boolean b = this.document.get().equals(this.oldDocument);
 		if ( b ) return;
 		if ( !b ) return;
+		System.out.println("reconcile");
 		this.oldDocument = this.document.get();
 		
 		List<Position> positions = getNewPositionsOfAnnotations();
