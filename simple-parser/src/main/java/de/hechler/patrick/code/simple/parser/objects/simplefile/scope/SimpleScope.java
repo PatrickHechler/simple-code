@@ -36,7 +36,7 @@ public interface SimpleScope {
 		throw new CompileError(ctx, "nothing with the name '" + name + "' could be found");
 	}
 	
-	Object nameTypeOrDepOrFuncOrNull(String typedefName, ErrorContext ctx);
+	Object nameTypeOrDepOrFuncOrNull(String typedefName);
 	
 	static SimpleScope newFuncScope(SimpleFile sf, FuncType ft, ErrorContext ctx) {
 		checkDuplicates(sf, ctx, ft.argMembers());
@@ -46,14 +46,14 @@ public interface SimpleScope {
 			
 			@Override
 			public SimpleValue nameValueOrNull(String name, ErrorContext ctx) {
-				SimpleVariable val = ft.memberOrNull(name, ctx, true);
-				if ( val != null ) return VariableVal.create(val, ctx);
+				SimpleVariable sv = ft.memberOrNull(name, ctx, true);
+				if ( sv != null ) return VariableVal.create(sv, ctx);
 				return sf.nameValueOrNull(name, ctx);
 			}
 			
 			@Override
-			public Object nameTypeOrDepOrFuncOrNull(String typedefName, ErrorContext ctx) {
-				return sf.nameTypeOrDepOrFuncOrNull(typedefName, ctx);
+			public Object nameTypeOrDepOrFuncOrNull(String typedefName) {
+				return sf.nameTypeOrDepOrFuncOrNull(typedefName);
 			}
 		};
 	}

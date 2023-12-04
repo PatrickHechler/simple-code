@@ -62,6 +62,7 @@ import static de.hechler.patrick.code.simple.parser.SimpleTokenStream.UWORD;
 import static de.hechler.patrick.code.simple.parser.SimpleTokenStream.WHILE;
 import static de.hechler.patrick.code.simple.parser.SimpleTokenStream.WORD;
 import static de.hechler.patrick.code.simple.parser.SimpleTokenStream.name;
+import static de.hechler.patrick.code.simple.parser.error.ErrorContext.NO_CONTEXT;
 
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -69,7 +70,6 @@ import java.util.List;
 import java.util.function.BiFunction;
 
 import de.hechler.patrick.code.simple.parser.error.CompileError;
-import de.hechler.patrick.code.simple.parser.error.ErrorContext;
 import de.hechler.patrick.code.simple.parser.objects.cmd.AsmCmd;
 import de.hechler.patrick.code.simple.parser.objects.cmd.AssignCmd;
 import de.hechler.patrick.code.simple.parser.objects.cmd.BlockCmd;
@@ -86,7 +86,9 @@ import de.hechler.patrick.code.simple.parser.objects.simplefile.SimpleVariable;
 import de.hechler.patrick.code.simple.parser.objects.simplefile.scope.SimpleScope;
 import de.hechler.patrick.code.simple.parser.objects.types.FuncType;
 import de.hechler.patrick.code.simple.parser.objects.types.SimpleType;
+import de.hechler.patrick.code.simple.parser.objects.types.StructType;
 import de.hechler.patrick.code.simple.parser.objects.value.CastVal;
+import de.hechler.patrick.code.simple.parser.objects.value.DataVal;
 import de.hechler.patrick.code.simple.parser.objects.value.FunctionVal;
 import de.hechler.patrick.code.simple.parser.objects.value.SimpleValue;
 
@@ -114,7 +116,7 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 	public SimpleSourceFileParser(SimpleTokenStream in, BiFunction<String,String,SimpleDependency> dep) {
 		super(in, dep);
 	}
-	//TODO: catch CompileError, let handleError handle that
+	
 	@Override
 	protected void parseDependency(SimpleFile sf) {
 		final Object enter = enterState(STATE_DEPENDENCY);
@@ -142,10 +144,15 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 		consumeToken(SEMI, "expected to get `;´ after `dep [NAME] [STRING]´");
 		SimpleDependency dependency = this.dep.apply(srcPath, binPath);
 		if ( dependency == null ) {
-			throw new CompileError(this.in.ctx(),
+			handleError(this.in.ctx(),
 				"could not find the dependency \"" + srcPath + "\"" + ( binPath == null ? "" : " \"" + binPath + "\"" ));
+		} else {
+			try {
+				sf.dependency(dependency, name, this.in.ctx());
+			} catch ( CompileError ce ) {
+				handleError(ce);
+			}
 		}
-		sf.dependency(dependency, name, this.in.ctx());
 		exitState(STATE_DEPENDENCY, enter, name == null ? dependency : name);
 	}
 	
@@ -174,26 +181,37 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 				this.in.consume();
 				flags |= FuncType.FLAG_MAIN;
 			} else if ( ( flags & FuncType.FLAG_EXPORT ) == 0 ) {
-				handleError(new CompileError(this.in.ctx(), List.of(name(NAME), name(EXP), name(INIT), name(MAIN)),
-					"expected `exp (main | init)? [NAME] | (main | init) [NAME]? | [NAME]´ after `func´"));
+				handleError(this.in.ctx(), List.of(name(NAME), name(EXP), name(INIT), name(MAIN)),
+					"expected `exp (main | init)? [NAME] | (main | init) [NAME]? | [NAME]´ after `func´");
 			}
 			if ( this.in.tok() == NAME ) {
 				name = this.in.consumeDynTokSpecialText();
 			} else if ( ( flags & FuncType.FLAG_EXPORT ) != 0 ) {
-				handleError(new CompileError(this.in.ctx(), List.of(name(NAME), name(EXP), name(INIT), name(MAIN)),
-					"expected `[NAME]´ after `func exp (main | init)?´"));
+				handleError(this.in.ctx(), List.of(name(NAME), name(EXP), name(INIT), name(MAIN)),
+					"expected `[NAME]´ after `func exp (main | init)?´");
 			}
 		}
-		ErrorContext ctx = this.in.ctx();
 		SimpleType type = parseType(sf);
-		if ( !( type instanceof FuncType ftype ) || ( ftype.flags() & FuncType.FLAG_FUNC_ADDRESS ) == 0 ) {
-			ctx.setOffendingTokenCach(type.toString());
-			throw new CompileError(ctx, "the [TYPE] of a function MUST be a function address type: " + type);
+		FuncType ftype;
+		if ( !( type instanceof FuncType ftype0 ) || ( ftype0.flags() & FuncType.FLAG_FUNC_ADDRESS ) == 0 ) {
+			handleError(this.in.ctx(), "the [TYPE] of a function MUST be a function address type: " + type);
+			ftype = FuncType.create(List.of(), List.of(), FuncType.FLAG_FUNC_ADDRESS, NO_CONTEXT);
+		} else ftype = ftype0;
+		BlockCmd block;
+		try {
+			ftype = FuncType.create(ftype.resMembers(), ftype.argMembers(), flags, this.in.ctx());
+			block = new BlockCmd(SimpleScope.newFuncScope(sf, ftype, this.in.ctx()));
+		} catch ( CompileError ce ) {
+			handleError(ce);
+			ftype = FuncType.create(List.of(), List.of(), flags, this.in.ctx());
+			block = new BlockCmd(SimpleScope.newFuncScope(sf, ftype, this.in.ctx()));
 		}
-		ftype = FuncType.create(ftype.resMembers(), ftype.argMembers(), flags, ctx);
-		BlockCmd block = new BlockCmd(SimpleScope.newFuncScope(sf, ftype, ctx));
 		SimpleFunction func = new SimpleFunction(sf, name, ftype, block);
-		sf.function(func, ctx);
+		try {
+			sf.function(func, this.in.ctx());
+		} catch ( CompileError ce ) {
+			handleError(ce);
+		}
 		parseCmdBlock(block);
 		exitState(STATE_FUNCTION, enter, func);
 	}
@@ -243,6 +261,7 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 			if ( this.in.tok() == SMALL_CLOSE ) {
 				final Object enter = decidedState(STATE_TYPE_FUNC_ADDR, undecided);
 				this.in.consume();
+				// this can't fail, no try catch needed
 				FuncType res = FuncType.create(List.of(), List.of(), FuncType.FLAG_FUNC_ADDRESS, this.in.ctx());
 				exitState(STATE_TYPE_FUNC_ADDR, enter, res);
 				return res;
@@ -255,10 +274,14 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 						decidedStates[i] = STATE_VAL_CAST + i;
 					}
 					Object[] arr = decidedStates(decidedStates, scope);
-					SimpleValue unaryVal = parseValueUnaryExp(scope, 0, null, null);
-					SimpleValue castVal = CastVal.create(unaryVal, type0, this.in.ctx());
-					exitState(STATE_VAL_CAST, arr[0], castVal);
-					return parseValue(scope, CAST_MAGIC, castVal, arr);
+					SimpleValue val = parseValueUnaryExp(scope, 0, null, null);
+					try {
+						val = CastVal.create(val, type0, this.in.ctx());
+					} catch ( CompileError ce ) {
+						handleError(ce);
+					}
+					exitState(STATE_VAL_CAST, arr[0], val);
+					return parseValue(scope, CAST_MAGIC, val, arr);
 				}
 				final Object[] enters = decidedStates(new int[]{ STATE_TYPE_FUNC_ADDR, STATE_TYPE }, undecided);
 				final Object subEnter = enterState(STATE_NAMED_TYPE_LIST);
@@ -278,7 +301,7 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 					this.in.consume();
 					break;
 				default:
-					throw new CompileError(this.in.ctx(), List.of(name(COMMA), name(SMALL_CLOSE)),
+					handleError(this.in.ctx(), List.of(name(COMMA), name(SMALL_CLOSE)),
 						"expected `, | \\)´ after `[TYPE] [NAME]´");
 				}
 				FuncType ftype = FuncType.create(List.of(), list, FuncType.FLAG_FUNC_ADDRESS, this.in.ctx());
@@ -300,7 +323,7 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 			boolean hasMid = false;
 			while ( true ) {
 				String name = this.in.consumeDynTokSpecialText();
-				Object typeOrDep = scope.nameTypeOrDepOrFuncOrNull(name, this.in.ctx());
+				Object typeOrDep = scope.nameTypeOrDepOrFuncOrNull(name);
 				switch ( typeOrDep ) {
 				case SimpleDependency dep -> {
 					scope = dep;
@@ -323,7 +346,14 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 						decidedStates[i] = STATE_VAL_DIRECT + i;
 					}
 					Object[] enters = decidedStates(decidedStates, undecided);
-					SimpleValue value = scope.nameValueOrErr(name, this.in.ctx());
+					SimpleValue value;
+					try {
+						value = scope.nameValueOrErr(name, this.in.ctx());
+					} catch ( CompileError ce ) {
+						handleError(ce);
+						value = new DataVal(new byte[0], StructType.create(List.of(), StructType.FLAG_NOUSE, this.in.ctx()),
+							this.in.ctx());
+					}
 					if ( hasMid ) {
 						remenberExitedState(STATE_VAL_DIRECT, enters == null ? null : enters[0], firstEnd, value);
 					} else {
@@ -335,12 +365,13 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 			}
 		}
 		default:
-			throw new CompileError(this.in.ctx(),
+			handleError(this.in.ctx(),
 				List.of(name(NUM), name(UNUM), name(FPNUM), name(FPDWORD), name(DWORD), name(UDWORD), name(WORD), name(UWORD),
 					name(BYTE), name(UBYTE), name(STRUCT), name(FSTRUCT), name(FUNC), name(NOPAD), name(LT), name(STRING),
 					name(CHARACTER), name(NUMBER), name(PLUS), name(MINUS), name(BIT_AND), name(BIT_NOT), name(BOOL_AND),
 					name(SMALL_OPEN), name(NAME)),
 				"expected a `[TYPE]´ or a `[VALUE]´");
+			return StructType.create(List.of(), StructType.FLAG_NOUSE, this.in.ctx());
 		}
 	}
 	
@@ -356,7 +387,15 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 			consumeToken(LARROW, "expected `<-- [VALUE] ;´ after `[VALUE]´");
 			SimpleValue val1 = parseValue(scope);
 			consumeToken(SEMI, "expected `;´ after `[VALUE] <-- [VALUE]´");
-			AssignCmd res = AssignCmd.create(scope, val0, val1, this.in.ctx());
+			SimpleCommand res;
+			try {
+				res = AssignCmd.create(scope, val0, val1, this.in.ctx());
+			} catch ( CompileError ce ) {
+				handleError(ce);
+				BlockCmd bc = new BlockCmd(scope);
+				bc.seal();
+				res = bc;
+			}
 			exitState(STATE_EX_CODE_ASSIGN_CMD, enter, res);
 			return res;
 		}
@@ -383,7 +422,15 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 		consumeToken(SMALL_CLOSE,
 			"expected `\\)´ after `[SHIFT_EXP] ( [FUNC_CALL_RESULT] <-- )? \\( ( [VALUE] ( , [VALUE] )* )?´");
 		consumeToken(SEMI, "expected `;´ after `call [VALUE]  ( [FUNC_CALL_RESULT] <-- )? [FUNC_CALL_ARGS]´");
-		FuncCallCmd res = FuncCallCmd.create(scope, func, results, args, this.in.ctx());
+		SimpleCommand res;
+		try {
+			res = FuncCallCmd.create(scope, func, results, args, this.in.ctx());
+		} catch ( CompileError ce ) {
+			handleError(ce);
+			BlockCmd bc = new BlockCmd(scope);
+			bc.seal();
+			res = bc;
+		}
 		exitState(STATE_EX_CODE_CALL_FUNC, enter, res);
 		return res;
 	}
@@ -433,7 +480,15 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 		}
 		consumeToken(SEMI, "expected `;´ after `( const | var ) [TYPE] [NAME] ( <-- [VALUE] )?´");
 		SimpleVariable sv = new SimpleVariable(type, name, initialVal, flags);
-		VarDeclCmd res = VarDeclCmd.create(scope, sv, this.in.ctx());
+		SimpleCommand res;
+		try {
+			res = VarDeclCmd.create(scope, sv, this.in.ctx());
+		} catch ( CompileError ce ) {
+			handleError(ce);
+			BlockCmd bc = new BlockCmd(scope);
+			bc.seal();
+			res = bc;
+		}
 		exitState(STATE_EX_CODE_VAR_DECL, enter, res);
 		return res;
 	}
@@ -466,44 +521,70 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 			}
 		}
 		consumeToken(SEMI, "expected `;´ after `asm [ASM_PARAMS] [ASM_BLOCK] [ASM_RESULTS]´");
-		AsmCmd res = AsmCmd.create(scope, params, asmBlock, results, this.in.ctx());
+		SimpleCommand res;
+		try {
+			res = AsmCmd.create(scope, params, asmBlock, results, this.in.ctx());
+		} catch ( CompileError ce ) {
+			handleError(ce);
+			BlockCmd bc = new BlockCmd(scope);
+			bc.seal();
+			res = bc;
+		}
 		exitState(STATE_EX_CODE_ASM, enter, res);
 		return res;
 	}
 	
 	private void addAsmParamPair(SimpleScope scope, List<AsmCmd.AsmParam> params) {
-		final Object subEnter = enterState(STATE_EX_CODE_ASM_PARAM_PAIR);
+		final Object enter = enterState(STATE_EX_CODE_ASM_PARAM_PAIR);
 		String target = this.in.consumeDynTokSpecialText();
 		consumeToken(LARROW, "expected `<--´ after `asm ( [STRING] <-- [VALUE] , )* [STRING]´");
 		SimpleValue val = parseValue(scope);
-		AsmCmd.AsmParam asmParam = AsmCmd.AsmParam.create(target, val, this.in.ctx());
-		params.add(asmParam);
-		exitState(STATE_EX_CODE_ASM_PARAM_PAIR, subEnter, asmParam);
+		AsmCmd.AsmParam asmParam;
+		try {
+			asmParam = AsmCmd.AsmParam.create(target, val, this.in.ctx());
+			params.add(asmParam);
+		} catch ( CompileError ce ) {
+			handleError(ce);
+			asmParam = null;
+		}
+		exitState(STATE_EX_CODE_ASM_PARAM_PAIR, enter, asmParam);
 	}
 	
 	private void addAsmCorruptResult(List<AsmCmd.AsmResult> results) {
-		final Object subEnter = enterState(STATE_EX_CODE_ASM_RESULT_IGNORE);
+		final Object enter = enterState(STATE_EX_CODE_ASM_RESULT_IGNORE);
 		String ignoreReg = this.in.consumeDynTokSpecialText();
 		consumeToken(LARROW,
 			"expected `<-- \\?´ after `[ASM_BLOCK] ( ( [VALUE] <-- [STRING] | [STRING] <-- \\? ) ( , [VALUE] <-- [STRING] | [STRING] <-- \\? )* )? [STRING]´");
 		expectToken(QUESTION,
 			"expected `\\?´ after `[ASM_BLOCK] ( [VALUE] <-- [STRING] ( , [VALUE] <-- [STRING] )* )? [VALUE] <--´");
-		AsmCmd.AsmResult asmRes = AsmCmd.AsmResult.create(ignoreReg, this.in.ctx());
-		results.add(asmRes);
-		exitState(STATE_EX_CODE_ASM_RESULT_IGNORE, subEnter, asmRes);
+		AsmCmd.AsmResult asmRes;
+		try {
+			asmRes = AsmCmd.AsmResult.create(ignoreReg, this.in.ctx());
+			results.add(asmRes);
+		} catch ( CompileError ce ) {
+			handleError(ce);
+			asmRes = null;
+		}
+		exitState(STATE_EX_CODE_ASM_RESULT_IGNORE, enter, asmRes);
 	}
 	
 	private void addAsmResultPair(SimpleScope scope, List<AsmCmd.AsmResult> results) {
-		final Object subEnter = enterState(STATE_EX_CODE_ASM_RESULT_PAIR);
+		final Object enter = enterState(STATE_EX_CODE_ASM_RESULT_PAIR);
 		SimpleValue target = parseValue(scope);
 		consumeToken(LARROW,
 			"expected `<-- ?´ after `[ASM_BLOCK] ( ( [VALUE] <-- [STRING] | [STRING] <-- \\? ) ( , [VALUE] <-- [STRING] | [STRING] <-- \\? )* )? [VALUE]´");
 		expectToken(STRING,
 			"expected `<-- ?´ after `[ASM_BLOCK] ( ( [VALUE] <-- [STRING] | [STRING] <-- \\? ) ( , [VALUE] <-- [STRING] | [STRING] <-- \\? )* )? [VALUE] <--´");
 		String source = this.in.consumeDynTokSpecialText();
-		AsmCmd.AsmResult asmRes = AsmCmd.AsmResult.create(target, source, this.in.ctx());
-		results.add(asmRes);
-		exitState(STATE_EX_CODE_ASM_RESULT_PAIR, subEnter, asmRes);
+		AsmCmd.AsmResult asmRes;
+		try {
+			asmRes = AsmCmd.AsmResult.create(target, source, this.in.ctx());
+			results.add(asmRes);
+		} catch ( CompileError ce ) {
+			handleError(ce);
+			asmRes = null;
+		}
+		exitState(STATE_EX_CODE_ASM_RESULT_PAIR, enter, asmRes);
 	}
 	
 	private SimpleCommand parseCmdIf(SimpleScope scope) {
@@ -518,7 +599,15 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 			this.in.consume();
 			elseCmd = parseCommand(scope);
 		}
-		IfCmd res = IfCmd.create(scope, cond, cmd, elseCmd, this.in.ctx());
+		SimpleCommand res;
+		try {
+			res = IfCmd.create(scope, cond, cmd, elseCmd, this.in.ctx());
+		} catch ( CompileError ce ) {
+			handleError(ce);
+			BlockCmd bc = new BlockCmd(scope);
+			bc.seal();
+			res = bc;
+		}
 		exitState(STATE_EX_CODE_IF, enter, res);
 		return res;
 	}
@@ -530,7 +619,15 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 		SimpleValue cond = parseValue(scope);
 		consumeToken(SMALL_CLOSE, "expected `)´ after `while ( [VALUE]´");
 		SimpleCommand cmd = parseCommand(scope);
-		WhileCmd res = WhileCmd.create(scope, cond, cmd, this.in.ctx());
+		SimpleCommand res;
+		try {
+			res = WhileCmd.create(scope, cond, cmd, this.in.ctx());
+		} catch ( CompileError ce ) {
+			handleError(ce);
+			BlockCmd bc = new BlockCmd(scope);
+			bc.seal();
+			res = bc;
+		}
 		exitState(STATE_EX_CODE_WHILE, enter, res);
 		return res;
 	}
@@ -541,7 +638,15 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 		SimpleValue func = super.parseValueShiftExp(scope, 0, null, null);
 		SimpleValue fstuct = super.parseValue(scope);
 		consumeToken(SEMI, "expected `;´ after `call [VALUE] [VALUE]´");
-		StructFuncCallCmd res = StructFuncCallCmd.create(scope, func, fstuct, this.in.ctx());
+		SimpleCommand res;
+		try {
+			res = StructFuncCallCmd.create(scope, func, fstuct, this.in.ctx());
+		} catch ( CompileError ce ) {
+			handleError(ce);
+			BlockCmd bc = new BlockCmd(scope);
+			bc.seal();
+			res = bc;
+		}
 		exitState(STATE_EX_CODE_CALL_FSTRUCT, enter, res);
 		return res;
 	}

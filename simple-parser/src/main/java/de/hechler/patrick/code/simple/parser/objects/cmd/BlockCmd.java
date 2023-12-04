@@ -77,8 +77,8 @@ public class BlockCmd extends SimpleCommand {
 			}
 			
 			@Override
-			public Object nameTypeOrDepOrFuncOrNull(String typedefName, ErrorContext ctx) {
-				return BlockCmd.this.nameTypeOrDepOrFuncOrNull(typedefName, ctx);
+			public Object nameTypeOrDepOrFuncOrNull(String typedefName) {
+				return BlockCmd.this.nameTypeOrDepOrFuncOrNull(typedefName);
 			}
 			
 		};

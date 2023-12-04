@@ -65,7 +65,7 @@ public class SimpleFile extends SimpleDependency {
 	}
 	
 	@Override
-	public Object nameTypeOrDepOrFuncOrNull(String name, @SuppressWarnings("unused") ErrorContext ctx) {
+	public Object nameTypeOrDepOrFuncOrNull(String name) {
 		SimpleTypedef t = this.typedefs.get(name);
 		if ( t != null ) return t.type();
 		SimpleDependency d = this.dependencies.get(name);
