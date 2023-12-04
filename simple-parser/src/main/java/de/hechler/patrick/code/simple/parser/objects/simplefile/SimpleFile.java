@@ -77,21 +77,62 @@ public class SimpleFile extends SimpleDependency {
 	
 	public void dependency(SimpleDependency dep, String name, ErrorContext ctx) {
 		if ( name == null ) {
-			// FIXME
-			throw new UnsupportedOperationException("<ME> dependency");
+			mergeMeDep(dep);
+			return;
 		}
-		checkDuplicateName(name, ctx);
-		this.dependencies.put(name, dep);
+		checkDuplicateName(name, ctx, CDN_DEP);
+		this.dependencies.compute(name, (n, old) -> {
+			if ( old.sourceFile.equals(old.sourceFile) ) {
+				if ( old.binaryTarget == null ) {
+					return dep;
+				}
+				if ( old.binaryTarget.equals(dep.binaryTarget) ) {
+					return old;
+				}
+			}
+			nameUsed(name, "dependency", ctx);
+		});
 	}
 	
 	public void typedef(SimpleTypedef typedef, ErrorContext ctx) {
-		checkDuplicateName(typedef.name(), ctx);
-		this.typedefs.put(typedef.name(), typedef);
+		checkDuplicateName(typedef.name(), ctx, CDN_TDF);
+		this.typedefs.merge(typedef.name(), typedef, (old, td) -> {
+			if ( ( old.flags() & SimpleTypedef.FLAG_FROM_ME_DEP ) == 0
+				&& ( ( td.flags() & SimpleTypedef.FLAG_FROM_ME_DEP ) == 0 ) ) {
+				nameUsed(td.name(), "typedef", ctx);
+			}
+			if ( !old.type().equals(td.type()) ) {
+				nameUsed(td.name(), "typedef", ctx);
+			}
+			if ( ( old.flags() & SimpleTypedef.FLAG_FROM_ME_DEP ) != 0 ) {
+				return td;
+			}
+			return old;
+		});
 	}
 	
 	public void variable(SimpleVariable sv, ErrorContext ctx) {
-		checkDuplicateName(sv.name(), ctx);
-		this.variables.put(sv.name(), sv);
+		checkDuplicateName(sv.name(), ctx, CDN_VAR);
+		this.variables.merge(sv.name(), sv, (old, svar) -> {
+			if ( ( old.flags() & SimpleVariable.FLAG_FROM_ME_DEP ) == 0
+				&& ( ( svar.flags() & SimpleVariable.FLAG_FROM_ME_DEP ) == 0 ) ) {
+				nameUsed(svar.name(), "variable", ctx);
+			}
+			if ( !old.type().equals(svar.type()) ) {
+				nameUsed(svar.name(), "variable", ctx);
+			}
+			if ( ( old.flags() & ~( SimpleTypedef.FLAG_FROM_ME_DEP | SimpleTypedef.FLAG_EXPORT ) )//
+				!= ( svar.flags() & ~( SimpleTypedef.FLAG_FROM_ME_DEP | SimpleTypedef.FLAG_EXPORT ) ) ) {
+				nameUsed(svar.name(), "variable", ctx);
+			}
+			if ( old.initialValue() != null && svar.initialValue() != null ) {
+				nameUsed(svar.name(), "variable", ctx);
+			}
+			if ( ( old.flags() & SimpleTypedef.FLAG_FROM_ME_DEP ) != 0 ) {
+				return svar;
+			}
+			return old;
+		});
 	}
 	
 	public void function(SimpleFunction func, ErrorContext ctx) {
@@ -126,22 +167,23 @@ public class SimpleFile extends SimpleDependency {
 		}
 	}
 	
-	private void checkDuplicateName(String name, ErrorContext ctx) {
-		if ( this.dependencies.get(name) != null ) {
-			throw new CompileError(ctx, "there is already a something (a dependency) with the name " + name + ": "
-				+ this.dependencies.get(name));
+	private static final int CDN_DEP = 1;
+	private static final int CDN_TDF = 2;
+	private static final int CDN_VAR = 3;
+	private static final int CDN_FNC = 4;
+	
+	private void checkDuplicateName(String name, ErrorContext ctx, int type) {
+		if ( type != CDN_DEP && this.dependencies.containsKey(name) ) {
+			nameUsed(name, "dependency", ctx);
 		}
-		if ( this.typedefs.get(name) != null ) {
-			throw new CompileError(ctx,
-				"there is already a something (a typedef) with the name " + name + ": " + this.typedefs.get(name));
+		if ( type != CDN_TDF && this.typedefs.containsKey(name) ) {
+			nameUsed(name, "typedef", ctx);
 		}
-		if ( this.variables.get(name) != null ) {
-			throw new CompileError(ctx,
-				"there is already a something (a variable) with the name " + name + ": " + this.variables.get(name));
+		if ( type != CDN_VAR && this.variables.containsKey(name) ) {
+			nameUsed(name, "variable", ctx);
 		}
-		if ( this.functions.get(name) != null ) {
-			throw new CompileError(ctx,
-				"there is already a something (a function) with the name " + name + ": " + this.functions.get(name));
+		if ( type != CDN_FNC && this.functions.containsKey(name) ) {
+			nameUsed(name, "function", ctx);
 		}
 	}
 	
@@ -247,9 +289,9 @@ public class SimpleFile extends SimpleDependency {
 	public String toExportString() {
 		StringBuilder b = new StringBuilder();
 		for (Entry<String,SimpleDependency> e : this.dependencies.entrySet()) {
-			if (e.getValue().sourceFile != null) {
+			if ( e.getValue().sourceFile != null ) {
 				b.append("dep ").append(e.getKey()).append(" \"").append(e.getValue().sourceFile).append("\";\n");
-			} else if (!"std".equals(e.getKey())) {
+			} else if ( !"std".equals(e.getKey()) ) {
 				b.append("dep ").append(e.getKey()).append(" NULL \"").append(e.getValue().binaryTarget).append("\";\n");
 			}
 		}

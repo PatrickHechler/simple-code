@@ -21,12 +21,12 @@ import java.util.Objects;
 import de.hechler.patrick.code.simple.parser.objects.types.SimpleType;
 import de.hechler.patrick.code.simple.parser.objects.value.SimpleValue;
 
-public record SimpleVariable(SimpleType type, String name, SimpleValue initialValue, int flags) {
+public record SimpleVariable(SimpleType type, String name, SimpleValue initialValue, int flags)
+	implements SimpleExportable<SimpleVariable> {
 	
-	public static final int FLAG_CONSTANT = 0x0001;
-	public static final int FLAG_EXPORT = 0x0002;
-	public static final int FLAG_GLOBAL = 0x0004;
-	public static final int ALL_FLAGS = FLAG_CONSTANT | FLAG_EXPORT;
+	public static final int FLAG_CONSTANT = 0x0004;
+	public static final int FLAG_GLOBAL = 0x0008;
+	public static final int ALL_FLAGS = FLAG_CONSTANT | FLAG_EXPORT | FLAG_GLOBAL | FLAG_FROM_ME_DEP;
 	
 	public SimpleVariable(SimpleType type, String name, SimpleValue initialValue, int flags) {
 		this.type = Objects.requireNonNull(type, "type");
@@ -36,6 +36,24 @@ public record SimpleVariable(SimpleType type, String name, SimpleValue initialVa
 		if ( this.flags != flags ) {
 			throw new IllegalArgumentException("invalid flags: " + Integer.toHexString(flags));
 		}
+	}
+	
+	@Override
+	public SimpleVariable replace(SimpleVariable other) {
+		if ( !this.type.equals(other.type) ) {
+			return null;
+		}
+		if ( ( this.flags & ~( FLAG_EXPORT | FLAG_FROM_ME_DEP ) ) != ( other.flags & ~( FLAG_EXPORT | FLAG_FROM_ME_DEP ) ) ) {
+			return null;
+		}
+		if ( this.initialValue != null && other.initialValue != null ) {
+			if ( ( this.flags & FLAG_CONSTANT ) != 0 || !this.initialValue.equals(other.initialValue) ) {
+				return null;
+			}
+		} else if ( this.initialValue != null ) {
+			return this;
+		}
+		return other;
 	}
 	
 	@Override

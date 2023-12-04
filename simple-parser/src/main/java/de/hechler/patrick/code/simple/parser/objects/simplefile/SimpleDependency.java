@@ -16,9 +16,10 @@
 //along with this program.  If not, see <https://www.gnu.org/licenses/>.
 package de.hechler.patrick.code.simple.parser.objects.simplefile;
 
+import de.hechler.patrick.code.simple.parser.error.ErrorContext;
 import de.hechler.patrick.code.simple.parser.objects.simplefile.scope.SimpleScope;
 
-public abstract class SimpleDependency implements SimpleScope {
+public abstract class SimpleDependency implements SimpleScope, SimpleExportable<SimpleDependency> {
 	
 	public final String sourceFile;
 	public final String binaryTarget;
@@ -28,4 +29,16 @@ public abstract class SimpleDependency implements SimpleScope {
 		this.binaryTarget = binaryTarget;
 	}
 	
+	public SimpleDependency replace(SimpleDependency other) {
+		if ( other.sourceFile.equals(other.sourceFile) ) {
+			if ( other.binaryTarget == null ) {
+				return this;
+			}
+			if ( other.binaryTarget.equals(this.binaryTarget) ) {
+				return other;
+			}
+		}
+		return null;
+	}
+
 }

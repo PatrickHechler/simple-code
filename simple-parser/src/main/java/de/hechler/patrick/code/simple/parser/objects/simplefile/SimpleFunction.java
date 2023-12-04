@@ -19,7 +19,8 @@ package de.hechler.patrick.code.simple.parser.objects.simplefile;
 import de.hechler.patrick.code.simple.parser.objects.cmd.BlockCmd;
 import de.hechler.patrick.code.simple.parser.objects.types.FuncType;
 
-public record SimpleFunction(SimpleDependency dep, String name, FuncType type, BlockCmd block) {
+public record SimpleFunction(SimpleDependency dep, String name, FuncType type, BlockCmd block)
+	implements SimpleExportable<SimpleFunction> {
 	
 	public SimpleFunction(SimpleDependency dep, String name, FuncType type) {
 		this(dep, name, type, null);
@@ -29,6 +30,27 @@ public record SimpleFunction(SimpleDependency dep, String name, FuncType type, B
 		if ( ( type.flags() & FuncType.FLAG_FUNC_ADDRESS ) == 0 ) {
 			throw new AssertionError();
 		}
+	}
+	
+	@Override
+	public SimpleFunction replace(SimpleFunction other) {
+		if ( !this.type.equals(other.type) ) {
+			return null;
+		}
+		if ( ( this.type.flags() & ~( FLAG_EXPORT | FLAG_FROM_ME_DEP | FuncType.FLAG_INIT | FuncType.FLAG_MAIN ) )//
+			!= ( other.type.flags() & ~( FLAG_EXPORT | FLAG_FROM_ME_DEP | FuncType.FLAG_INIT | FuncType.FLAG_MAIN ) ) ) {
+			return null;
+		}
+		if ( this.block != null && other.block != null ) {
+			return null;
+		}
+		if ( !this.type.equalsIgnoreNonStructuralFlags(other) ) {
+			return null;
+		}
+		if ( this.block != null ) {
+			return this;
+		}
+		return other;
 	}
 	
 }

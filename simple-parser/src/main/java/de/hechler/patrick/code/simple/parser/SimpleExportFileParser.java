@@ -913,7 +913,7 @@ public class SimpleExportFileParser {
 	@SuppressWarnings("unchecked")
 	private < T > T parseTypeNamedType(SimpleScope scope, Class<T> cls) {
 		while ( true ) {
-			Object obj = scope.nameTypeOrDepOrFuncOrNull(this.in.consumeDynTokSpecialText(), this.in.ctx());
+			Object obj = scope.nameTypeOrDepOrFuncOrNull(this.in.consumeDynTokSpecialText());
 			if ( cls.isInstance(obj) ) return cls.cast(obj);
 			if ( !( obj instanceof SimpleDependency nscope ) ) {
 				String simpleName = cls.getSimpleName().startsWith("Simple") ? cls.getSimpleName().substring("Simple".length())

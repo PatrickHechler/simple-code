@@ -18,9 +18,24 @@ package de.hechler.patrick.code.simple.parser.objects.simplefile;
 
 import de.hechler.patrick.code.simple.parser.objects.types.SimpleType;
 
-public record SimpleTypedef(String name, int flags, SimpleType type) {
+public record SimpleTypedef(String name, int flags, SimpleType type) implements SimpleExportable<SimpleTypedef> {
 	
 	public static final int FLAG_EXPORT = 0x1000;
 	public static final int FLAG_FROM_ME_DEP = 0x2000;
+	
+	@Override
+	public SimpleTypedef replace(SimpleTypedef other) {
+		if ( ( other.flags() & SimpleTypedef.FLAG_FROM_ME_DEP ) == 0
+			&& ( ( this.flags() & SimpleTypedef.FLAG_FROM_ME_DEP ) == 0 ) ) {
+			return null;
+		}
+		if ( !other.type().equals(this.type()) ) {
+			return null;
+		}
+		if ( ( other.flags() & SimpleTypedef.FLAG_FROM_ME_DEP ) != 0 ) {
+			return this;
+		}
+		return other;
+	}
 	
 }
