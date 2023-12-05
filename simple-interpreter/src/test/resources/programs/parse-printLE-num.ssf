@@ -35,7 +35,7 @@ func main <ubyte exitnum> <-- (unum argc, char## argv) {
 		off <-- off + 1;
 		if (!exitnum) {
             print[off] <-- '\0';
-			std:puts<?,exitnum><--(print);
+			std:writestr<?,exitnum><--(print);
 			std:exit(exitnum);
 		}
 	}

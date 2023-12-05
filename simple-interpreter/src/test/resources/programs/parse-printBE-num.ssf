@@ -42,7 +42,7 @@ func main <ubyte exitnum> <-- (unum argc, char## argv) {
 				highI <-- highI - 1;
 				lowI <-- lowI + 1;
 			}
-			std:puts<?,exitnum><--(print);
+			std:writestr<?,exitnum><--(print);
 			std:exit(exitnum);
 		}
 	}

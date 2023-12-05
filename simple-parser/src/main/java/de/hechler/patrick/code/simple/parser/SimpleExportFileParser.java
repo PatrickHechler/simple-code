@@ -543,7 +543,9 @@ public class SimpleExportFileParser {
 			return res;
 		}
 		if ( this.in.tok() == SMALL_OPEN ) {
+			final Object undecided = enterUnknownState();
 			this.in.consume();
+			// TODO check for ( [VALUE] )
 			SimpleType t = parseType(scope);
 			consumeToken(SMALL_CLOSE, "expected `> [UNARY_EXP]´ after `< [TYPE]´");
 			SimpleValue a = parseValueUnaryExp(scope, 0, null, null);
@@ -914,14 +916,15 @@ public class SimpleExportFileParser {
 	@SuppressWarnings("unchecked")
 	private < T > T parseTypeNamedType(SimpleScope scope, Class<T> cls) {
 		while ( true ) {
-			Object obj = scope.nameTypeOrDepOrFuncOrNull(this.in.consumeDynTokSpecialText());
+			String name = this.in.consumeDynTokSpecialText();
+			Object obj = scope.nameTypeOrDepOrFuncOrNull(name);
 			if ( cls.isInstance(obj) ) return cls.cast(obj);
 			if ( !( obj instanceof SimpleDependency nscope ) ) {
 				String simpleName = cls.getSimpleName().startsWith("Simple") ? cls.getSimpleName().substring("Simple".length())
 					: cls.getSimpleName();
 				if ( obj == null ) {
 					this.in.handleError(this.in.ctx(), "expected the `[NAME]´ to be the [NAME] of a " + simpleName
-						+ " or a dependency, but there is nothing with the given name");
+						+ " or a dependency, but there is nothing with the name " + name);
 					if ( cls == SimpleType.class ) {
 						return (T) StructType.create(List.of(), StructType.FLAG_NOUSE, this.in.ctx());
 					}

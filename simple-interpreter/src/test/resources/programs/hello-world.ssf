@@ -18,7 +18,7 @@
 // this function prints hello world and exits with 0 if the print was successful
 func main <ubyte exitnum> <-- (unum argc, char## argv) {
     unum wrote;
-    std:puts <wrote, exitnum> <-- ("hello world\n");
+    std:writestr <wrote, exitnum> <-- ("hello world\n");
     if (!wrote && !exitnum) {
     	exitnum <-- 1;
     }
