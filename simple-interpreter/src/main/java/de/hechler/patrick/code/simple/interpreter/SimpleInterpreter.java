@@ -61,13 +61,13 @@ public class SimpleInterpreter {
 	private long roaddr;
 	private long stack;
 	
-	private final Path[]                   src;
-	private final Path                     defMain;
-	private final MemoryManager            mm;
-	private final FSManager                fsm;
-	private final SimpleFile               stdlib;
-	private final Map<Path,LoadedSF>       files  = new HashMap<>();
-	private final Map<SimpleFile,LoadedSF> loaded = new HashMap<>();
+	private final Path[]                    src;
+	private final Path                      defMain;
+	private final MemoryManager             mm;
+	private final FSManager                 fsm;
+	private final SimpleFile                stdlib;
+	private final Map<Path, LoadedSF>       files  = new HashMap<>();
+	private final Map<SimpleFile, LoadedSF> loaded = new HashMap<>();
 	
 	public SimpleInterpreter(List<Path> src) {
 		this(src, null);
@@ -91,10 +91,9 @@ public class SimpleInterpreter {
 		this.defMain = defMain;
 		this.mm = memManager;
 		this.fsm = fsManager;
-		this.stdlib = stdlib == null ? new JavaStdLib(this) : stdlib;
+		this.stdlib = stdlib == null ? new JavaStdLib() : stdlib;
 		final long pageSize = memManager.pageSize();
-		this.stack = pageSize
-			+ memManager.allocate(1L, 0x7FFFFFFFFFFFFFFFL & ~( pageSize - 1 ), MemoryManager.FLAG_GROW_DOWN);
+		this.stack = pageSize + memManager.allocate(1L, 0x7FFFFFFFFFFFFFFFL & ~( pageSize - 1 ), MemoryManager.FLAG_GROW_DOWN);
 		putWithDependencies(this.stdlib);
 	}
 	
@@ -143,9 +142,9 @@ public class SimpleInterpreter {
 		try {
 			Path realP = p.toRealPath();
 			Path p0 = realP;
-			try ( InputStream in = Files.newInputStream(p0) ) {
-				SimpleSourceFileParser parser = new SimpleSourceFileParser(in, oldP.toString(),
-					(srcPath, runtimePath) -> {
+			try (InputStream in = Files.newInputStream(p0)) {
+				SimpleSourceFileParser parser =
+					new SimpleSourceFileParser(in, oldP.toString(), (srcPath, runtimePath) -> {
 						if ( runtimePath == null ) {
 							if ( srcPath.endsWith(".sexp") ) {
 								runtimePath = srcPath.substring(0, srcPath.length() - ".sexp".length());
@@ -168,7 +167,8 @@ public class SimpleInterpreter {
 				this.loaded.put(sf, lsf);
 				return lsf;
 			}
-		} catch ( @SuppressWarnings("unused") IOException e ) {}
+		} catch (@SuppressWarnings("unused") IOException e) {
+		}
 		return null;
 	}
 	
@@ -214,7 +214,7 @@ public class SimpleInterpreter {
 			List<ConstantValue> resultList = execute(mainFile, func, list);
 			ConstantValue.ScalarValue exitNum = (ConstantValue.ScalarValue) resultList.get(0);
 			return (int) exitNum.value();
-		} catch ( ExitError e ) {
+		} catch (ExitError e) {
 			return e.exitnum;
 		}
 	}
@@ -874,7 +874,7 @@ public class SimpleInterpreter {
 		}
 	}
 	
-	private record SubScope(ValueScope parent, Map<String,ConstantValue> values) implements ValueScope {
+	private record SubScope(ValueScope parent, Map<String, ConstantValue> values) implements ValueScope {
 		
 		public SubScope(SimpleInterpreter si, ValueScope parent, List<SimpleVariable> l0, List<SimpleVariable> l1) {
 			this(parent, funcMap(si, l0, l1));
@@ -884,15 +884,15 @@ public class SimpleInterpreter {
 			this(parent, new HashMap<>());
 		}
 		
-		private static Map<String,ConstantValue> funcMap(SimpleInterpreter si, List<SimpleVariable> l0,
+		private static Map<String, ConstantValue> funcMap(SimpleInterpreter si, List<SimpleVariable> l0,
 			List<SimpleVariable> l1) {
-			Map<String,ConstantValue> map = new HashMap<>();
+			Map<String, ConstantValue> map = new HashMap<>();
 			putList(si, l0, map);
 			putList(si, l1, map);
 			return map;
 		}
 		
-		private static void putList(SimpleInterpreter si, List<SimpleVariable> l0, Map<String,ConstantValue> map)
+		private static void putList(SimpleInterpreter si, List<SimpleVariable> l0, Map<String, ConstantValue> map)
 			throws AssertionError {
 			for (SimpleVariable sv : l0) {
 				switch ( sv.type() ) {
@@ -968,7 +968,7 @@ public class SimpleInterpreter {
 		
 	}
 	
-	private final Map<Long,LoadedFunction> funcs = new HashMap<>();
+	private final Map<Long, LoadedFunction> funcs = new HashMap<>();
 	
 	public LoadedFunction ofAddr(long addr) {
 		LoadedFunction f = this.funcs.get(Long.valueOf(addr));
@@ -978,7 +978,7 @@ public class SimpleInterpreter {
 	
 	private record LoadedFunction(LoadedSF file, SimpleFunction func) {}
 	
-	private record LoadedSF(SimpleFile sf, Map<String,ConstantValue.DataValue> addrs, Map<byte[],Long> rodata)
+	private record LoadedSF(SimpleFile sf, Map<String, ConstantValue.DataValue> addrs, Map<byte[], Long> rodata)
 		implements ValueScope {
 		
 		public LoadedSF(SimpleFile sf) {

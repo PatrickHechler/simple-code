@@ -4,25 +4,31 @@ import static de.hechler.patrick.code.simple.parser.objects.types.NativeType.UBY
 import static de.hechler.patrick.code.simple.parser.objects.types.NativeType.UNUM;
 import static java.util.List.of;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.ClosedChannelException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 import de.hechler.patrick.code.simple.interpreter.SimpleInterpreter;
 import de.hechler.patrick.code.simple.interpreter.memory.MemoryManager;
 import de.hechler.patrick.code.simple.parser.error.ErrorContext;
+import de.hechler.patrick.code.simple.parser.objects.simplefile.SimpleExportable;
 import de.hechler.patrick.code.simple.parser.objects.simplefile.SimpleFile;
 import de.hechler.patrick.code.simple.parser.objects.simplefile.SimpleVariable;
 import de.hechler.patrick.code.simple.parser.objects.types.FuncType;
 import de.hechler.patrick.code.simple.parser.objects.types.PointerType;
 import de.hechler.patrick.code.simple.parser.objects.types.SimpleType;
+import de.hechler.patrick.code.simple.parser.objects.types.StructType;
 import de.hechler.patrick.code.simple.parser.objects.value.ScalarNumericVal;
 
 public class JavaStdLib extends JavaDependency {
 	
-	private static final SimpleType PNTR = PointerType.create(UBYTE, ErrorContext.NO_CONTEXT);
+	private static final SimpleType PNTR  =
+		PointerType.create(StructType.create(List.of(), 0, ErrorContext.NO_CONTEXT), ErrorContext.NO_CONTEXT);
+	private static final SimpleType BPNTR = PointerType.create(UBYTE, ErrorContext.NO_CONTEXT);
 	
-	private final SimpleInterpreter si;
+	private SimpleInterpreter si;
 	
 	/**
 	 * <ol>
@@ -50,23 +56,12 @@ public class JavaStdLib extends JavaDependency {
 	 * <li>start address of the next page</li>
 	 * </ol>
 	 */
-	private final long firstPage;
+	private long firstPage;
 	
-	public JavaStdLib(SimpleInterpreter si) {
+	private ByteBuffer sysinBuf;
+	
+	public JavaStdLib() {
 		super(null);
-		this.si = si;
-		final MemoryManager mem = this.si.memManager();
-		final long bs = mem.pageSize();
-		if ( bs < 32L ) {
-			throw new IllegalArgumentException("page size too small");
-		}
-		final int offSize = offSize(bs);
-		this.firstPage = mem.allocate(bs, 0L, 0);
-		final long blockEndOff = bs - 8L;
-		final long blockStartOff = blockEndOff - offSize * 3;
-		final long blockEndAddr = this.firstPage + blockEndOff;
-		btSetOffset(mem, blockEndAddr - offSize, offSize, blockStartOff);
-		btSetOffset(mem, blockEndAddr - ( offSize << 1 ), offSize, 8L);
 		function("exit", ft(of(), of(sv(UBYTE, "exitnum"))), (si_, args) -> {
 			int eval = (int) ( (ConstantValue.ScalarValue) args.get(0) ).value();
 			throw new SimpleInterpreter.ExitError(eval);
@@ -74,7 +69,7 @@ public class JavaStdLib extends JavaDependency {
 		function("mem_alloc", ft(of(sv(PNTR, "addr")), of(sv(UNUM, "length"), sv(UNUM, "align"))), (si_, args) -> {// NOSONAR
 			long len = ( (ConstantValue.ScalarValue) args.get(0) ).value();
 			long align = ( (ConstantValue.ScalarValue) args.get(1) ).value();
-			return List.of(new ConstantValue.ScalarValue(UNUM, alloc(len, align)));
+			return List.of(new ConstantValue.ScalarValue(UNUM, alloc(si_, len, align)));
 		});
 		function("mem_realloc",
 			ft(of(sv(PNTR, "new_addr")), of(sv(PNTR, "old_addr"), sv(UNUM, "new_length"), sv(UNUM, "new_align"))),
@@ -82,11 +77,11 @@ public class JavaStdLib extends JavaDependency {
 				long addr = ( (ConstantValue.ScalarValue) args.get(0) ).value();
 				long nlen = ( (ConstantValue.ScalarValue) args.get(1) ).value();
 				long nalign = ( (ConstantValue.ScalarValue) args.get(2) ).value();
-				return List.of(new ConstantValue.ScalarValue(PNTR, realloc(addr, nlen, nalign)));
+				return List.of(new ConstantValue.ScalarValue(PNTR, realloc(si_, addr, nlen, nalign)));
 			});
 		function("mem_free", ft(of(), of(sv(PNTR, "addr"))), (si_, args) -> {
 			long addr = ( (ConstantValue.ScalarValue) args.get(0) ).value();
-			free(addr);
+			free(si_, addr);
 			return List.of();
 		});
 		function("mem_copy", ft(of(), of(sv(PNTR, "from"), sv(PNTR, "to"), sv(UNUM, "length"))), (si_, args) -> {
@@ -103,9 +98,10 @@ public class JavaStdLib extends JavaDependency {
 			si_.memManager().move(from, to, length);
 			return List.of();
 		});
-		function("puts", ft(of(sv(UNUM, "wrote"), sv(UNUM, "errno")), of(sv(PNTR, "string"))), (si_, args) -> {
+		function("writestr", ft(of(sv(UNUM, "wrote"), sv(UNUM, "errno")), of(sv(BPNTR, "string"))), (si_, args) -> {
 			long addr = ( (ConstantValue.ScalarValue) args.get(0) ).value();
 			long len;
+			MemoryManager mem = si_.memManager();
 			for (len = 0L; mem.get8(addr + len) != 0; len++);
 			if ( len > Integer.MAX_VALUE ) len = Integer.MAX_VALUE;
 			ByteBuffer bb = ByteBuffer.allocate((int) len);
@@ -114,6 +110,19 @@ public class JavaStdLib extends JavaDependency {
 			System.out.print(str);
 			return List.of(new ConstantValue.ScalarValue(UNUM, len), new ConstantValue.ScalarValue(UNUM, 0L));
 		});
+		function("readln",
+			ft(of(sv(UNUM, "read_len"), sv(UNUM, "errno")), of(sv(BPNTR, "buffer"), sv(UNUM, "max_length"))),
+			(si_, args) -> {
+				long addr = ( (ConstantValue.ScalarValue) args.get(0) ).value();
+				long maxLen = ( (ConstantValue.ScalarValue) args.get(1) ).value();
+				long len = 0L;
+				long errno = 0L;
+				MemoryManager mem = si_.memManager();
+				if ( maxLen < 0L ) {
+					errno = 1L;
+				}
+				return readLine(addr, maxLen, len, errno, mem);
+			});
 		JavaDependency sys = new JavaDependency(null) {
 			@Override
 			public int hashCode() {
@@ -131,7 +140,92 @@ public class JavaStdLib extends JavaDependency {
 			(si_, args) -> List.of(new ConstantValue.ScalarValue(UNUM, si_.memManager().pageShift())));
 		dependency(sys, "sys", ErrorContext.NO_CONTEXT);
 		variable(new SimpleVariable(PNTR, "NULL", ScalarNumericVal.create(PNTR, 0L, ErrorContext.NO_CONTEXT),
-			SimpleVariable.FLAG_CONSTANT | SimpleVariable.FLAG_EXPORT), ErrorContext.NO_CONTEXT);
+			SimpleVariable.FLAG_CONSTANT | SimpleExportable.FLAG_EXPORT), ErrorContext.NO_CONTEXT);
+	}
+	
+	private List<ConstantValue> readLine(long addr, long maxLen, long len, long errno, MemoryManager mem) {
+		ByteBuffer bb = this.sysinBuf;
+		byte[] buf;
+		if ( bb == null ) {
+			bb = ByteBuffer.allocate(128);
+			this.sysinBuf = bb;
+			buf = bb.array();
+		} else if ( bb.hasRemaining() ) {
+			buf = bb.array();
+			int limit = bb.limit();
+			int cpy = (int) Math.max(bb.remaining(), maxLen - len);
+			bb.limit(bb.position() + cpy);
+			mem.set(addr, bb);
+			bb.limit(limit);
+			len += cpy;
+			addr += cpy;
+		} else buf = bb.array();
+		try {
+			while ( len < maxLen ) {
+				int r = System.in.available();
+				if ( r == 0 ) {
+					int b = System.in.read();
+					if ( b == -1 ) {
+						break;
+					}
+					mem.set8(addr++, b);
+					len++;
+					if ( b == '\n' ) break;
+					if ( len == maxLen ) break;
+				}
+				r = (int) Math.max(maxLen - len, r);
+				r = Math.max(buf.length, r);
+				r = System.in.read(buf, 0, r);
+				bb.position(0);
+				for (int i = 0; i < buf.length; i++) {
+					if ( buf[i] == '\n' ) {
+						bb.limit(i);
+						mem.set(addr, bb);
+						bb.position(i);
+						bb.limit(r);
+						return readResult(len, errno);
+					}
+				}
+				bb.limit(r);
+				mem.set(addr, bb);
+				addr += r;
+			}
+		} catch (ClosedChannelException e) {
+			errno = 2L;
+			System.err.println(e);
+		} catch (IOException e) {
+			errno = 3L;
+			System.err.println(e);
+		}
+		return readResult(len, errno);
+	}
+	
+	private static List<ConstantValue> readResult(long len, long errno) {
+		return List.of(new ConstantValue.ScalarValue(UNUM, len), new ConstantValue.ScalarValue(UNUM, errno));
+	}
+	
+	private void init(SimpleInterpreter si) {
+		if ( si == null ) {
+			throw new NullPointerException("si");
+		}
+		if ( this.si == si ) {
+			return;
+		} else if ( this.si != null ) {
+			throw new IllegalStateException("already initilized");
+		}
+		this.si = si;
+		final MemoryManager mem = this.si.memManager();
+		final long bs = mem.pageSize();
+		if ( bs < 32L ) {
+			throw new IllegalArgumentException("page size too small");
+		}
+		final int offSize = offSize(bs);
+		this.firstPage = mem.allocate(bs, 0L, 0);
+		final long blockEndOff = bs - 8L;
+		final long blockStartOff = blockEndOff - offSize * 3;
+		final long blockEndAddr = this.firstPage + blockEndOff;
+		btSetOffset(mem, blockEndAddr - offSize, offSize, blockStartOff);
+		btSetOffset(mem, blockEndAddr - ( offSize << 1 ), offSize, 8L);
 	}
 	
 	private static SimpleVariable sv(SimpleType t, String name) {
@@ -139,10 +233,12 @@ public class JavaStdLib extends JavaDependency {
 	}
 	
 	private static FuncType ft(List<SimpleVariable> res, List<SimpleVariable> args) {
-		return FuncType.create(res, args, FuncType.FLAG_FUNC_ADDRESS | FuncType.FLAG_EXPORT, ErrorContext.NO_CONTEXT);
+		return FuncType.create(res, args, FuncType.FLAG_FUNC_ADDRESS | SimpleExportable.FLAG_EXPORT,
+			ErrorContext.NO_CONTEXT);
 	}
 	
-	public long alloc(final long len, final long align) {
+	public long alloc(SimpleInterpreter si, final long len, final long align) {
+		init(si);
 		if ( len <= 0L ) {
 			throw new IllegalArgumentException("len <= 0: " + len);
 		}
@@ -275,12 +371,13 @@ public class JavaStdLib extends JavaDependency {
 		return result;
 	}
 	
-	public long realloc(final long oldAddr, final long newLength, final long newAlign) {
+	public long realloc(SimpleInterpreter si, final long oldAddr, final long newLength, final long newAlign) {
+		init(si);
 		if ( newLength <= 0L ) {
 			if ( newLength != 0L ) {
 				throw new IllegalArgumentException("newLength < 0: " + newLength);
 			}
-			free(oldAddr);
+			free(si, oldAddr);
 			return 0L;
 		}
 		if ( newAlign <= 0L ) {
@@ -352,9 +449,9 @@ public class JavaStdLib extends JavaDependency {
 					}
 					return result;
 				}
-				long result = alloc(newLength, newAlign);
+				long result = alloc(this.si, newLength, newAlign);
 				mem.copy(oldAddr, result, Math.min(newLength, oldLength));
-				free(oldAddr);
+				free(this.si, oldAddr);
 				return result;
 			}
 		}
@@ -365,7 +462,8 @@ public class JavaStdLib extends JavaDependency {
 		return "no allocated memory block starts at 0x" + Long.toHexString(oldAddr);
 	}
 	
-	public void free(long addr) {
+	public void free(SimpleInterpreter si, long addr) {
+		init(si);
 		final MemoryManager mem = this.si.memManager();
 		final long pageSize = mem.pageSize();
 		final long pageAddr = addr & ~pageSize;
@@ -524,7 +622,7 @@ public class JavaStdLib extends JavaDependency {
 	}
 	
 	private static long alloc(SimpleInterpreter si, SimpleFile sl, long len) {
-		if ( sl instanceof JavaStdLib jsl ) return jsl.alloc(len, 1L);
+		if ( sl instanceof JavaStdLib jsl ) return jsl.alloc(si, len, 1L);
 		ConstantValue.ScalarValue param0 = new ConstantValue.ScalarValue(UNUM, len);
 		ConstantValue.ScalarValue param1 = new ConstantValue.ScalarValue(UNUM, 1L);
 		List<ConstantValue> params = List.of(param0, param1);

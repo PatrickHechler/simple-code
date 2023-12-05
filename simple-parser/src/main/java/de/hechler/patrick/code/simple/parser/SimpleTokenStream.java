@@ -25,6 +25,7 @@ import java.io.Reader;
 import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 import de.hechler.patrick.code.simple.parser.error.CompileError;
 import de.hechler.patrick.code.simple.parser.error.ErrorContext;
@@ -101,7 +102,8 @@ public class SimpleTokenStream {
 	public static final int  ASM_BLOCK   = 62;
 	public static final int  MAX_TOKEN   = ASM_BLOCK;
 	
-	private static final String[] NAMES = { // @formatter:off
+	private static final String[] NAMES =
+		{ // @formatter:off
 		"!",           // BOOL_NOT
 		"!=",          // NOT_EQ
 		"#",           // DIAMOND
@@ -166,7 +168,7 @@ public class SimpleTokenStream {
 		"[CHARACTER]", // CHARACTER
 		"[ASM_BLOCK]", // ASM_BLOCK
 	};//@formatter:on
-	
+		
 	public static String name(int token) { // NOSONAR
 		if ( token < 0 || token >= NAMES.length ) {
 			if ( token == EOF ) return "EOF";
@@ -312,8 +314,9 @@ public class SimpleTokenStream {
 					return res;
 				} // was a comment
 			}
-		} catch ( IOException e ) {
-			throw new IllegalStateException(e);
+		} catch (IOException e) {
+			handleError(new CompileError(this.ctx, e.toString()));
+			return EOF;
 		}
 	}
 	
@@ -372,8 +375,9 @@ public class SimpleTokenStream {
 		if ( r == '\'' ) {
 			return returnChar();
 		}
-		throw new CompileError(this.file, this.line, this.charInLine, this.totalChar, String.valueOf((char) r), null,
-			null);
+		handleError(new CompileError(this.file, this.line, this.charInLine, this.totalChar, String.valueOf((char) r),
+			null, null));
+		return EOF;
 	}
 	
 	private int returnToken(int r, int tok) throws IOException {
@@ -420,11 +424,11 @@ public class SimpleTokenStream {
 	
 	private void skip(int len) throws IOException {
 		while ( len > 0 ) {// see InputStream.skipNBytes
-			long ns = in.skip(len);
+			long ns = this.in.skip(len);
 			if ( ns > 0 && ns <= len ) {
 				len -= ns;
 			} else if ( ns == 0 ) {
-				if ( in.read() == -1 ) {
+				if ( this.in.read() == -1 ) {
 					throw new EOFException();
 				}
 				len--;
@@ -495,7 +499,6 @@ public class SimpleTokenStream {
 		}
 	}
 	
-	
 	private int returnNumber(StringBuilder sb) throws IOException {
 		char[] bytes = new char[8];
 		if ( sb.length() >= 2 ) return readDecimal(bytes, sb, sb.indexOf(".") != -1);
@@ -517,10 +520,11 @@ public class SimpleTokenStream {
 			case 'O':
 				return readNumberWithPrefix(bytes, sb.append('O'), "NOCT-", 8);
 			case -1:
-				throw new CompileError(this.file, this.line, this.charInLine, this.totalChar, "N", null,
-					"expected more input");
+				this.dynTok = "N";
+				return NAME;
 			default:
-				throw new CompileError(this.file, this.line, this.charInLine, this.totalChar, "N", null, null);
+				this.dynTok = "N" + (char) r;
+				return NAME;
 			}
 		}
 		case 'D':
@@ -538,14 +542,14 @@ public class SimpleTokenStream {
 		}
 	}
 	
-	private int readNumberWithPrefix(char[] bytes, StringBuilder sb, String prefix, int number) throws IOException {
+	private int readNumberWithPrefix(char[] chars, StringBuilder sb, String prefix, int number) throws IOException {
 		while ( true ) {
 			this.in.mark(8);
-			int r = read(bytes, 0, 8);
+			int r = read(chars, 0, 8);
 			int i;
 			for (i = 0; i < r; i++) {
 				if ( sb.length() < prefix.length() ) {
-					if ( bytes[i] != prefix.charAt(sb.length()) ) {
+					if ( chars[i] != prefix.charAt(sb.length()) ) {
 						this.in.reset();
 						skip(i);
 						return returnName(sb);
@@ -553,15 +557,15 @@ public class SimpleTokenStream {
 						// the string builder is still smaller than the prefix
 						// thus it contains a valid name
 					}
-				} else if ( invalidNumber(bytes[i], number) ) {
-					int val = bytes[i];
+				} else if ( invalidNumber(chars[i], number) ) {
+					int val = chars[i];
 					if ( val == 'S' || val == 's' || val == 'U' || val == 'u' ) {// NOSONAR
 						sb.append(val);
 						if ( ++i >= r ) {
 							i = 0;
 							this.in.mark(1);
 							val = this.in.read();
-						} else val = bytes[i];
+						} else val = chars[i];
 					}
 					switch ( val ) {
 					case 'Q', 'q', 'N', 'n':
@@ -582,12 +586,16 @@ public class SimpleTokenStream {
 					this.tok = NUMBER;
 					return NUMBER;
 				}
-				sb.append((char) bytes[i]);
+				sb.append(chars[i]);
 			}
 			if ( r == 0 ) {
 				if ( sb.length() <= prefix.length() ) {
-					throw new CompileError(this.file, this.line, this.charInLine, this.totalChar, sb.toString(), null,
-						"reached EOF too early, the number after the prefix is missing");
+					if ( sb.length() < prefix.length() ) {
+						this.dynTok = sb.toString();
+						return NAME;
+					}
+					handleError(sb.toString(), "reached EOF too early, the number after the prefix is missing");
+					return EOF;
 				}
 				this.dynTok = sb.toString();
 				this.charInLine += this.dynTok.length();
@@ -620,13 +628,13 @@ public class SimpleTokenStream {
 						alreadyDot = true;
 					} else {
 						this.dynTok = sb.toString();
-						if ( this.dynTok.length() == 1 && ".".equals(this.dynTok) ) {
-							this.dynTok = null; // needs to be changed when a '.' token is added
-							throw new CompileError(this.file, this.line, this.charInLine, this.totalChar, sb.toString(),
-								null, null);
-						} else if ( this.dynTok.length() == 2 && "-.".equals(this.dynTok) ) {
+						if ( ".".equals(this.dynTok) ) {
+							handleError(sb.toString(), "a number must at least contain one digit");
+							this.dynTok = "0.0";
+							return NUMBER;
+						} else if ( "-.".equals(this.dynTok) ) {
 							// this will (currently) soon fail, because there is (currently) no '.' token
-							// maybe we the parser can handle this
+							// maybe the parser can handle this
 							this.in.reset();
 							skip(i);
 							this.charInLine++;
@@ -653,7 +661,7 @@ public class SimpleTokenStream {
 						return NUMBER;
 					}
 				}
-				sb.append((char) chars[i]);
+				sb.append(chars[i]);
 			}
 		}
 	}
@@ -690,7 +698,7 @@ public class SimpleTokenStream {
 		}
 		if ( chars[off] != '\'' ) {
 			throw new CompileError(this.file, this.line, this.charInLine, this.totalChar,
-				"'" + ( off == 2 ? "\\" + (char) chars[1] : Character.toString(chars[0]) ), null,
+				"'" + ( off == 2 ? "\\" + chars[1] : Character.toString(chars[0]) ), null,
 				"character not directly closed");
 		}
 		this.in.reset();
@@ -727,6 +735,8 @@ public class SimpleTokenStream {
 					return STRING;
 				}
 				case '\n', '\r' -> {
+					this.in.reset();
+					skip(i + 1 - origOff);
 					String tok = sb.insert(0, '"').append(chars, sbi, i - sbi).toString().replace("\n", "\\n")
 						.replace("\r", "\\r").replace("\t", "\\t").replace("\0", "\\0");
 					String msg = "line seperator inside of a string";
@@ -752,6 +762,32 @@ public class SimpleTokenStream {
 								val |= parseBSUHex(sb, chars[i + 4]) << 4;
 								val |= parseBSUHex(sb, chars[i + 5]);
 								sb.append((char) val);
+								i += 5;
+								sbi = i + 1;
+							}
+						}
+						case 'U' -> {
+							if ( i > r - 10 ) {
+								System.arraycopy(chars, i, chars, 0, r - i);
+								off = r - i;
+								sbi = r;
+								i = r;
+							} else {
+								int val = parseBSUHex(sb, chars[i + 2]) << 28;
+								val |= parseBSUHex(sb, chars[i + 3]) << 24;
+								val |= parseBSUHex(sb, chars[i + 4]) << 20;
+								val |= parseBSUHex(sb, chars[i + 5]) << 16;
+								val |= parseBSUHex(sb, chars[i + 2]) << 12;
+								val |= parseBSUHex(sb, chars[i + 3]) << 8;
+								val |= parseBSUHex(sb, chars[i + 4]) << 4;
+								val |= parseBSUHex(sb, chars[i + 5]);
+								try {
+									sb.append(Character.toString(val));
+								} catch (IllegalArgumentException iae) {
+									this.in.reset();
+									skip(i + 1 - origOff);
+									throw new CompileError(this.ctx(), iae.toString());
+								}
 								i += 5;
 								sbi = i + 1;
 							}
@@ -871,10 +907,10 @@ public class SimpleTokenStream {
 	
 	private int returnName(StringBuilder sb) throws IOException {
 		// no need for a decoder: name only allows ASCII characters
-		char[] bytes = new char[16];
+		char[] chars = new char[16];
 		while ( true ) {
 			this.in.mark(16);
-			int r = read(bytes, 0, 16);
+			int r = read(chars, 0, 16);
 			if ( r <= 0 ) {
 				this.charInLine += sb.length();
 				this.totalChar += sb.length();
@@ -883,7 +919,7 @@ public class SimpleTokenStream {
 				return NAME;
 			}
 			for (int i = 0; i < r; i++) {
-				if ( noName(bytes[i]) ) {
+				if ( noName(chars[i]) ) {
 					this.in.reset();
 					skip(i);
 					this.charInLine += sb.length();
@@ -892,7 +928,7 @@ public class SimpleTokenStream {
 					this.tok = NAME;
 					return NAME;
 				}
-				sb.append((char) bytes[i]);
+				sb.append(chars[i]);
 			}
 		}
 	}
@@ -941,6 +977,41 @@ public class SimpleTokenStream {
 			high++;
 		}
 		return high;
+	}
+	
+	public void handleError(String addMsg) {
+		handleError(ctx(), addMsg);
+	}
+	
+	public void handleError(String offTok, String addMsg) {
+		ErrorContext ctx = ctx();
+		ctx.setOffendingTokenCach(offTok);
+		handleError(ctx, addMsg);
+	}
+	
+	public void handleError(ErrorContext ctx, String addMsg) {
+		handleError(new CompileError(ctx, addMsg));
+	}
+	
+	public void handleError(ErrorContext ctx, List<String> expected) {
+		handleError(new CompileError(ctx, expected));
+	}
+	
+	public void handleError(ErrorContext ctx, List<String> expected, String addMsg) {
+		handleError(new CompileError(ctx, expected, addMsg));
+	}
+	
+	/**
+	 * handles the error
+	 * <p>
+	 * the default implementation just throws the error<br>
+	 * if this method is overwritten and returns normally the parser will guess what the input should have been<br>
+	 * after handleError returns normally the following data produced by the parser may not make any sense
+	 * 
+	 * @param err the error
+	 */
+	public void handleError(CompileError err) {
+		throw err;
 	}
 	
 }
