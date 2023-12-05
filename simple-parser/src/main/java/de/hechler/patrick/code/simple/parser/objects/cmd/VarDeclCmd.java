@@ -17,6 +17,7 @@
 package de.hechler.patrick.code.simple.parser.objects.cmd;
 
 import de.hechler.patrick.code.simple.parser.error.ErrorContext;
+import de.hechler.patrick.code.simple.parser.objects.simplefile.SimpleExportable;
 import de.hechler.patrick.code.simple.parser.objects.simplefile.SimpleVariable;
 import de.hechler.patrick.code.simple.parser.objects.simplefile.scope.SimpleScope;
 import de.hechler.patrick.code.simple.parser.objects.value.SimpleValue;
@@ -32,7 +33,7 @@ public class VarDeclCmd extends SimpleCommand {
 	}
 	
 	public static VarDeclCmd create(SimpleScope parent, SimpleVariable sv, ErrorContext ctx) {
-		if ( ( sv.flags() & SimpleVariable.FLAG_EXPORT ) != 0 ) {
+		if ( ( sv.flags() & SimpleExportable.FLAG_EXPORT ) != 0 ) {
 			throw new AssertionError(ctx);
 		}
 		return new VarDeclCmd(parent, sv);
@@ -51,12 +52,12 @@ public class VarDeclCmd extends SimpleCommand {
 		if ( ( this.sv.flags() & SimpleVariable.FLAG_CONSTANT ) != 0 ) {
 			append.append("const ");
 		}
-		if ( ( this.sv.flags() & SimpleVariable.FLAG_EXPORT ) != 0 ) {
+		if ( ( this.sv.flags() & SimpleExportable.FLAG_EXPORT ) != 0 ) {
 			append.append("exp ");
 		}
-		append.append(this.sv.type()).append(' ').append(sv.name());
+		append.append(this.sv.type()).append(' ').append(this.sv.name());
 		if ( this.sv.initialValue() != null ) {
-			append.append(" <-- ").append(sv.initialValue());
+			append.append(" <-- ").append(this.sv.initialValue());
 		}
 		append.append(';');
 	}

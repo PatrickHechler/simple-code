@@ -7,7 +7,7 @@ This dependency is small, but provides some basic functionality like allocating 
 ## file
 
 A simple-code file can either be compiled/interpreted.    
-If there is a main-function (that is a function marked with `main`) it can be [executed](#function).
+If there is a main-function (that is a function marked with `main`) it can be executed.
 
 `( [dependency] | [variable] | [typedef] | [function] )* EOF`
 

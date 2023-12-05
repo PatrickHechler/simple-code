@@ -16,26 +16,15 @@
 //along with this program.  If not, see <https://www.gnu.org/licenses/>.
 package de.hechler.patrick.code.simple.parser;
 
-import static de.hechler.patrick.code.simple.parser.SimpleTokenStream.ASM;
+import static de.hechler.patrick.code.simple.parser.SimpleTokenStream.*;
 import static de.hechler.patrick.code.simple.parser.SimpleTokenStream.ASM_BLOCK;
-import static de.hechler.patrick.code.simple.parser.SimpleTokenStream.BIT_AND;
-import static de.hechler.patrick.code.simple.parser.SimpleTokenStream.BIT_NOT;
 import static de.hechler.patrick.code.simple.parser.SimpleTokenStream.BLOCK_CLOSE;
 import static de.hechler.patrick.code.simple.parser.SimpleTokenStream.BLOCK_OPEN;
-import static de.hechler.patrick.code.simple.parser.SimpleTokenStream.BOOL_AND;
-import static de.hechler.patrick.code.simple.parser.SimpleTokenStream.BYTE;
 import static de.hechler.patrick.code.simple.parser.SimpleTokenStream.CALL;
-import static de.hechler.patrick.code.simple.parser.SimpleTokenStream.CHARACTER;
-import static de.hechler.patrick.code.simple.parser.SimpleTokenStream.COLON;
 import static de.hechler.patrick.code.simple.parser.SimpleTokenStream.COMMA;
 import static de.hechler.patrick.code.simple.parser.SimpleTokenStream.CONST;
-import static de.hechler.patrick.code.simple.parser.SimpleTokenStream.DWORD;
 import static de.hechler.patrick.code.simple.parser.SimpleTokenStream.ELSE;
 import static de.hechler.patrick.code.simple.parser.SimpleTokenStream.EXP;
-import static de.hechler.patrick.code.simple.parser.SimpleTokenStream.FPDWORD;
-import static de.hechler.patrick.code.simple.parser.SimpleTokenStream.FPNUM;
-import static de.hechler.patrick.code.simple.parser.SimpleTokenStream.FSTRUCT;
-import static de.hechler.patrick.code.simple.parser.SimpleTokenStream.FUNC;
 import static de.hechler.patrick.code.simple.parser.SimpleTokenStream.GT;
 import static de.hechler.patrick.code.simple.parser.SimpleTokenStream.IF;
 import static de.hechler.patrick.code.simple.parser.SimpleTokenStream.INIT;
@@ -43,24 +32,13 @@ import static de.hechler.patrick.code.simple.parser.SimpleTokenStream.LARROW;
 import static de.hechler.patrick.code.simple.parser.SimpleTokenStream.LT;
 import static de.hechler.patrick.code.simple.parser.SimpleTokenStream.MAIN;
 import static de.hechler.patrick.code.simple.parser.SimpleTokenStream.ME;
-import static de.hechler.patrick.code.simple.parser.SimpleTokenStream.MINUS;
 import static de.hechler.patrick.code.simple.parser.SimpleTokenStream.NAME;
-import static de.hechler.patrick.code.simple.parser.SimpleTokenStream.NOPAD;
-import static de.hechler.patrick.code.simple.parser.SimpleTokenStream.NUM;
-import static de.hechler.patrick.code.simple.parser.SimpleTokenStream.NUMBER;
-import static de.hechler.patrick.code.simple.parser.SimpleTokenStream.PLUS;
 import static de.hechler.patrick.code.simple.parser.SimpleTokenStream.QUESTION;
 import static de.hechler.patrick.code.simple.parser.SimpleTokenStream.SEMI;
 import static de.hechler.patrick.code.simple.parser.SimpleTokenStream.SMALL_CLOSE;
 import static de.hechler.patrick.code.simple.parser.SimpleTokenStream.SMALL_OPEN;
 import static de.hechler.patrick.code.simple.parser.SimpleTokenStream.STRING;
-import static de.hechler.patrick.code.simple.parser.SimpleTokenStream.STRUCT;
-import static de.hechler.patrick.code.simple.parser.SimpleTokenStream.UBYTE;
-import static de.hechler.patrick.code.simple.parser.SimpleTokenStream.UDWORD;
-import static de.hechler.patrick.code.simple.parser.SimpleTokenStream.UNUM;
-import static de.hechler.patrick.code.simple.parser.SimpleTokenStream.UWORD;
 import static de.hechler.patrick.code.simple.parser.SimpleTokenStream.WHILE;
-import static de.hechler.patrick.code.simple.parser.SimpleTokenStream.WORD;
 import static de.hechler.patrick.code.simple.parser.SimpleTokenStream.name;
 import static de.hechler.patrick.code.simple.parser.error.ErrorContext.NO_CONTEXT;
 
@@ -87,9 +65,6 @@ import de.hechler.patrick.code.simple.parser.objects.simplefile.SimpleVariable;
 import de.hechler.patrick.code.simple.parser.objects.simplefile.scope.SimpleScope;
 import de.hechler.patrick.code.simple.parser.objects.types.FuncType;
 import de.hechler.patrick.code.simple.parser.objects.types.SimpleType;
-import de.hechler.patrick.code.simple.parser.objects.types.StructType;
-import de.hechler.patrick.code.simple.parser.objects.value.CastVal;
-import de.hechler.patrick.code.simple.parser.objects.value.DataVal;
 import de.hechler.patrick.code.simple.parser.objects.value.FunctionVal;
 import de.hechler.patrick.code.simple.parser.objects.value.SimpleValue;
 
@@ -130,8 +105,7 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 			expectToken(NAME, "expected to get `[NAME] [STRING] ;´ after `dep´");
 			try {
 				name = this.in.consumeDynTokSpecialText();
-			} catch (AssertionError ae) {
-				this.in.handleError(this.in.ctx(), ae.toString());
+			} catch (@SuppressWarnings("unused") AssertionError ae) {
 				name = name(this.in.consumeTok());
 			}
 		}
@@ -221,8 +195,13 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 		final Object enter = enterState(STATE_EX_CODE_BLOCK);
 		consumeToken(BLOCK_OPEN, "expected `{´ to start the block command");
 		while ( true ) {
-			if ( this.in.tok() == BLOCK_CLOSE ) {
+			if ( this.in.tok() == BLOCK_CLOSE  ) {
 				this.in.consume();
+				block.seal();
+				exitState(STATE_EX_CODE_BLOCK, enter, block);
+				return;
+			} else if (this.in.tok() == EOF) {
+				this.in.handleError(this.in.ctx(), "expected `}´ or `[COMMAND]´ after `{ [COMMAND]*´");
 				block.seal();
 				exitState(STATE_EX_CODE_BLOCK, enter, block);
 				return;
@@ -248,132 +227,6 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 		};
 		exitState(STATE_EX_CODE, enter, res);
 		return res;
-	}
-	
-	protected Object parseShiftExpOrType(SimpleScope scope) {
-		switch ( this.in.tok() ) {
-		case NUM, UNUM, FPNUM, FPDWORD, DWORD, UDWORD, WORD, UWORD, BYTE, UBYTE, STRUCT, FSTRUCT, FUNC, NOPAD, LT:
-			return parseType(scope);
-		case STRING, CHARACTER, NUMBER, PLUS, MINUS, BIT_AND, BIT_NOT, BOOL_AND:
-			return parseValueShiftExp(scope, 0, null, null);
-		case SMALL_OPEN: {
-			final Object undecided = enterUnknownState();
-			this.in.consume();
-			if ( this.in.tok() == SMALL_CLOSE ) {
-				final Object enter = decidedState(STATE_TYPE_FUNC_ADDR, undecided);
-				this.in.consume();
-				// this can't fail, no try catch needed
-				FuncType res = FuncType.create(List.of(), List.of(), FuncType.FLAG_FUNC_ADDRESS, this.in.ctx());
-				exitState(STATE_TYPE_FUNC_ADDR, enter, res);
-				return res;
-			}
-			Object obj = parseShiftExpOrType(scope);
-			if ( obj instanceof SimpleType type0 ) {
-				if ( this.in.tok() != NAME ) {
-					int[] decidedStates = new int[COND_MAGIC + 2 - ( CAST_MAGIC - 1 )];
-					for (int i = 0; i < COND_MAGIC + 2 - ( CAST_MAGIC - 1 ); i++) {
-						decidedStates[i] = STATE_VAL_CAST + i;
-					}
-					Object[] arr = decidedStates(decidedStates, scope);
-					consumeToken(SMALL_CLOSE, "expected `) [VALUE]´ after `( [TYPE]´");
-					SimpleValue val = parseValueUnaryExp(scope, 0, null, null);
-					try {
-						val = CastVal.create(val, type0, this.in.ctx());
-					} catch (CompileError ce) {
-						this.in.handleError(ce);
-					}
-					exitState(STATE_VAL_CAST, arr[0], val);
-					return parseValue(scope, CAST_MAGIC, val, arr);
-				}
-				final Object[] enters = decidedStates(new int[] { STATE_TYPE_FUNC_ADDR, STATE_TYPE }, undecided);
-				final Object subEnter = enterState(STATE_NAMED_TYPE_LIST);
-				String name = this.in.consumeDynTokSpecialText();
-				List<SimpleVariable> list = new ArrayList<>();
-				list.add(new SimpleVariable(type0, name, null, 0));
-				switch ( this.in.tok() ) {
-				case COMMA:
-					this.in.consume();
-					if ( parseNamedTypeList(SMALL_CLOSE, COMMA, false, scope, list, subEnter).isEmpty() ) {
-						throw new CompileError(this.in.ctx(), List.of("[TYPE]"),
-							"expected `[TYPE] [NAME] (, [TYPE] [NAME])* \\)´ after `[TYPE] [NAME] ,´");
-					}
-					break;
-				case SMALL_CLOSE:
-					exitState(STATE_NAMED_TYPE_LIST, subEnter, list);
-					this.in.consume();
-					break;
-				default:
-					this.in.handleError(this.in.ctx(), List.of(name(COMMA), name(SMALL_CLOSE)),
-						"expected `, | \\)´ after `[TYPE] [NAME]´");
-				}
-				FuncType ftype = FuncType.create(List.of(), list, FuncType.FLAG_FUNC_ADDRESS, this.in.ctx());
-				exitState(STATE_TYPE_FUNC_ADDR, enters == null ? null : enters[0], ftype);
-				return parseTypePostfix(scope, ftype, enters == null ? null : enters[1]);
-			}
-			SimpleValue shiftVal = (SimpleValue) obj;
-			int[] decidedStates = new int[COND_MAGIC + 2 - ( SHIFT_MAGIC - 1 )];
-			for (int i = 0; i < COND_MAGIC + 2 - ( SHIFT_MAGIC - 1 ); i++) {
-				decidedStates[i] = STATE_VAL_SHIFT + i;
-			}
-			Object[] arr = decidedStates(decidedStates, scope);
-			return parseValue(scope, SHIFT_MAGIC, shiftVal, arr);
-		}
-		case NAME: {
-			final Object undecided = enterUnknownState();
-			Object firstEnd = null;
-			boolean hasMid = false;
-			while ( true ) {
-				String name = this.in.consumeDynTokSpecialText();
-				Object typeOrDep = scope.nameTypeOrDepOrFuncOrNull(name);
-				switch ( typeOrDep ) {
-				case SimpleDependency dep -> {
-					scope = dep;
-					if ( !hasMid ) {
-						hasMid = true;
-						firstEnd = maybeFinishUnknownState();
-					}
-					consumeToken(COLON, "expected `: [NAME]´ after the `[NAME]´ of a dependency");
-					expectToken(NAME, "expected `[NAME]´ after `[NAME] :´ where the [NAME] is of a dependency");
-					continue;
-				}
-				case SimpleType type -> {
-					Object[] enters = decidedStates(new int[] { STATE_TYPE_TYPEDEFED_TYPE, STATE_TYPE }, undecided);
-					exitState(STATE_TYPE_TYPEDEFED_TYPE, enters == null ? null : enters[0], type);
-					return parseTypePostfix(scope, type, enters == null ? null : enters[1]);
-				}
-				case null, default -> {
-					int[] decidedStates = new int[SHIFT_MAGIC];
-					for (int i = 0; i < SHIFT_MAGIC; i++) {
-						decidedStates[i] = STATE_VAL_DIRECT + i;
-					}
-					Object[] enters = decidedStates(decidedStates, undecided);
-					SimpleValue value;
-					try {
-						value = scope.nameValueOrErr(name, this.in.ctx());
-					} catch (CompileError ce) {
-						this.in.handleError(ce);
-						value = new DataVal(new byte[0],
-							StructType.create(List.of(), StructType.FLAG_NOUSE, this.in.ctx()), this.in.ctx());
-					}
-					if ( hasMid ) {
-						remenberExitedState(STATE_VAL_DIRECT, enters == null ? null : enters[0], firstEnd, value);
-					} else {
-						exitState(STATE_VAL_DIRECT, enters == null ? null : enters[0], value);
-					}
-					return parseValueShiftExp(scope, DIRECT_MAGIC, value, enters);
-				}
-				}
-			}
-		}
-		default:
-			this.in.handleError(this.in.ctx(),
-				List.of(name(NUM), name(UNUM), name(FPNUM), name(FPDWORD), name(DWORD), name(UDWORD), name(WORD),
-					name(UWORD), name(BYTE), name(UBYTE), name(STRUCT), name(FSTRUCT), name(FUNC), name(NOPAD),
-					name(LT), name(STRING), name(CHARACTER), name(NUMBER), name(PLUS), name(MINUS), name(BIT_AND),
-					name(BIT_NOT), name(BOOL_AND), name(SMALL_OPEN), name(NAME)),
-				"expected a `[TYPE]´ or a `[VALUE]´");
-			return StructType.create(List.of(), StructType.FLAG_NOUSE, this.in.ctx());
-		}
 	}
 	
 	private SimpleCommand parseCmdDefault(SimpleScope scope) {
@@ -482,12 +335,16 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 			initialVal = parseValue(scope);
 		}
 		consumeToken(SEMI, "expected `;´ after `( const | var ) [TYPE] [NAME] ( <-- [VALUE] )?´");
-		SimpleVariable sv = new SimpleVariable(type, name, initialVal, flags);
 		SimpleCommand res;
 		try {
+			SimpleVariable sv = new SimpleVariable(type, name, initialVal, flags);
 			res = VarDeclCmd.create(scope, sv, this.in.ctx());
-		} catch (CompileError ce) {
-			this.in.handleError(ce);
+		} catch (NullPointerException | CompileError err) {
+			if ( err instanceof CompileError ce ) {
+				this.in.handleError(ce);
+			} else if ( name != null ) {
+				throw new AssertionError(err);
+			}
 			BlockCmd bc = new BlockCmd(scope);
 			bc.seal();
 			res = bc;
