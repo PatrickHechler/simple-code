@@ -276,67 +276,86 @@ if marked with `const` there must be a constant initial value
 comments are treated like whitespace, they are allowed everywhere exept in the middle of a token (but betwen any two tokens)
 
 ## std
-
 * some symbols are already defined by the compiler
 * these are from the automatically imported dependency `std`
 * the `std` dependency may be a compile time only dependency.
     * the `std:sys´ dependency **must** be a compile time only dependency.
 * if `std` has dependencies, which are not used the binary must not rely on these dependencies
-    * the only exception is the `std:sys´ dependency
-* the `std` dependency **must not** define variables
-    * the dependencies of `std` **must not** define variables
+    * the only exception is the `std:sys` dependency
+* the `std` dependency **must not** define non constant variables
+    * the dependencies of `std` **must not** define non constant variables
         * dependencies of the `std` dependency are dependencies of `std` or a dependency of a dependency of `std`
 
 ### std:sys
-
-this dependency interacts as a low level interface    
 this dependency may define additional symbols not mentioned here
 
-* `func pagesize <unum result> <-- ();`
-    * returns the size of a memory page (whatever this may be, it will always be a non zero power of two)
-* `func pageshift <unum result> <-- ();`
-    * returns the shift of a memory page (whatever this may be)
-    * the page shift is defined as the bit count of `pagesize:result - 1` (or `pagesize:result = 1 << pageshift:result`)
+`func pagesize <unum result> <-- ();`
+* returns the size of a memory page (whatever this may be, it will always be a non zero power of two)
+
+`func pageshift <unum result> <-- ();`
+* returns the shift of a memory page (whatever this may be)
+* the page shift is defined as the bit count of `pagesize:result - 1` (or `pagesize:result = 1 << pageshift:result`)
 
 ### functions
 
-system functions;
-* `func exit <> <-- (ubyte exitnum);`
-    * terminates the process with the given exit number
-    * this function will never return to the caller
+#### system functions
+`func exit <> <-- (ubyte exitnum)`
+* terminates the process with the given exit number
+* this function will never return to the caller
 
-memory functions:
-* `func mem_alloc <ubyte# addr> <-- (unum length, unum align);`
-    * allocates `length` bytes, which are aligned to `align` bytes and stores the address of the allocated block in `addr`
-    * `align` must be a non zero power of two
-* `func mem_realloc <ubyte# new_addr> <-- (ubyte# old_addr, unum new_length, unum new_align);`
-    * reallocates the memory block to now store `new_length` bytes aligned to `new_align`
-    * the new address of the memory block is stored in `new_addr`
-    * `new_align` must be a non zero power of two
-* `func mem_free <> <-- (ubyte# addr);`
-    * frees the given memory block
-* `func mem_copy <> <-- (ubyte# from, ubyte# to, unum length);`
-    * copies `length` bytes from `from` to `to`
-    * if the memory regiones `from..(from+length)` and `to..(to+length)` overlap the new content of `from..(from+length)` is undefined
-    * otherwise the new content of `from..(from+length)` is the old content of `to..(to+length)`
-* `func mem_move <> <-- (ubyte# from, ubyte# to, unum length);`
-    * copies `length` bytes from `from` to `to`
-    * the new content of `from..(from+length)` is the old content of `to..(to+length)`
-        * even if the memory regiones `from..(from+length)` and `to..(to+length)` overlap 
+#### memory functions
+`func mem_alloc <ubyte# addr> <-- (unum length, unum align)`
+* allocates `length` bytes, which are aligned to `align` bytes and stores the address of the allocated block in `addr`
+* `align` must be a non zero power of two
 
-write to stdout:
-* `func puts <unum wrote, unum errno> <-- (char# string);`
-    * prints the given (`\0` terminated) string to stdout
+`func mem_realloc <ubyte# new_addr> <-- (ubyte# old_addr, unum new_length, unum new_align)`
+* reallocates the memory block to now store `new_length` bytes aligned to `new_align`
+* the new address of the memory block is stored in `new_addr`
+* `new_align` must be a non zero power of two
+
+`func mem_free <> <-- (ubyte# addr)`
+* frees the given memory block
+
+`func mem_copy <> <-- (ubyte# from, ubyte# to, unum length)`
+* copies `length` bytes from `from` to `to`
+* if the memory regiones `from..(from+length)` and `to..(to+length)` overlap the new content of `from..(from+length)` is undefined
+* otherwise the new content of `from..(from+length)` is the old content of `to..(to+length)`
+
+`func mem_move <> <-- (ubyte# from, ubyte# to, unum length)`
+* copies `length` bytes from `from` to `to`
+* the new content of `from..(from+length)` is the old content of `to..(to+length)`
+    * even if the memory regiones `from..(from+length)` and `to..(to+length)` overlap 
+
+#### interact with the std streams
+
+`func writestr <unum wrote, unum errno> <-- (char# string)`
+* prints the given (`\0` terminated) string to stdout
+* `wrote` will be the number of bytes written to stdout
+* `errno` will be the error number or `0` on success
+
+`func readln <unum read_len, unum errno> <-- (char# buffer, unum max_length)`
+* reads the next line from stdin
+* at most `max_length-1` bytes will be read
+* a `\0` character will be inserted after the line terminator `\n`
+    * or at the end of the buffer, if no `\n` was read
+* note that if a `\0` was read from stdin, it will not be modified and treated as any other character
+    * this can lead to an truncated string, if `read_len` is not checked
+* the line terminator `\n` will also be copied to the buffer
+    * thus the user can check if the buffer was large enugh or if `readln` should be called again
+        * note that the part of the line wich was already read will not be read again
+* `read_len` will be the number of bytes read from stdin
+    * note that the `\0` is not read from stdin
+* `errno` will be the error number or `0` on success
 
 ### constants
 
-`const struct {}# NULL <-- (struct {}#) 0;`
+`const struct {}# NULL <-- (struct {}#) 0`
 
 ### types
 
-* `typedef [TYPE] file_handle;`
+* `typedef [TYPE] file_handle`
     * the exact type is implementation specific
     * the size and alingment will be at most the size and alignment of `unum`
-* `typedef [TYPE] fs_element_handle;`
+* `typedef [TYPE] fs_element_handle`
     * the exact type is implementation specific
     * the size and alingment will be at most the size and alignment of `unum`
