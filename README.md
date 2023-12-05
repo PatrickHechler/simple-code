@@ -1,8 +1,13 @@
 # simple-code
 
-simple-code is a simple programming language.
+simple-code is a simple programming language.    
+The std-lib is represented by the [std](#std) dependency:    
+This dependency is small, but provides some basic functionality like allocating memory, writeing to stdout and some more.
 
 ## file
+
+A simple-code file can either be compiled/interpreted.    
+If there is a main-function (that is a function marked with `main`) it can be [executed](#function).
 
 `( [dependency] | [variable] | [typedef] | [function] )* EOF`
 
@@ -215,7 +220,7 @@ if marked with `const` there must be a constant initial value
 * MUL_EXP
     * `[CAST_EXP] ( ( \* | / | % ) [CAST_EXP] )*`
 * CAST_EXP
-    * `( < [TYPE] > )? [UNARY_EXP]`
+    * `( \( [TYPE] \) )? [UNARY_EXP]`
 * UNARY_EXP
     * `( \+ | - | & | ~ | ! )? [POSTFIX_EXP]`
 * POSTFIX_EXP
@@ -227,9 +232,9 @@ if marked with `const` there must be a constant initial value
     * `[NAME]`
     * `\( [VALUE] \)`
 * STRING
-    * `"([^"\\\r\n\0]|\\(["rnt0\\]|u[0-9A-Fa-f]{4}))*"`
+    * `"([^"\\\r\n\0]|\\(["rnt0\\]|u[0-9A-Fa-f]{4}|U[0-9A-Fa-f]{8}))*"`
 * CHARACTER
-    * `'([^'\\\r\n\0]|\\(['rnt0\\]))'`
+    * `'([^'\\\r\n\0]|\\['rnt0\\])'`
 * NUMBER
     * `[SCALAR_NUM]([Ss]|[Uu])?([QqNn]|[Dd]|[Ww]|[HhBb])?`
         * the sign (first) postfix:
