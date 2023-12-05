@@ -115,13 +115,11 @@ public class JavaStdLib extends JavaDependency {
 			(si_, args) -> {
 				long addr = ( (ConstantValue.ScalarValue) args.get(0) ).value();
 				long maxLen = ( (ConstantValue.ScalarValue) args.get(1) ).value();
-				long len = 0L;
-				long errno = 0L;
 				MemoryManager mem = si_.memManager();
-				if ( maxLen < 0L ) {
-					errno = 1L;
+				if ( maxLen == 0L ) {
+					return readResult(0L, 1L);
 				}
-				return readLine(addr, maxLen, len, errno, mem);
+				return readLine(addr, maxLen - 1L, mem);
 			});
 		JavaDependency sys = new JavaDependency(null) {
 			@Override
@@ -143,7 +141,9 @@ public class JavaStdLib extends JavaDependency {
 			SimpleVariable.FLAG_CONSTANT | SimpleExportable.FLAG_EXPORT), ErrorContext.NO_CONTEXT);
 	}
 	
-	private List<ConstantValue> readLine(long addr, long maxLen, long len, long errno, MemoryManager mem) {
+	private List<ConstantValue> readLine(long addr, final long maxLen, MemoryManager mem) {
+		long len = 0L;
+		long errno = 0L;
 		ByteBuffer bb = this.sysinBuf;
 		byte[] buf;
 		if ( bb == null ) {
@@ -152,42 +152,57 @@ public class JavaStdLib extends JavaDependency {
 			buf = bb.array();
 		} else if ( bb.hasRemaining() ) {
 			buf = bb.array();
-			int limit = bb.limit();
-			int cpy = (int) Math.max(bb.remaining(), maxLen - len);
-			bb.limit(bb.position() + cpy);
+			int prevLimit = bb.limit();
+			int cpy = (int) Math.max(bb.remaining(), maxLen - 1L);// len is still 0
+			int off = bb.position();
+			for (int i = 0; i < cpy; i++) {
+				if ( buf[off + i] == '\n' ) {
+					cpy = i + 1;
+					break;
+				}
+			}
+			bb.limit(off + cpy);
 			mem.set(addr, bb);
-			bb.limit(limit);
-			len += cpy;
+			bb.limit(prevLimit);
+			len = cpy;// no need to add zero to cpy
 			addr += cpy;
-		} else buf = bb.array();
+		} else {
+			buf = bb.array();
+		}
 		try {
-			while ( len < maxLen ) {
+			while ( Long.compareUnsigned(len, maxLen) < 0 ) {
 				int r = System.in.available();
 				if ( r == 0 ) {
 					int b = System.in.read();
 					if ( b == -1 ) {
 						break;
 					}
-					mem.set8(addr++, b);
+					mem.set8(addr, b);
 					len++;
+					addr++;
 					if ( b == '\n' ) break;
 					if ( len == maxLen ) break;
 				}
-				r = (int) Math.max(maxLen - len, r);
+				if ( maxLen - len > 0 ) {// if greater than Long.MAX_VALUE, it definitely also is greater than r
+					r = (int) Math.min(maxLen - len, r);
+				}
 				r = Math.max(buf.length, r);
 				r = System.in.read(buf, 0, r);
 				bb.position(0);
 				for (int i = 0; i < buf.length; i++) {
 					if ( buf[i] == '\n' ) {
-						bb.limit(i);
+						bb.limit(++i);
 						mem.set(addr, bb);
 						bb.position(i);
 						bb.limit(r);
+						mem.set8(addr + i, 0);
+						len += i;
 						return readResult(len, errno);
 					}
 				}
 				bb.limit(r);
 				mem.set(addr, bb);
+				len += r;
 				addr += r;
 			}
 		} catch (ClosedChannelException e) {
@@ -197,6 +212,7 @@ public class JavaStdLib extends JavaDependency {
 			errno = 3L;
 			System.err.println(e);
 		}
+		mem.set8(addr, 0);
 		return readResult(len, errno);
 	}
 	
