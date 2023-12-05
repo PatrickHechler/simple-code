@@ -21,7 +21,6 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.function.BiFunction;
 
 import de.hechler.patrick.code.simple.parser.error.CompileError;
 import de.hechler.patrick.code.simple.parser.error.ErrorContext;
@@ -78,7 +77,7 @@ public class SimpleFile extends SimpleDependency {
 	
 	public void dependency(SimpleDependency dep, String name, ErrorContext ctx) {
 		if ( name == null ) {
-			mergeMeDep(dep);
+			mergeMeDep((SimpleFile) dep, ctx);
 			return;
 		}
 		checkDuplicateName(name, ctx, CDN_DEP);
@@ -91,10 +90,36 @@ public class SimpleFile extends SimpleDependency {
 		});
 	}
 	
-	private void mergeMeDep(SimpleDependency dep) {
-		return new AssertionError("<ME> dep");
+	public void dependencyFromMeDep(SimpleDependency dep, String name, ErrorContext ctx) {
+		checkDuplicateName(name, ctx, CDN_DEP);
+		this.dependencies.merge(name, dep, (a, b) -> {
+			if ( a.replace(b) == null ) {
+				nameUsed(name, "dependency", ctx);
+			}
+			return b;
+		});
 	}
-
+	
+	private void mergeMeDep(SimpleFile dep, ErrorContext ctx) {
+		for (Entry<String, SimpleDependency> e : dep.dependencies.entrySet()) {
+			dependencyFromMeDep(e.getValue(), e.getKey(), ctx);
+		}
+		for (SimpleTypedef t : dep.typedefs.values()) {
+			t = new SimpleTypedef(t.name(), t.flags() | SimpleExportable.FLAG_FROM_ME_DEP, t.type());
+			typedef(t, ctx);
+		}
+		for (SimpleVariable v : dep.variables.values()) {
+			v = new SimpleVariable(v.type(), v.name(), v.initialValue(), v.flags() | SimpleExportable.FLAG_FROM_ME_DEP);
+			variable(v, ctx);
+		}
+		for (SimpleFunction f : dep.functions.values()) {
+			FuncType ft = f.type();
+			ft = FuncType.create(ft.resMembers(), ft.argMembers(), ft.flags() | SimpleExportable.FLAG_FROM_ME_DEP, ctx);
+			f = new SimpleFunction(f.dep(), f.name(), ft);
+			function(f, ctx);
+		}
+	}
+	
 	public void typedef(SimpleTypedef typedef, ErrorContext ctx) {
 		checkDuplicateName(typedef.name(), ctx, CDN_TDF);
 		this.typedefs.merge(typedef.name(), typedef, (a, b) -> {
@@ -123,23 +148,25 @@ public class SimpleFile extends SimpleDependency {
 		if ( ( flags & FuncType.FLAG_INIT ) != 0 ) {
 			if ( this.init != null ) {
 				ctx.setOffendingTokenCach("");
-				throw new CompileError(ctx, "there is already a function marked with init: " + this.init + " second init: " + func);
+				throw new CompileError(ctx,
+					"there is already a function marked with init: " + this.init + " second init: " + func);
 			}
 			if ( !func.type().equalsIgnoreNonStructuralFlags(FuncType.INIT_TYPE) ) {
 				ctx.setOffendingTokenCach("");
-				throw new CompileError(ctx,
-						"a function marked with `init´ must be of type: " + FuncType.INIT_TYPE + " but the function has the type: " + func.type());
+				throw new CompileError(ctx, "a function marked with `init´ must be of type: " + FuncType.INIT_TYPE
+					+ " but the function has the type: " + func.type());
 			}
 		}
 		if ( ( flags & FuncType.FLAG_MAIN ) != 0 ) {
 			if ( this.main != null ) {
 				ctx.setOffendingTokenCach("");
-				throw new CompileError(ctx, "there is already a function marked with main: " + this.main + " second main: " + func);
+				throw new CompileError(ctx,
+					"there is already a function marked with main: " + this.main + " second main: " + func);
 			}
 			if ( !func.type().equalsIgnoreNonStructuralFlags(FuncType.MAIN_TYPE) ) {
 				ctx.setOffendingTokenCach("");
-				throw new CompileError(ctx,
-						"a function marked with `main´ must be of type: " + FuncType.MAIN_TYPE + " but the function has the type: " + func.type());
+				throw new CompileError(ctx, "a function marked with `main´ must be of type: " + FuncType.MAIN_TYPE
+					+ " but the function has the type: " + func.type());
 			}
 		}
 		this.functions.merge(func.name(), func, (a, b) -> {
@@ -158,8 +185,9 @@ public class SimpleFile extends SimpleDependency {
 	
 	private void nameUsed(String name, String type, ErrorContext ctx) {
 		throw new CompileError(ctx,
-				"there is already a something (a " + type + ") with the name " + name + " (known dependencies: " + this.dependencies.keySet() + ", typedefs: "
-						+ this.typedefs.keySet() + ", variables: " + this.variables.keySet() + ", functions: " + this.functions.keySet() + ")");
+			"there is already a something (a " + type + ") with the name " + name + " (known dependencies: "
+				+ this.dependencies.keySet() + ", typedefs: " + this.typedefs.keySet() + ", variables: "
+				+ this.variables.keySet() + ", functions: " + this.functions.keySet() + ")");
 	}
 	
 	private static final int CDN_DEP = 1;
@@ -242,7 +270,7 @@ public class SimpleFile extends SimpleDependency {
 			if ( ( sv.flags() & SimpleVariable.FLAG_CONSTANT ) != 0 ) {
 				b.append("const ");
 			}
-			if ( ( sv.flags() & SimpleVariable.FLAG_EXPORT ) != 0 ) {
+			if ( ( sv.flags() & SimpleExportable.FLAG_EXPORT ) != 0 ) {
 				b.append("exp ");
 			}
 			b.append(sv.type()).append(' ').append(sv.name());
@@ -254,7 +282,7 @@ public class SimpleFile extends SimpleDependency {
 		StringBuilder indent = new StringBuilder();
 		for (SimpleFunction sf : this.functions.values()) {
 			b.append("func ");
-			if ( ( sf.type().flags() & FuncType.FLAG_EXPORT ) != 0 ) {
+			if ( ( sf.type().flags() & SimpleExportable.FLAG_EXPORT ) != 0 ) {
 				b.append("exp ");
 			}
 			if ( ( sf.type().flags() & FuncType.FLAG_MAIN ) != 0 ) {
@@ -287,7 +315,8 @@ public class SimpleFile extends SimpleDependency {
 			if ( e.getValue().sourceFile != null ) {
 				b.append("dep ").append(e.getKey()).append(" \"").append(e.getValue().sourceFile).append("\";\n");
 			} else if ( !"std".equals(e.getKey()) ) {
-				b.append("dep ").append(e.getKey()).append(" NULL \"").append(e.getValue().binaryTarget).append("\";\n");
+				b.append("dep ").append(e.getKey()).append(" NULL \"").append(e.getValue().binaryTarget)
+					.append("\";\n");
 			}
 		}
 		for (SimpleTypedef t : this.typedefs.values()) {
@@ -299,7 +328,7 @@ public class SimpleFile extends SimpleDependency {
 			b.append(t.type()).append(' ').append(t.name()).append(";\n");
 		}
 		for (SimpleVariable sv : this.variables.values()) {
-			if ( ( sv.flags() & SimpleVariable.FLAG_EXPORT ) == 0 ) continue;
+			if ( ( sv.flags() & SimpleExportable.FLAG_EXPORT ) == 0 ) continue;
 			if ( ( sv.flags() & SimpleVariable.FLAG_CONSTANT ) != 0 ) {
 				b.append("const ");
 			}
@@ -311,7 +340,7 @@ public class SimpleFile extends SimpleDependency {
 			b.append(";\n");
 		}
 		for (SimpleFunction sf : this.functions.values()) {
-			if ( ( sf.type().flags() & FuncType.FLAG_EXPORT ) == 0 ) continue;
+			if ( ( sf.type().flags() & SimpleExportable.FLAG_EXPORT ) == 0 ) continue;
 			b.append("func exp ").append(sf.name()).append(' ');
 			if ( ( sf.type().flags() & FuncType.FLAG_NOPAD ) != 0 ) {
 				b.append("nopad ");

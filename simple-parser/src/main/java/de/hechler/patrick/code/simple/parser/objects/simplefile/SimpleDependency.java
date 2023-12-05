@@ -34,11 +34,14 @@ public abstract class SimpleDependency implements SimpleScope, SimpleExportable<
 			if ( other.binaryTarget == null ) {
 				return this;
 			}
+			if ( this.binaryTarget == null ) {
+				return other;
+			}
 			if ( other.binaryTarget.equals(this.binaryTarget) ) {
 				return other;
 			}
 		}
 		return null;
 	}
-
+	
 }

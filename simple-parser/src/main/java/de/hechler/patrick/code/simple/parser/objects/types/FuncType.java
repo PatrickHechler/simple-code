@@ -17,6 +17,7 @@
 package de.hechler.patrick.code.simple.parser.objects.types;
 
 import static de.hechler.patrick.code.simple.parser.error.ErrorContext.NO_CONTEXT;
+import static de.hechler.patrick.code.simple.parser.objects.simplefile.SimpleExportable.FLAG_EXPORT;
 
 import java.util.List;
 
@@ -27,7 +28,6 @@ import de.hechler.patrick.code.simple.parser.objects.simplefile.SimpleVariable;
 public record FuncType(List<SimpleVariable> resMembers, List<SimpleVariable> argMembers, int flags)
 	implements SimpleType {
 	
-	public static final int FLAG_EXPORT = 0x0100;
 	public static final int FLAG_MAIN = 0x0200;
 	public static final int FLAG_INIT = 0x0400;
 	public static final int FLAG_FUNC_ADDRESS = 0x0800;
