@@ -21,6 +21,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.function.BiFunction;
 
 import de.hechler.patrick.code.simple.parser.error.CompileError;
 import de.hechler.patrick.code.simple.parser.error.ErrorContext;
@@ -32,12 +33,12 @@ import de.hechler.patrick.code.simple.parser.objects.value.VariableVal;
 
 public class SimpleFile extends SimpleDependency {
 	
-	private Map<String,SimpleDependency> dependencies;
-	private Map<String,SimpleTypedef>    typedefs;
-	private Map<String,SimpleVariable>   variables;
-	private Map<String,SimpleFunction>   functions;
-	private SimpleFunction               main;
-	private SimpleFunction               init;
+	private Map<String, SimpleDependency> dependencies;
+	private Map<String, SimpleTypedef>    typedefs;
+	private Map<String, SimpleVariable>   variables;
+	private Map<String, SimpleFunction>   functions;
+	private SimpleFunction                main;
+	private SimpleFunction                init;
 	
 	public SimpleFile(String sourceFile, String binaryTarget) {
 		super(sourceFile, binaryTarget);
@@ -81,90 +82,84 @@ public class SimpleFile extends SimpleDependency {
 			return;
 		}
 		checkDuplicateName(name, ctx, CDN_DEP);
-		this.dependencies.compute(name, (n, old) -> {
-			if ( old.sourceFile.equals(old.sourceFile) ) {
-				if ( old.binaryTarget == null ) {
-					return dep;
-				}
-				if ( old.binaryTarget.equals(dep.binaryTarget) ) {
-					return old;
-				}
+		this.dependencies.merge(name, dep, (a, b) -> {
+			SimpleDependency d = a.replace(b);
+			if ( d == null ) {
+				nameUsed(name, "dependency", ctx);
 			}
-			nameUsed(name, "dependency", ctx);
+			return d;
 		});
 	}
 	
+	private void mergeMeDep(SimpleDependency dep) {
+		return new AssertionError("<ME> dep");
+	}
+
 	public void typedef(SimpleTypedef typedef, ErrorContext ctx) {
 		checkDuplicateName(typedef.name(), ctx, CDN_TDF);
-		this.typedefs.merge(typedef.name(), typedef, (old, td) -> {
-			if ( ( old.flags() & SimpleTypedef.FLAG_FROM_ME_DEP ) == 0
-				&& ( ( td.flags() & SimpleTypedef.FLAG_FROM_ME_DEP ) == 0 ) ) {
-				nameUsed(td.name(), "typedef", ctx);
+		this.typedefs.merge(typedef.name(), typedef, (a, b) -> {
+			SimpleTypedef t = a.replace(b);
+			if ( t == null ) {
+				nameUsed(a.name(), "typedef", ctx);
 			}
-			if ( !old.type().equals(td.type()) ) {
-				nameUsed(td.name(), "typedef", ctx);
-			}
-			if ( ( old.flags() & SimpleTypedef.FLAG_FROM_ME_DEP ) != 0 ) {
-				return td;
-			}
-			return old;
+			return t;
 		});
 	}
 	
 	public void variable(SimpleVariable sv, ErrorContext ctx) {
 		checkDuplicateName(sv.name(), ctx, CDN_VAR);
-		this.variables.merge(sv.name(), sv, (old, svar) -> {
-			if ( ( old.flags() & SimpleVariable.FLAG_FROM_ME_DEP ) == 0
-				&& ( ( svar.flags() & SimpleVariable.FLAG_FROM_ME_DEP ) == 0 ) ) {
-				nameUsed(svar.name(), "variable", ctx);
+		this.variables.merge(sv.name(), sv, (a, b) -> {
+			SimpleVariable v = a.replace(b);
+			if ( v == null ) {
+				nameUsed(a.name(), "variable", ctx);
 			}
-			if ( !old.type().equals(svar.type()) ) {
-				nameUsed(svar.name(), "variable", ctx);
-			}
-			if ( ( old.flags() & ~( SimpleTypedef.FLAG_FROM_ME_DEP | SimpleTypedef.FLAG_EXPORT ) )//
-				!= ( svar.flags() & ~( SimpleTypedef.FLAG_FROM_ME_DEP | SimpleTypedef.FLAG_EXPORT ) ) ) {
-				nameUsed(svar.name(), "variable", ctx);
-			}
-			if ( old.initialValue() != null && svar.initialValue() != null ) {
-				nameUsed(svar.name(), "variable", ctx);
-			}
-			if ( ( old.flags() & SimpleTypedef.FLAG_FROM_ME_DEP ) != 0 ) {
-				return svar;
-			}
-			return old;
+			return v;
 		});
 	}
 	
 	public void function(SimpleFunction func, ErrorContext ctx) {
-		checkDuplicateName(func.name(), ctx);
-		this.functions.put(func.name(), func);
+		checkDuplicateName(func.name(), ctx, CDN_FNC);
 		int flags = func.type().flags();
 		if ( ( flags & FuncType.FLAG_INIT ) != 0 ) {
 			if ( this.init != null ) {
 				ctx.setOffendingTokenCach("");
-				throw new CompileError(ctx,
-					"there is already a function marked with init: " + this.init + " second init: " + func);
+				throw new CompileError(ctx, "there is already a function marked with init: " + this.init + " second init: " + func);
 			}
 			if ( !func.type().equalsIgnoreNonStructuralFlags(FuncType.INIT_TYPE) ) {
 				ctx.setOffendingTokenCach("");
-				throw new CompileError(ctx, "a function marked with `init´ must be of type: " + FuncType.INIT_TYPE
-					+ " but the function has the type: " + func.type());
+				throw new CompileError(ctx,
+						"a function marked with `init´ must be of type: " + FuncType.INIT_TYPE + " but the function has the type: " + func.type());
 			}
-			this.init = func;
 		}
 		if ( ( flags & FuncType.FLAG_MAIN ) != 0 ) {
 			if ( this.main != null ) {
 				ctx.setOffendingTokenCach("");
-				throw new CompileError(ctx,
-					"there is already a function marked with main: " + this.main + " second main: " + func);
+				throw new CompileError(ctx, "there is already a function marked with main: " + this.main + " second main: " + func);
 			}
 			if ( !func.type().equalsIgnoreNonStructuralFlags(FuncType.MAIN_TYPE) ) {
 				ctx.setOffendingTokenCach("");
-				throw new CompileError(ctx, "a function marked with `main´ must be of type: " + FuncType.MAIN_TYPE
-					+ " but the function has the type: " + func.type());
+				throw new CompileError(ctx,
+						"a function marked with `main´ must be of type: " + FuncType.MAIN_TYPE + " but the function has the type: " + func.type());
 			}
+		}
+		this.functions.merge(func.name(), func, (a, b) -> {
+			SimpleFunction f = a.replace(b);
+			if ( f == null ) {
+				nameUsed(a.name(), "function", ctx);
+			}
+			return f;
+		});
+		if ( ( flags & FuncType.FLAG_INIT ) != 0 ) {
+			this.init = func;
+		} else if ( ( flags & FuncType.FLAG_MAIN ) != 0 ) {
 			this.main = func;
 		}
+	}
+	
+	private void nameUsed(String name, String type, ErrorContext ctx) {
+		throw new CompileError(ctx,
+				"there is already a something (a " + type + ") with the name " + name + " (known dependencies: " + this.dependencies.keySet() + ", typedefs: "
+						+ this.typedefs.keySet() + ", variables: " + this.variables.keySet() + ", functions: " + this.functions.keySet() + ")");
 	}
 	
 	private static final int CDN_DEP = 1;
@@ -230,7 +225,7 @@ public class SimpleFile extends SimpleDependency {
 	@Override
 	public String toString() {
 		StringBuilder b = new StringBuilder();
-		for (Entry<String,SimpleDependency> e : this.dependencies.entrySet()) {
+		for (Entry<String, SimpleDependency> e : this.dependencies.entrySet()) {
 			b.append("dep ").append(e.getKey()).append(" [PATH] \"").append(e.getValue().binaryTarget).append("\";\n");
 		}
 		for (SimpleTypedef t : this.typedefs.values()) {
@@ -288,7 +283,7 @@ public class SimpleFile extends SimpleDependency {
 	
 	public String toExportString() {
 		StringBuilder b = new StringBuilder();
-		for (Entry<String,SimpleDependency> e : this.dependencies.entrySet()) {
+		for (Entry<String, SimpleDependency> e : this.dependencies.entrySet()) {
 			if ( e.getValue().sourceFile != null ) {
 				b.append("dep ").append(e.getKey()).append(" \"").append(e.getValue().sourceFile).append("\";\n");
 			} else if ( !"std".equals(e.getKey()) ) {
