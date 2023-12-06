@@ -46,6 +46,7 @@ public class SsfPresentationReconciler extends PresentationReconciler {
 	}
 	
 	private final void setScanner(int r, int g, int b, String type, String... otherTypes) {
+		if (true) return;
 		RGB rgb = new RGB(r, g, b);
 		TextAttribute attr = new TextAttribute(new Color(Display.getCurrent(), rgb));
 		Token tok = new Token(attr);
@@ -72,7 +73,7 @@ public class SsfPresentationReconciler extends PresentationReconciler {
 		}
 		
 		@Override
-		public void setRange(IDocument document, int offset, int length) {
+		public void setRange(@SuppressWarnings("unused") IDocument document, int offset, int length) {
 			this.off = offset;
 			this.len = length;
 		}

@@ -2,9 +2,10 @@ package de.hechler.patrick.code.simple.ecl.editor;
 
 import java.io.Reader;
 import java.io.StringReader;
-import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.function.BiFunction;
 
 import org.eclipse.core.resources.IFile;
@@ -160,7 +161,6 @@ public class SsfDocumentPartitioner implements IDocumentPartitioner {
 	
 	@Override
 	public ITypedRegion getPartition(int offset) {
-		documentChanged(null);
 		return this.regions[getIndex(offset)];
 	}
 	
@@ -177,18 +177,12 @@ public class SsfDocumentPartitioner implements IDocumentPartitioner {
 			int off = reg.getOffset();
 			if ( off > offset ) {
 				high = mid - 1;
-				if ( low > high ) {
-					return high;
-				}
 			}
 			int end = off + reg.getLength();
 			if ( end > offset ) {
 				return mid;
 			}
 			low = mid + 1;
-			if ( low > high ) {
-				return low;
-			}
 		}
 	}
 	
@@ -204,7 +198,7 @@ public class SsfDocumentPartitioner implements IDocumentPartitioner {
 		try (StringReader reader = new StringReader(doc)) {
 			this.file.deleteMarkers(SimpleCodeBuilder.VOLATILE_MARKER_TYPE, false, IResource.DEPTH_ZERO);
 			buildTree(reader);
-			rebuildPartitions();
+			rebuildPartitions(doc.length());
 			this.last = doc;
 			return true;
 		} catch (CoreException e) {
@@ -215,9 +209,20 @@ public class SsfDocumentPartitioner implements IDocumentPartitioner {
 		}
 	}
 	
-	private void rebuildPartitions() {
-		List<ITypedRegion> regions = new ArrayList<>();
+	private void rebuildPartitions(int docLen) {
+		List<ITypedRegion> regions = new LinkedList<>();
 		addTree(this.tree, 0, regions);
+		int prevEnd = 0;
+		for (ListIterator<ITypedRegion> iter = regions.listIterator(); iter.hasNext();) {
+			ITypedRegion reg = iter.next();
+			if ( reg.getOffset() != prevEnd ) {
+				iter.add(new TypedRegion(prevEnd, reg.getOffset(), TOKEN_WHITESPACE));
+			}
+			prevEnd = reg.getOffset() + reg.getLength();
+		}
+		if ( prevEnd != docLen ) {
+			regions.add(new TypedRegion(prevEnd, docLen - prevEnd, TOKEN_WHITESPACE));
+		}
 		this.regions = regions.toArray(new ITypedRegion[regions.size()]);
 	}
 	
@@ -481,9 +486,10 @@ public class SsfDocumentPartitioner implements IDocumentPartitioner {
 				} else {
 					this.ftok = null;
 				}
-				this.pushedDynTok = true;
+				int ct = super.consumeTok();
+				this.pushedDynTok = ct >= SimpleTokenStream.NAME;// FIRST_DYN;
 				this.tree.parsedToken(ft);
-				return super.consumeTok();
+				return ct;
 			} finally {
 				this.b = false;
 			}
@@ -499,10 +505,8 @@ public class SsfDocumentPartitioner implements IDocumentPartitioner {
 				this.b = true;
 				FileToken ft = this.ftok;
 				if ( ft == null ) {
-					if ( this.pushed || this.pushedDynTok ) {
-						this.pushed = false;
-						this.pushedDynTok = false;
-					}
+					this.pushed = false;
+					this.pushedDynTok = false;
 					super.consume();
 				} else {
 					this.ftok = null;
@@ -535,23 +539,31 @@ public class SsfDocumentPartitioner implements IDocumentPartitioner {
 		}
 		
 		private FileToken nft() {
-			FileToken ft;
-			FilePosition start = genPos();
-			int tok = super.tok();
-			FilePosition end = genPos();
-			int token = tok == INVALID ? COMMENT_TOKEN : tok;
-			ft = new FilePosition.FileToken(start, token, end);
-			return ft;
+			while ( true ) {
+				FileToken ft;
+				FilePosition start = genPos();
+				int tok = super.tok();
+				FilePosition end = genPos();
+				if ( tok == INVALID ) {
+					ft = new FilePosition.FileToken(start, COMMENT_TOKEN, end);
+					this.tree.parsedToken(ft);
+					continue;
+				}
+				ft = new FilePosition.FileToken(start, tok, end);
+				return ft;
+			}
 		}
 		
 		private FileToken nfct() {
-			FileToken ft;
-			FilePosition start = genPos();
-			int tok = super.consumeTok();
-			FilePosition end = genPos();
-			int token = tok == INVALID ? COMMENT_TOKEN : tok;
-			ft = new FilePosition.FileToken(start, token, end);
-			return ft;
+			while ( true ) {
+				FileToken ft;
+				FilePosition start = genPos();
+				int tok = super.consumeTok();
+				FilePosition end = genPos();
+				assert tok != INVALID;
+				ft = new FilePosition.FileToken(start, tok, end);
+				return ft;
+			}
 		}
 		
 		private FilePosition genPos() {
