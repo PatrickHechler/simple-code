@@ -14,7 +14,8 @@ import org.eclipse.swt.widgets.Display;
 public class SsfPresentationReconciler extends PresentationReconciler {
 	
 	public SsfPresentationReconciler() {
-		setScanner(0, 0, 0, SsfDocumentPartitioner.TOKEN_WHITESPACE);
+//		setScanner(0,0,0, PresentationReconciler.);
+		setScanner(Token.WHITESPACE, SsfDocumentPartitioner.TOKEN_WHITESPACE);
 		setScanner(128, 128, 128, SsfDocumentPartitioner.TOKEN_COMMENT);
 		setScanner(0, 0, 0, SsfDocumentPartitioner.TOKEN_OTHER_SYMBOL);
 		setScanner(0, 64, 64, SsfDocumentPartitioner.TOKEN_ASM_BLOCK);
@@ -25,9 +26,10 @@ public class SsfPresentationReconciler extends PresentationReconciler {
 		setScanner(64, 128, 0, SsfDocumentPartitioner.TOKEN_DEFED_TYPE);
 		setScanner(0, 64, 128, SsfDocumentPartitioner.KEYWORD_ASM, SsfDocumentPartitioner.KEYWORD_WHILE_IF_ELSE,
 			SsfDocumentPartitioner.KEYWORD_CALL, SsfDocumentPartitioner.KEYWORD_FSTRUCT_STRUCT,
-			SsfDocumentPartitioner.KEYWORD_CONST, SsfDocumentPartitioner.KEYWORD_MAIN_INIT, SsfDocumentPartitioner.KEYWORD_NOPAD,
-			SsfDocumentPartitioner.KEYWORD_EXP, SsfDocumentPartitioner.KEYWORD_FUNC_AS_FUNC_ADDR,
-			SsfDocumentPartitioner.KEYWORD_FUNC, SsfDocumentPartitioner.KEYWORD_DEP, SsfDocumentPartitioner.KEYWORD_TYPEDEF);
+			SsfDocumentPartitioner.KEYWORD_CONST, SsfDocumentPartitioner.KEYWORD_MAIN_INIT,
+			SsfDocumentPartitioner.KEYWORD_NOPAD, SsfDocumentPartitioner.KEYWORD_EXP,
+			SsfDocumentPartitioner.KEYWORD_FUNC_AS_FUNC_ADDR, SsfDocumentPartitioner.KEYWORD_FUNC,
+			SsfDocumentPartitioner.KEYWORD_DEP, SsfDocumentPartitioner.KEYWORD_TYPEDEF);
 		setScanner(32, 32, 32, SsfDocumentPartitioner.DECL_TYPEDEF_NAME);
 		setScanner(64, 0, 64, SsfDocumentPartitioner.DECL_DEP_NAME);
 		setScanner(0, 0, 64, SsfDocumentPartitioner.DECL_FUNC_NAME);
@@ -46,41 +48,59 @@ public class SsfPresentationReconciler extends PresentationReconciler {
 	}
 	
 	private final void setScanner(int r, int g, int b, String type, String... otherTypes) {
-		if (true) return;
-		RGB rgb = new RGB(r, g, b);
+		RGB rgb = new RGB(255, 0, 0);
 		TextAttribute attr = new TextAttribute(new Color(Display.getCurrent(), rgb));
 		Token tok = new Token(attr);
-		DefaultDamagerRepairer dr = new DefaultDamagerRepairer(new Scanner(tok));
-		this.setDamager(dr, type);
-		this.setRepairer(dr, type);
+		setScanner(tok, type);
 		if ( otherTypes != null ) {
 			for (String otherType : otherTypes) {
-				this.setDamager(dr, otherType);
-				this.setRepairer(dr, otherType);
+				setScanner(r, g, b, otherType);
 			}
 		}
 	}
 	
+	private final void setScanner(IToken tok, String type) {
+		DefaultDamagerRepairer dr = new DefaultDamagerRepairer(new Scanner(tok));
+		this.setDamager(dr, type);
+		this.setRepairer(dr, type);
+	}
+	
 	private static class Scanner implements ITokenScanner {
 		
-		private final Token tok;
+		private final IToken tok;
 		
-		private int off;
-		private int len;
+		private IToken t;
+		private int    off;
+		private int    len;
 		
-		public Scanner(Token tok) {
+		public Scanner(IToken tok) {
 			this.tok = tok;
 		}
 		
 		@Override
-		public void setRange(@SuppressWarnings("unused") IDocument document, int offset, int length) {
+		public void setRange(IDocument document, int offset, int length) {
 			this.off = offset;
 			this.len = length;
+			final int maxLen = document.getLength();
+			this.t = this.tok;
+			if ( offset > maxLen ) {
+				this.off = maxLen;
+				this.len = 0;
+				this.t = Token.EOF;
+			} else if ( offset + length > maxLen ) {
+				this.len = maxLen - offset;
+			}
 		}
 		
 		@Override
 		public IToken nextToken() {
-			return this.tok;
+			IToken result = this.t;
+			this.t = Token.EOF;
+			if ( result == this.t ) {
+				this.off += this.len;
+				this.len = 0;
+			}
+			return result;
 		}
 		
 		@Override

@@ -296,31 +296,39 @@ public class SimpleTokenStream {
 		}
 		try {
 			while ( true ) {
-				this.in.mark(16); // maximum length until I now which token it is
-				int r = this.in.read(); // currently 8 should also work
-				if ( r == -1 ) return EOF;
-				if ( Character.isWhitespace(r) ) {
-					if ( r == '\n' ) {
-						this.line++;
-						this.charInLine = 0;
-					} else {
-						this.charInLine++;
-					}
-					this.totalChar++;
-					continue;
-				}
+				int r = skipInitialWS();
 				int res = findToken(r);
-				if ( res > INVALID ) {
+				if ( res >= EOF ) {
 					return res;
-				} // was a comment
+				} // else: was a comment
 			}
 		} catch (IOException e) {
-			handleError(new CompileError(this.ctx, e.toString()));
+			handleError(e.toString());
 			return EOF;
 		}
 	}
 	
-	private int findToken(int r) throws IOException {
+	protected int skipInitialWS() throws IOException {
+		while ( true ) {
+			int r;
+			this.in.mark(16); // maximum length until I now which token it is
+			r = this.in.read(); // currently 8 should also work
+			if ( r == -1 ) return EOF;
+			if ( Character.isWhitespace(r) ) {
+				if ( r == '\n' ) {
+					this.line++;
+					this.charInLine = 0;
+				} else {
+					this.charInLine++;
+				}
+				this.totalChar++;
+				continue;
+			}
+			return r;
+		}
+	}
+	
+	protected int findToken(int r) throws IOException {
 		int low = 0;
 		int high = FIRST_DYN - 1;
 		int depth = 0;
@@ -375,8 +383,10 @@ public class SimpleTokenStream {
 		if ( r == '\'' ) {
 			return returnChar();
 		}
-		handleError(new CompileError(this.file, this.line, this.charInLine, this.totalChar, String.valueOf((char) r),
-			null, null));
+		if ( r != -1 ) {
+			this.ctx().setOffendingTokenCach(String.valueOf((char) r));
+			handleError(this.ctx, "invalid token");
+		}
 		return EOF;
 	}
 	

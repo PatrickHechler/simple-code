@@ -1,5 +1,6 @@
 package de.hechler.patrick.code.simple.ecl.editor;
 
+import java.io.IOException;
 import java.io.Reader;
 import java.io.StringReader;
 import java.util.Arrays;
@@ -39,38 +40,38 @@ import de.hechler.patrick.code.simple.parser.objects.value.VariableVal;
 
 public class SsfDocumentPartitioner implements IDocumentPartitioner {
 	
-	public static final String TOKEN_WHITESPACE                = "token: whitespace";
-	public static final String TOKEN_COMMENT                   = "token: comment";
-	public static final String TOKEN_OTHER_SYMBOL              = "token: seperator/math/other-symbol";
-	public static final String TOKEN_ASM_BLOCK                 = "token: asm block";
-	public static final String TOKEN_CHARACTER                 = "token: character";
-	public static final String TOKEN_STRING                    = "token: string";
-	public static final String TOKEN_NUMBER                    = "token: number";
-	public static final String TOKEN_PRIM_TYPE                 = "token: type";
-	public static final String TOKEN_DEFED_TYPE                = "keyword: typedefed type";
-	public static final String KEYWORD_ASM                     = "keyword: asm";
-	public static final String KEYWORD_WHILE_IF_ELSE           = "keyword: while/if/else";
-	public static final String KEYWORD_CALL                    = "keyword: call";
-	public static final String KEYWORD_FSTRUCT_STRUCT          = "keyword: fstruct/struct";
-	public static final String KEYWORD_CONST                   = "keyword: const";
-	public static final String KEYWORD_MAIN_INIT               = "keyword: main/init";
-	public static final String KEYWORD_NOPAD                   = "keyword: nopad";
-	public static final String KEYWORD_EXP                     = "keyword: exp";
-	public static final String KEYWORD_FUNC_AS_FUNC_ADDR       = "keyword: func (as function address type)";
-	public static final String KEYWORD_FUNC                    = "keyword: func";
-	public static final String KEYWORD_DEP                     = "keyword: dep";
-	public static final String KEYWORD_TYPEDEF                 = "keyword: typedef";
-	public static final String DECL_TYPEDEF_NAME               = "decl: typedef name";
-	public static final String DECL_DEP_NAME                   = "decl: dependency name";
-	public static final String DECL_FUNC_NAME                  = "decl: function name";
-	public static final String DECL_PARAM_RESULT_VARIABLE_NAME = "decl: param/result variable name";
-	public static final String DECL_LOCAL_VARIABLE_NAME        = "decl: local variable name";
-	public static final String DECL_GLOBAL_VARIABLE_NAME       = "decl: global variable name";
-	public static final String REF_VALUE_REFERENCE_NAME        = "ref: value reference name";
-	public static final String REF_LOCAL_VARIABLE              = "ref: local variable";
-	public static final String REF_GLOBAL_DEPENDENCY           = "ref: global dependency";
-	public static final String REF_GLOBAL_FUNCTION             = "ref: global function";
-	public static final String REF_GLOBAL_VARIABLE             = "ref: global variable";
+	public static final String TOKEN_WHITESPACE                = "token_Whitespace";
+	public static final String TOKEN_COMMENT                   = "token_Comment";
+	public static final String TOKEN_OTHER_SYMBOL              = "token_Seperator_Math_other_symbol";
+	public static final String TOKEN_ASM_BLOCK                 = "token_Asm_block";
+	public static final String TOKEN_CHARACTER                 = "token_Character";
+	public static final String TOKEN_STRING                    = "token_String";
+	public static final String TOKEN_NUMBER                    = "token_Number";
+	public static final String TOKEN_PRIM_TYPE                 = "token_Type";
+	public static final String TOKEN_DEFED_TYPE                = "keyword_Typedefed_type";
+	public static final String KEYWORD_ASM                     = "keyword_Asm";
+	public static final String KEYWORD_WHILE_IF_ELSE           = "keyword_While_If_else";
+	public static final String KEYWORD_CALL                    = "keyword_Call";
+	public static final String KEYWORD_FSTRUCT_STRUCT          = "keyword_Fstruct_Struct";
+	public static final String KEYWORD_CONST                   = "keyword_Const";
+	public static final String KEYWORD_MAIN_INIT               = "keyword_Main_Init";
+	public static final String KEYWORD_NOPAD                   = "keyword_Nopad";
+	public static final String KEYWORD_EXP                     = "keyword_Exp";
+	public static final String KEYWORD_FUNC_AS_FUNC_ADDR       = "keyword_Func_As_func_addr";
+	public static final String KEYWORD_FUNC                    = "keyword_Func";
+	public static final String KEYWORD_DEP                     = "keyword_Dep";
+	public static final String KEYWORD_TYPEDEF                 = "keyword_Typedef";
+	public static final String DECL_TYPEDEF_NAME               = "decl_Typedef_name";
+	public static final String DECL_DEP_NAME                   = "decl_Dependency_name";
+	public static final String DECL_FUNC_NAME                  = "decl_Function_name";
+	public static final String DECL_PARAM_RESULT_VARIABLE_NAME = "decl_Param_Result_Variable_name";
+	public static final String DECL_LOCAL_VARIABLE_NAME        = "decl_Local_Variable_name";
+	public static final String DECL_GLOBAL_VARIABLE_NAME       = "decl_Global_Variable_name";
+	public static final String REF_VALUE_REFERENCE_NAME        = "ref_Value_Reference_name";
+	public static final String REF_LOCAL_VARIABLE              = "ref_Local_Variable";
+	public static final String REF_GLOBAL_DEPENDENCY           = "ref_Global_Dependency";
+	public static final String REF_GLOBAL_FUNCTION             = "ref_Global_Function";
+	public static final String REF_GLOBAL_VARIABLE             = "ref_Global_Variable";
 	
 	private static final int COMMENT_TOKEN = SimpleTokenStream.MAX_TOKEN + 1;
 	
@@ -149,6 +150,16 @@ public class SsfDocumentPartitioner implements IDocumentPartitioner {
 	
 	@Override
 	public ITypedRegion[] computePartitioning(int offset, int length) {
+		if ( offset >= this.last.length() ) {
+			return new ITypedRegion[0];
+		} else if ( offset < 0 ) {
+			length += offset;
+			offset = 0;
+		}
+		int maxLen = this.last.length() - offset;
+		if ( length < maxLen ) {
+			length = maxLen;
+		}
 		if ( offset == 0 && length == this.last.length() ) {
 			System.out.println("all regions");
 			return this.regions.clone();
@@ -161,6 +172,11 @@ public class SsfDocumentPartitioner implements IDocumentPartitioner {
 	
 	@Override
 	public ITypedRegion getPartition(int offset) {
+		if ( offset >= this.last.length() ) {
+			return this.regions[this.regions.length - 1];
+		} else if ( offset < 0 ) {
+			return this.regions[0];
+		}
 		return this.regions[getIndex(offset)];
 	}
 	
@@ -171,7 +187,7 @@ public class SsfDocumentPartitioner implements IDocumentPartitioner {
 		if ( low == high ) {
 			return low;
 		}
-		while ( true ) {
+		while ( low <= high ) {
 			int mid = ( low + high ) >>> 1;
 			ITypedRegion reg = regs[mid];
 			int off = reg.getOffset();
@@ -184,6 +200,7 @@ public class SsfDocumentPartitioner implements IDocumentPartitioner {
 			}
 			low = mid + 1;
 		}
+		throw new IllegalArgumentException();
 	}
 	
 	@Override
@@ -193,6 +210,11 @@ public class SsfDocumentPartitioner implements IDocumentPartitioner {
 	
 	private boolean checkChange(String doc) {
 		if ( doc.equals(this.last) ) {
+			return true;
+		}
+		if ( doc.isEmpty() ) {
+			this.regions = new ITypedRegion[1];
+			this.regions[0] = new TypedRegion(0, 1, TOKEN_WHITESPACE);
 			return true;
 		}
 		try (StringReader reader = new StringReader(doc)) {
@@ -463,7 +485,9 @@ public class SsfDocumentPartitioner implements IDocumentPartitioner {
 				}
 				FileToken ft = this.ftok;
 				// if consumeTok() was called pushedDynTok is set, this.ftok should not be null
-				this.tree.parsedToken(ft);
+				if ( ft.token() != EOF ) {
+					this.tree.parsedToken(ft);
+				}
 				this.ftok = null;
 				return super.consumeDynTokSpecialText();
 			} finally {
@@ -485,11 +509,13 @@ public class SsfDocumentPartitioner implements IDocumentPartitioner {
 					ft = nfct();
 				} else {
 					this.ftok = null;
+					super.consumeTok();
 				}
-				int ct = super.consumeTok();
-				this.pushedDynTok = ct >= SimpleTokenStream.NAME;// FIRST_DYN;
-				this.tree.parsedToken(ft);
-				return ct;
+				this.pushedDynTok = false;
+				if ( ft.token() != EOF ) {
+					this.tree.parsedToken(ft);
+				}
+				return ft.token();
 			} finally {
 				this.b = false;
 			}
@@ -511,7 +537,9 @@ public class SsfDocumentPartitioner implements IDocumentPartitioner {
 				} else {
 					this.ftok = null;
 					super.consume();
-					this.tree.parsedToken(ft);
+					if ( ft.token() != EOF ) {
+						this.tree.parsedToken(ft);
+					}
 				}
 			} finally {
 				this.b = false;
@@ -540,17 +568,24 @@ public class SsfDocumentPartitioner implements IDocumentPartitioner {
 		
 		private FileToken nft() {
 			while ( true ) {
-				FileToken ft;
-				FilePosition start = genPos();
-				int tok = super.tok();
+				FilePosition start;
+				int tok;
+				try {// manually do what super.tok() does:
+					int r = super.skipInitialWS();
+					start = genPos();
+					tok = super.findToken(r);
+				} catch (IOException e) {
+					addMarker(this.myFile, e.getLocalizedMessage(), super.line(), IMarker.SEVERITY_ERROR);
+					start = genPos();
+					return new FilePosition.FileToken(start, EOF, start);
+				}
 				FilePosition end = genPos();
 				if ( tok == INVALID ) {
-					ft = new FilePosition.FileToken(start, COMMENT_TOKEN, end);
+					FileToken ft = new FilePosition.FileToken(start, COMMENT_TOKEN, end);
 					this.tree.parsedToken(ft);
 					continue;
 				}
-				ft = new FilePosition.FileToken(start, tok, end);
-				return ft;
+				return new FilePosition.FileToken(start, tok, end);
 			}
 		}
 		
