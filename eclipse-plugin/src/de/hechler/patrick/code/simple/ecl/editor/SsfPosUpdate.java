@@ -6,7 +6,6 @@ import java.io.StringReader;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.ListIterator;
 import java.util.function.BiFunction;
 
 import org.eclipse.core.resources.IFile;
@@ -16,9 +15,10 @@ import org.eclipse.core.resources.IProject;
 import org.eclipse.core.resources.IResource;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IPath;
+import org.eclipse.jface.text.BadLocationException;
 import org.eclipse.jface.text.DocumentEvent;
 import org.eclipse.jface.text.IDocument;
-import org.eclipse.jface.text.IDocumentPartitioner;
+import org.eclipse.jface.text.IPositionUpdater;
 import org.eclipse.jface.text.ITypedRegion;
 import org.eclipse.jface.text.TypedRegion;
 import org.osgi.service.log.LogLevel;
@@ -38,7 +38,7 @@ import de.hechler.patrick.code.simple.parser.objects.value.DependencyVal;
 import de.hechler.patrick.code.simple.parser.objects.value.FunctionVal;
 import de.hechler.patrick.code.simple.parser.objects.value.VariableVal;
 
-public class SsfDocumentPartitioner implements IDocumentPartitioner {
+public class SsfPosUpdate implements IPositionUpdater {
 	
 	public static final String TOKEN_WHITESPACE                = "token_Whitespace";
 	public static final String TOKEN_COMMENT                   = "token_Comment";
@@ -75,41 +75,6 @@ public class SsfDocumentPartitioner implements IDocumentPartitioner {
 	
 	private static final int COMMENT_TOKEN = SimpleTokenStream.MAX_TOKEN + 1;
 	
-	private static final String[] LEGAL = new String[] { //
-		TOKEN_WHITESPACE, //
-		TOKEN_COMMENT, //
-		TOKEN_OTHER_SYMBOL, //
-		TOKEN_ASM_BLOCK, //
-		TOKEN_CHARACTER, //
-		TOKEN_STRING, //
-		TOKEN_NUMBER, //
-		TOKEN_PRIM_TYPE, //
-		TOKEN_DEFED_TYPE, //
-		KEYWORD_ASM, //
-		KEYWORD_WHILE_IF_ELSE, //
-		KEYWORD_CALL, //
-		KEYWORD_FSTRUCT_STRUCT, //
-		KEYWORD_CONST, //
-		KEYWORD_MAIN_INIT, //
-		KEYWORD_NOPAD, //
-		KEYWORD_EXP, //
-		KEYWORD_FUNC_AS_FUNC_ADDR, //
-		KEYWORD_FUNC, //
-		KEYWORD_DEP, //
-		KEYWORD_TYPEDEF, //
-		DECL_TYPEDEF_NAME, //
-		DECL_DEP_NAME, //
-		DECL_FUNC_NAME, //
-		DECL_PARAM_RESULT_VARIABLE_NAME, //
-		DECL_LOCAL_VARIABLE_NAME, //
-		DECL_GLOBAL_VARIABLE_NAME, //
-		REF_VALUE_REFERENCE_NAME, //
-		REF_LOCAL_VARIABLE, //
-		REF_GLOBAL_DEPENDENCY, //
-		REF_GLOBAL_FUNCTION, //
-		REF_GLOBAL_VARIABLE,//
-	};
-	
 	private final IFile    file;
 	private final IProject p;
 	private final boolean  ssfMode;
@@ -117,38 +82,29 @@ public class SsfDocumentPartitioner implements IDocumentPartitioner {
 	private String         last;
 	private ITypedRegion[] regions;
 	
-	public SsfDocumentPartitioner(IFile file) {
+	public SsfPosUpdate(IFile file) {
 		this(file, file.getName().endsWith(".ssf"));
 	}
 	
-	public SsfDocumentPartitioner(IFile file, boolean ssfMode) {
+	public SsfPosUpdate(IFile file, boolean ssfMode) {
 		this.file = file;
 		this.ssfMode = ssfMode;
 		this.p = file.getProject();
 	}
 	
-	@Override
-	public void connect(IDocument document) {
-		checkChange(document.get());
+	public void init(IDocument document) {
+		checkChange(document);
 	}
 	
-	@Override
-	public void disconnect() {}
-	
-	@Override
-	public void documentAboutToBeChanged(@SuppressWarnings("unused") DocumentEvent event) {}
-	
-	@Override
-	public String[] getLegalContentTypes() {
-		return LEGAL.clone();
+	public static SsfPosUpdate getSPU(IDocument doc) {
+		for (IPositionUpdater pu : doc.getPositionUpdaters()) {
+			if ( pu instanceof SsfPosUpdate spu0 ) {
+				return spu0;
+			}
+		}
+		return null;
 	}
 	
-	@Override
-	public String getContentType(int offset) {
-		return this.regions[getIndex(offset)].getType();
-	}
-	
-	@Override
 	public ITypedRegion[] computePartitioning(int offset, int length) {
 		if ( offset >= this.last.length() ) {
 			return new ITypedRegion[0];
@@ -170,7 +126,6 @@ public class SsfDocumentPartitioner implements IDocumentPartitioner {
 		return Arrays.copyOfRange(this.regions, start, end);
 	}
 	
-	@Override
 	public ITypedRegion getPartition(int offset) {
 		if ( offset >= this.last.length() ) {
 			return this.regions[this.regions.length - 1];
@@ -184,15 +139,13 @@ public class SsfDocumentPartitioner implements IDocumentPartitioner {
 		ITypedRegion[] regs = this.regions;
 		int low = 0;
 		int high = regs.length - 1;
-		if ( low == high ) {
-			return low;
-		}
 		while ( low <= high ) {
 			int mid = ( low + high ) >>> 1;
 			ITypedRegion reg = regs[mid];
 			int off = reg.getOffset();
 			if ( off > offset ) {
 				high = mid - 1;
+				continue;
 			}
 			int end = off + reg.getLength();
 			if ( end > offset ) {
@@ -200,65 +153,60 @@ public class SsfDocumentPartitioner implements IDocumentPartitioner {
 			}
 			low = mid + 1;
 		}
-		throw new IllegalArgumentException();
+		throw new IllegalArgumentException(
+			"len: " + this.last.length() + " off: " + offset + " regions: " + Arrays.toString(regs));
 	}
 	
 	@Override
-	public boolean documentChanged(DocumentEvent event) {
-		return checkChange(event.fDocument.get());
+	public void update(DocumentEvent event) {
+		checkChange(event.fDocument);
 	}
 	
-	private boolean checkChange(String doc) {
-		if ( doc.equals(this.last) ) {
-			return true;
+	private void checkChange(IDocument doc) {
+		String docStr = doc.get();
+		if ( docStr.equals(this.last) ) {
+			return;
 		}
-		if ( doc.isEmpty() ) {
+		if ( docStr.isEmpty() ) {
 			this.regions = new ITypedRegion[1];
 			this.regions[0] = new TypedRegion(0, 1, TOKEN_WHITESPACE);
-			return true;
+			return;
 		}
-		try (StringReader reader = new StringReader(doc)) {
+		try ( StringReader reader = new StringReader(docStr) ) {
 			this.file.deleteMarkers(SimpleCodeBuilder.VOLATILE_MARKER_TYPE, false, IResource.DEPTH_ZERO);
 			buildTree(reader);
-			rebuildPartitions(doc.length());
-			this.last = doc;
-			return true;
-		} catch (CoreException e) {
+			rebuildPartitions(doc);
+			this.last = docStr;
+			return;
+		} catch ( CoreException e ) {
 			if ( Activator.doLog(LogLevel.ERROR) ) {
 				log("validation crashed: " + e);
 			}
-			return false;
+			return;
 		}
 	}
 	
-	private void rebuildPartitions(int docLen) {
+	private void rebuildPartitions(IDocument doc) {
 		List<ITypedRegion> regions = new LinkedList<>();
-		addTree(this.tree, 0, regions);
-		int prevEnd = 0;
-		for (ListIterator<ITypedRegion> iter = regions.listIterator(); iter.hasNext();) {
-			ITypedRegion reg = iter.next();
-			if ( reg.getOffset() != prevEnd ) {
-				iter.add(new TypedRegion(prevEnd, reg.getOffset(), TOKEN_WHITESPACE));
-			}
-			prevEnd = reg.getOffset() + reg.getLength();
-		}
-		if ( prevEnd != docLen ) {
-			regions.add(new TypedRegion(prevEnd, docLen - prevEnd, TOKEN_WHITESPACE));
-		}
+		int prevEnd = addTree(doc, this.tree, 0, regions);
+		insertWSReg(prevEnd, regions, doc.getLength());
 		this.regions = regions.toArray(new ITypedRegion[regions.size()]);
+		for (ITypedRegion reg : regions) {
+			System.out.println("reg: " + reg);
+		}
 	}
 	
-	private int addTree(DocumentTree docTree, int off, List<ITypedRegion> regions) {
+	private int addTree(IDocument doc, DocumentTree docTree, int off, List<ITypedRegion> regions) {
 		for (FilePosition.FileRegion reg : docTree) {
 			switch ( reg ) {
-			case FilePosition.FileToken tok -> off = addTok(tok, off, regions);
-			case DocumentTree dt -> off = addTree(dt, off, regions);
+			case FilePosition.FileToken tok -> off = addTok(doc, tok, off, regions);
+			case DocumentTree dt -> off = addTree(doc, dt, off, regions);
 			}
 		}
 		return off;
 	}
 	
-	private static int addTok(FileToken tok, int off, List<ITypedRegion> regions) {
+	private static int addTok(IDocument doc, FileToken tok, int off, List<ITypedRegion> regions) {
 		String type = switch ( tok.token() ) {
 		case SimpleTokenStream.INVALID -> TOKEN_COMMENT;
 		case SimpleTokenStream.BOOL_NOT -> TOKEN_OTHER_SYMBOL;
@@ -373,15 +321,46 @@ public class SsfDocumentPartitioner implements IDocumentPartitioner {
 		case SimpleTokenStream.ASM_BLOCK -> TOKEN_ASM_BLOCK;
 		default -> throw new AssertionError(tok);
 		};
-		int start = tok.start().totalChar();
-		int end = tok.end().totalChar();
-		if ( start != off ) {
-			ITypedRegion treg = new TypedRegion(off, start - off, TOKEN_WHITESPACE);
+		final int start = tok.start().totalChar();
+		final int end = tok.end().totalChar();
+		if ( tok.start().line() != tok.end().line() ) {
+			final int oldRegSize = regions.size();
+			try {
+				int offInLine = tok.start().charInLine();
+				for (int l = tok.start().line(); l <= tok.end().line(); l++) {
+					int len = doc.getLineLength(l - 1) - offInLine - 1;// use getLineInfo instead?
+					int offset = doc.getLineOffset(l - 1) + offInLine;
+					for (; Character.isWhitespace(doc.getChar(offset + len - 1)) && len > 0; len--);
+					if ( len > 0 ) {// remove leading and trailing whitespace, trailing may be important for windows
+						for (; Character.isWhitespace(doc.getChar(offset)); offset++, len--);
+					}
+					insertWSReg(off, regions, offset);
+					ITypedRegion treg = new TypedRegion(offset, len, type);
+					regions.add(treg);
+					offInLine = 0;
+					off = offset + len;
+				}
+				return off;//may differ if the token contains trailing whitespace
+			} catch ( BadLocationException e ) {
+				e.printStackTrace();
+				regions.subList(oldRegSize, regions.size()).clear();
+				insertWSReg(off, regions, start);
+				ITypedRegion treg = new TypedRegion(start, end - start, type);
+				regions.add(treg);
+			}
+		} else {
+			insertWSReg(off, regions, start);
+			ITypedRegion treg = new TypedRegion(start, end - start, type);
 			regions.add(treg);
 		}
-		ITypedRegion treg = new TypedRegion(start, end - start, type);
-		regions.add(treg);
 		return end;
+	}
+	
+	private static void insertWSReg(int prevEnd, List<ITypedRegion> regions, int myStart) {
+		if ( myStart != prevEnd ) {
+			ITypedRegion treg = new TypedRegion(prevEnd, myStart - prevEnd, TOKEN_WHITESPACE);
+			regions.add(treg);
+		}
 	}
 	
 	static void addMarker(IFile file, String msg, int line, int severity) {
@@ -393,19 +372,19 @@ public class SsfDocumentPartitioner implements IDocumentPartitioner {
 				line = 1;
 			}
 			m.setAttribute(IMarker.LINE_NUMBER, line);
-		} catch (CoreException e) {
+		} catch ( CoreException e ) {
 			if ( Activator.doLog(LogLevel.ERROR) ) {
 				log("could not set a marker: " + e);
 			}
 		}
 	}
 	
-	private static BiFunction<String, String, SimpleDependency> dep(IFile file, IProject p) throws CoreException {
+	private static BiFunction<String,String,SimpleDependency> dep(IFile file, IProject p) throws CoreException {
 		ProjectProps props = SimpleCodeBuilder.parseProps(p, null);
 		if ( props == null ) return null;
 		IPath fp = file.getFullPath();
 		for (IFolder src : props.src()) {
-			BiFunction<String, String, SimpleDependency> d = dep0(file, props, fp, src);
+			BiFunction<String,String,SimpleDependency> d = dep0(file, props, fp, src);
 			if ( d != null ) return d;
 		}
 		if ( file.getName().endsWith(".sexp") ) {
@@ -414,19 +393,18 @@ public class SsfDocumentPartitioner implements IDocumentPartitioner {
 		return null;
 	}
 	
-	private static BiFunction<String, String, SimpleDependency> dep0(IFile file, ProjectProps props, IPath fp,
-		IFolder src) {
+	private static BiFunction<String,String,SimpleDependency> dep0(IFile file, ProjectProps props, IPath fp, IFolder src) {
 		IPath sfp = src.getFullPath();
 		if ( sfp.isPrefixOf(fp) ) {
 			IFile exportFile = src.getFile(fp.makeRelativeTo(sfp));
-			BiFunction<String, String, SimpleDependency> result = SimpleCodeBuilder.dep(props, sfp, exportFile, null);
+			BiFunction<String,String,SimpleDependency> result = SimpleCodeBuilder.dep(props, sfp, exportFile, null);
 			return (source, runtime) -> {
 				try {
 					return result.apply(source, runtime);
-				} catch (CompileError ce) {
+				} catch ( CompileError ce ) {
 					addMarker(exportFile, ce.getLocalizedMessage(), ce.line, IMarker.SEVERITY_ERROR);
-					addMarker(file, "the dependency " + source + " could not be parsed: " + ce.getLocalizedMessage(),
-						-1, IMarker.SEVERITY_ERROR);
+					addMarker(file, "the dependency " + source + " could not be parsed: " + ce.getLocalizedMessage(), -1,
+						IMarker.SEVERITY_ERROR);
 					return null;
 				}
 			};
@@ -437,16 +415,16 @@ public class SsfDocumentPartitioner implements IDocumentPartitioner {
 	private void buildTree(Reader reader) throws CoreException {
 		DocumentTree tree = new DocumentTree();
 		LogTokenStream sts = new LogTokenStream(reader, this.file, tree);
-		BiFunction<String, String, SimpleDependency> dep = dep(this.file, this.p);
+		BiFunction<String,String,SimpleDependency> dep = dep(this.file, this.p);
 		if ( dep == null ) {
-			SsfDocumentPartitioner.this.tree = null;
+			SsfPosUpdate.this.tree = null;
 			return;
 		}
 		SimpleExportFileParser sp = createParser(tree, sts, dep);
 		SimpleFile sf = new SimpleFile(this.file.toString(), this.file.toString());
 		SimpleCodeBuilder.initilizeSimpleFile(sf);
 		sp.parse(sf);
-		SsfDocumentPartitioner.this.tree = tree;
+		SsfPosUpdate.this.tree = tree;
 	}
 	
 	private static final class LogTokenStream extends SimpleTokenStream {
@@ -574,7 +552,7 @@ public class SsfDocumentPartitioner implements IDocumentPartitioner {
 					int r = super.skipInitialWS();
 					start = genPos();
 					tok = super.findToken(r);
-				} catch (IOException e) {
+				} catch ( IOException e ) {
 					addMarker(this.myFile, e.getLocalizedMessage(), super.line(), IMarker.SEVERITY_ERROR);
 					start = genPos();
 					return new FilePosition.FileToken(start, EOF, start);
@@ -617,7 +595,7 @@ public class SsfDocumentPartitioner implements IDocumentPartitioner {
 	}
 	
 	private SimpleExportFileParser createParser(DocumentTree tree, LogTokenStream sts,
-		BiFunction<String, String, SimpleDependency> dep) {
+		BiFunction<String,String,SimpleDependency> dep) {
 		SimpleExportFileParser sp;
 		if ( this.ssfMode ) {
 			sp = new SimpleSourceFileParser(sts, dep) {

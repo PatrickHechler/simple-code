@@ -31,10 +31,10 @@ public class ValidatorDocumentSetupParticipant implements IDocumentSetupParticip
 				if ( !desc.hasNature(SimpleCodeNature.NATURE_ID) ) {
 					return;
 				}
-				SsfDocumentPartitioner docVal = new SsfDocumentPartitioner(file);
-				document.setDocumentPartitioner(docVal);
+				SsfPosUpdate docVal = new SsfPosUpdate(file);
+				document.addPositionUpdater(docVal);
 			} catch (UnsupportedClassVersionError e) {
-				SsfDocumentPartitioner.addMarker(file, "are you running eclipse with JavaSE21 with preview enabled? " + e, -1, IMarker.SEVERITY_ERROR);
+				SsfPosUpdate.addMarker(file, "are you running eclipse with JavaSE21 with preview enabled? " + e, -1, IMarker.SEVERITY_ERROR);
 			} catch (CoreException e) {
 				if ( Activator.doLog(LogLevel.ERROR) ) {
 					log("could not initilize the editor: " + e);

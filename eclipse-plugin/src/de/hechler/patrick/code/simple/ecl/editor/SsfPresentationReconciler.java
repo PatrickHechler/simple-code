@@ -1,6 +1,10 @@
 package de.hechler.patrick.code.simple.ecl.editor;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import org.eclipse.jface.text.IDocument;
+import org.eclipse.jface.text.ITypedRegion;
 import org.eclipse.jface.text.TextAttribute;
 import org.eclipse.jface.text.presentation.PresentationReconciler;
 import org.eclipse.jface.text.rules.DefaultDamagerRepairer;
@@ -13,94 +17,125 @@ import org.eclipse.swt.widgets.Display;
 
 public class SsfPresentationReconciler extends PresentationReconciler {
 	
-	public SsfPresentationReconciler() {
-//		setScanner(0,0,0, PresentationReconciler.);
-		setScanner(Token.WHITESPACE, SsfDocumentPartitioner.TOKEN_WHITESPACE);
-		setScanner(128, 128, 128, SsfDocumentPartitioner.TOKEN_COMMENT);
-		setScanner(0, 0, 0, SsfDocumentPartitioner.TOKEN_OTHER_SYMBOL);
-		setScanner(0, 64, 64, SsfDocumentPartitioner.TOKEN_ASM_BLOCK);
-		setScanner(0, 128, 0, SsfDocumentPartitioner.TOKEN_CHARACTER);
-		setScanner(0, 96, 0, SsfDocumentPartitioner.TOKEN_STRING);
-		setScanner(0, 0, 96, SsfDocumentPartitioner.TOKEN_NUMBER);
-		setScanner(64, 64, 0, SsfDocumentPartitioner.TOKEN_PRIM_TYPE);
-		setScanner(64, 128, 0, SsfDocumentPartitioner.TOKEN_DEFED_TYPE);
-		setScanner(0, 64, 128, SsfDocumentPartitioner.KEYWORD_ASM, SsfDocumentPartitioner.KEYWORD_WHILE_IF_ELSE,
-			SsfDocumentPartitioner.KEYWORD_CALL, SsfDocumentPartitioner.KEYWORD_FSTRUCT_STRUCT,
-			SsfDocumentPartitioner.KEYWORD_CONST, SsfDocumentPartitioner.KEYWORD_MAIN_INIT,
-			SsfDocumentPartitioner.KEYWORD_NOPAD, SsfDocumentPartitioner.KEYWORD_EXP,
-			SsfDocumentPartitioner.KEYWORD_FUNC_AS_FUNC_ADDR, SsfDocumentPartitioner.KEYWORD_FUNC,
-			SsfDocumentPartitioner.KEYWORD_DEP, SsfDocumentPartitioner.KEYWORD_TYPEDEF);
-		setScanner(32, 32, 32, SsfDocumentPartitioner.DECL_TYPEDEF_NAME);
-		setScanner(64, 0, 64, SsfDocumentPartitioner.DECL_DEP_NAME);
-		setScanner(0, 0, 64, SsfDocumentPartitioner.DECL_FUNC_NAME);
-		setScanner(32, 16, 32, SsfDocumentPartitioner.DECL_PARAM_RESULT_VARIABLE_NAME);
-		setScanner(16, 16, 64, SsfDocumentPartitioner.DECL_LOCAL_VARIABLE_NAME);
-		setScanner(0, 64, 128, SsfDocumentPartitioner.DECL_GLOBAL_VARIABLE_NAME);
-		setScanner(64, 64, 64, SsfDocumentPartitioner.REF_VALUE_REFERENCE_NAME);
-		setScanner(8, 8, 32, SsfDocumentPartitioner.REF_LOCAL_VARIABLE);
-		setScanner(64, 0, 128, SsfDocumentPartitioner.REF_GLOBAL_FUNCTION);
-		setScanner(128, 0, 64, SsfDocumentPartitioner.REF_GLOBAL_DEPENDENCY);
-		setScanner(64, 0, 64, SsfDocumentPartitioner.REF_GLOBAL_VARIABLE);
+	private static Map<String,IToken> TOKENS;
+	
+	static {
+		TOKENS = new HashMap<>();
+		TOKENS.put(SsfPosUpdate.TOKEN_WHITESPACE, Token.WHITESPACE);
+		TOKENS.put(SsfPosUpdate.TOKEN_COMMENT, token(63, 63, 63));
+		TOKENS.put(SsfPosUpdate.TOKEN_OTHER_SYMBOL, token(0, 0, 0));
+		TOKENS.put(SsfPosUpdate.TOKEN_ASM_BLOCK, token(0, 63, 63));
+		TOKENS.put(SsfPosUpdate.TOKEN_CHARACTER, token(0, 191, 0));
+		TOKENS.put(SsfPosUpdate.TOKEN_STRING, token(0, 191, 0));
+		TOKENS.put(SsfPosUpdate.TOKEN_NUMBER, token(63, 63, 127));
+		TOKENS.put(SsfPosUpdate.TOKEN_PRIM_TYPE, token(127, 0, 127));
+		TOKENS.put(SsfPosUpdate.TOKEN_DEFED_TYPE, token(159, 0, 127));
+		IToken _127_0_255 = token(127, 0, 255);
+		TOKENS.put(SsfPosUpdate.KEYWORD_ASM, _127_0_255);
+		TOKENS.put(SsfPosUpdate.KEYWORD_ASM, _127_0_255);
+		TOKENS.put(SsfPosUpdate.KEYWORD_WHILE_IF_ELSE, _127_0_255);
+		TOKENS.put(SsfPosUpdate.KEYWORD_CALL, _127_0_255);
+		TOKENS.put(SsfPosUpdate.KEYWORD_FSTRUCT_STRUCT, _127_0_255);
+		TOKENS.put(SsfPosUpdate.KEYWORD_CONST, _127_0_255);
+		TOKENS.put(SsfPosUpdate.KEYWORD_MAIN_INIT, _127_0_255);
+		TOKENS.put(SsfPosUpdate.KEYWORD_NOPAD, _127_0_255);
+		TOKENS.put(SsfPosUpdate.KEYWORD_EXP, _127_0_255);
+		TOKENS.put(SsfPosUpdate.KEYWORD_FUNC_AS_FUNC_ADDR, _127_0_255);
+		TOKENS.put(SsfPosUpdate.KEYWORD_FUNC, _127_0_255);
+		TOKENS.put(SsfPosUpdate.KEYWORD_DEP, _127_0_255);
+		TOKENS.put(SsfPosUpdate.KEYWORD_TYPEDEF, _127_0_255);
+		TOKENS.put(SsfPosUpdate.DECL_TYPEDEF_NAME, token(0, 127, 127));
+		TOKENS.put(SsfPosUpdate.DECL_FUNC_NAME, token(31, 31, 31));
+		TOKENS.put(SsfPosUpdate.DECL_DEP_NAME, token(63, 0, 63));
+		TOKENS.put(SsfPosUpdate.DECL_PARAM_RESULT_VARIABLE_NAME, token(31, 0, 63));
+		TOKENS.put(SsfPosUpdate.DECL_LOCAL_VARIABLE_NAME, token(15, 15, 31));
+		TOKENS.put(SsfPosUpdate.DECL_GLOBAL_VARIABLE_NAME, token(31, 0, 63));
+		TOKENS.put(SsfPosUpdate.REF_VALUE_REFERENCE_NAME, token(0, 63, 127));
+		TOKENS.put(SsfPosUpdate.REF_GLOBAL_FUNCTION, token(63, 63, 63));
+		TOKENS.put(SsfPosUpdate.REF_GLOBAL_DEPENDENCY, token(127, 0, 127));
+		TOKENS.put(SsfPosUpdate.REF_LOCAL_VARIABLE, token(31, 31, 63));
+		TOKENS.put(SsfPosUpdate.REF_GLOBAL_VARIABLE, token(63, 0, 127));
 	}
 	
-	private final void setScanner(int r, int g, int b, String type) {
-		setScanner(r, g, b, type, (String[]) null);
-	}
-	
-	private final void setScanner(int r, int g, int b, String type, String... otherTypes) {
-		RGB rgb = new RGB(255, 0, 0);
+	private static IToken token(int r, int g, int b) {
+		RGB rgb = new RGB(r, g, b);
 		TextAttribute attr = new TextAttribute(new Color(Display.getCurrent(), rgb));
 		Token tok = new Token(attr);
-		setScanner(tok, type);
-		if ( otherTypes != null ) {
-			for (String otherType : otherTypes) {
-				setScanner(r, g, b, otherType);
-			}
-		}
+		return tok;
 	}
 	
-	private final void setScanner(IToken tok, String type) {
-		DefaultDamagerRepairer dr = new DefaultDamagerRepairer(new Scanner(tok));
-		this.setDamager(dr, type);
-		this.setRepairer(dr, type);
+	public static void setToken(String key, int r, int g, int b) {
+		IToken tok = token(r, g, b);
+		setToken(key, tok);
+	}
+	
+	public static void setToken(String key, IToken tok) {
+		if ( tok.isEOF() ) {
+			throw new IllegalArgumentException("EOF token");
+		}
+		if ( !TOKENS.containsKey(key) ) {
+			throw new IllegalArgumentException("unknown key: '" + key + "'");
+		}
+		TOKENS.put(key, tok);
+	}
+	
+	public SsfPresentationReconciler() {
+		DefaultDamagerRepairer dr = new DefaultDamagerRepairer(new Scanner());
+		this.setDamager(dr, IDocument.DEFAULT_CONTENT_TYPE);
+		this.setRepairer(dr, IDocument.DEFAULT_CONTENT_TYPE);
 	}
 	
 	private static class Scanner implements ITokenScanner {
 		
-		private final IToken tok;
+		private IDocument doc;
+		private int       off;
+		private int       len;
+		private int       endOff;
 		
-		private IToken t;
-		private int    off;
-		private int    len;
-		
-		public Scanner(IToken tok) {
-			this.tok = tok;
+		public Scanner() {
 		}
 		
 		@Override
 		public void setRange(IDocument document, int offset, int length) {
+			this.doc = document;
 			this.off = offset;
-			this.len = length;
+			this.len = 0;
+			this.endOff = offset + length;
 			final int maxLen = document.getLength();
-			this.t = this.tok;
-			if ( offset > maxLen ) {
-				this.off = maxLen;
-				this.len = 0;
-				this.t = Token.EOF;
-			} else if ( offset + length > maxLen ) {
-				this.len = maxLen - offset;
+			if ( endOff > maxLen ) {
+				endOff = maxLen;
 			}
 		}
 		
 		@Override
 		public IToken nextToken() {
-			IToken result = this.t;
-			this.t = Token.EOF;
-			if ( result == this.t ) {
-				this.off += this.len;
+			SsfPosUpdate spu = SsfPosUpdate.getSPU(this.doc);
+			if ( spu == null ) {
 				this.len = 0;
+				System.err.println("SsfPosUpdate not found");
+				return Token.EOF;
 			}
-			return result;
+			this.off += this.len;
+			if ( this.off >= this.endOff ) {
+				this.len = 0;
+				return Token.EOF;
+			}
+			ITypedRegion part = spu.getPartition(this.off);
+			int poff = part.getOffset();
+			int plen = part.getLength();
+			int pend = poff + plen;
+			if ( pend > this.endOff ) {
+				pend = this.endOff;
+			}
+			this.len = pend - this.off;
+			String type = part.getType();
+			IToken tok = TOKENS.get(type);
+			Object data = tok.getData();
+			if ( data instanceof TextAttribute ta ) {
+				data = ta.getForeground() + " : " + ta;
+			}
+			System.out.println("token: " + this.off + ".." + ( this.off + this.len ) + " : " + data + " : " + type);
+			return tok;
 		}
 		
 		@Override
