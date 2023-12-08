@@ -913,7 +913,7 @@ public class SimpleExportFileParser {
 						value = new DataVal(new byte[0], StructType.create(List.of(), StructType.FLAG_NOUSE, this.in.ctx()),
 							this.in.ctx());
 					}
-					if ( midResult != null) {
+					if ( midResult != null ) {
 						remenberExitedState(STATE_VAL_DIRECT, enters == null ? null : enters[0], firstEnd, midResult);
 					} else {
 						exitState(STATE_VAL_DIRECT, enters == null ? null : enters[0], value);
@@ -1140,7 +1140,13 @@ public class SimpleExportFileParser {
 		} catch ( @SuppressWarnings("unused") AssertionError ae ) {
 			name = name(this.in.consumeTok());
 		}
-		members.add(new SimpleVariable(type, name, null, 0));
+		try {
+			members.add(new SimpleVariable(type, name, null, 0));
+		} catch ( NullPointerException npe ) {
+			if ( name != null ) {
+				throw npe;
+			}
+		}
 		while ( true ) {
 			if ( this.in.tok() != sep ) {
 				if ( sepBeforeEnd || this.in.tok() != end ) {
@@ -1177,7 +1183,13 @@ public class SimpleExportFileParser {
 			} catch ( @SuppressWarnings("unused") AssertionError ae ) {
 				name = name(this.in.consumeTok());
 			}
-			members.add(new SimpleVariable(type, name, null, 0));
+			try {
+				members.add(new SimpleVariable(type, name, null, 0));
+			} catch ( NullPointerException npe ) {
+				if ( name != null ) {
+					throw npe;
+				}
+			}
 		}
 	}
 	

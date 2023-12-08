@@ -34,6 +34,7 @@ import de.hechler.patrick.code.simple.parser.error.CompileError;
 import de.hechler.patrick.code.simple.parser.objects.simplefile.SimpleDependency;
 import de.hechler.patrick.code.simple.parser.objects.simplefile.SimpleFile;
 import de.hechler.patrick.code.simple.parser.objects.simplefile.SimpleVariable;
+import de.hechler.patrick.code.simple.parser.objects.value.DataVal;
 import de.hechler.patrick.code.simple.parser.objects.value.DependencyVal;
 import de.hechler.patrick.code.simple.parser.objects.value.FunctionVal;
 import de.hechler.patrick.code.simple.parser.objects.value.VariableVal;
@@ -298,6 +299,7 @@ public class SsfPosUpdate implements IPositionUpdater {
 						}
 						yield REF_LOCAL_VARIABLE;
 					}
+					case DataVal _v -> REF_VALUE_REFERENCE_NAME;
 					default -> throw new AssertionError("illegal info " + p.global().info().getClass());
 					};
 				}
@@ -319,6 +321,7 @@ public class SsfPosUpdate implements IPositionUpdater {
 		case SimpleTokenStream.STRING -> TOKEN_STRING;
 		case SimpleTokenStream.CHARACTER -> TOKEN_CHARACTER;
 		case SimpleTokenStream.ASM_BLOCK -> TOKEN_ASM_BLOCK;
+		case COMMENT_TOKEN -> TOKEN_COMMENT;
 		default -> throw new AssertionError(tok);
 		};
 		final int start = tok.start().totalChar();

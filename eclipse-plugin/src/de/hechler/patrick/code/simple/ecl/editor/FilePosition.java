@@ -23,6 +23,13 @@ public record FilePosition(int totalChar, int line, int charInLine) {
 	public record FileToken(FilePosition start, int token, FilePosition end, DocumentTree parent, int parentIndex)
 		implements FileRegion {
 		
+		public FileToken(FilePosition start, int token, FilePosition end, DocumentTree parent, int parentIndex) {
+			this.start = start;
+			this.token = token;
+			this.end = end;
+			this.parent = parent;
+			this.parentIndex = parentIndex;
+		}
 		
 		public FileToken(FilePosition start, int token, FilePosition end) {
 			this(start, token, end, null, -1);

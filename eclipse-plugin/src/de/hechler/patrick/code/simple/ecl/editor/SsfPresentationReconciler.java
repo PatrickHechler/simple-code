@@ -22,7 +22,7 @@ public class SsfPresentationReconciler extends PresentationReconciler {
 	static {
 		TOKENS = new HashMap<>();
 		TOKENS.put(SsfPosUpdate.TOKEN_WHITESPACE, Token.WHITESPACE);
-		TOKENS.put(SsfPosUpdate.TOKEN_COMMENT, token(63, 63, 63));
+		TOKENS.put(SsfPosUpdate.TOKEN_COMMENT, token(127, 127, 127));
 		TOKENS.put(SsfPosUpdate.TOKEN_OTHER_SYMBOL, token(0, 0, 0));
 		TOKENS.put(SsfPosUpdate.TOKEN_ASM_BLOCK, token(0, 95, 95));
 		TOKENS.put(SsfPosUpdate.TOKEN_CHARACTER, token(0, 191, 0));
@@ -43,9 +43,9 @@ public class SsfPresentationReconciler extends PresentationReconciler {
 		TOKENS.put(SsfPosUpdate.KEYWORD_NOPAD, _95_0_191);
 		TOKENS.put(SsfPosUpdate.KEYWORD_EXP, _95_0_191);
 		
-		TOKENS.put(SsfPosUpdate.TOKEN_PRIM_TYPE, token(127, 0, 127));
-		TOKENS.put(SsfPosUpdate.DECL_TYPEDEF_NAME, token(159, 63, 159));
-		TOKENS.put(SsfPosUpdate.TOKEN_DEFED_TYPE, token(159, 63, 159));
+		TOKENS.put(SsfPosUpdate.TOKEN_PRIM_TYPE, token(63, 0, 159));
+		TOKENS.put(SsfPosUpdate.DECL_TYPEDEF_NAME, token(127, 63, 191));
+		TOKENS.put(SsfPosUpdate.TOKEN_DEFED_TYPE, token(127, 63, 191));
 		
 		TOKENS.put(SsfPosUpdate.DECL_PARAM_RESULT_VARIABLE_NAME, token(159, 159, 127));
 		TOKENS.put(SsfPosUpdate.DECL_LOCAL_VARIABLE_NAME, token(127, 127, 63));
@@ -57,8 +57,8 @@ public class SsfPresentationReconciler extends PresentationReconciler {
 		TOKENS.put(SsfPosUpdate.DECL_DEP_NAME, token(159, 0, 0));
 		TOKENS.put(SsfPosUpdate.REF_GLOBAL_DEPENDENCY, token(159, 0, 0));
 		
-		TOKENS.put(SsfPosUpdate.DECL_FUNC_NAME, token(127, 127, 0));
-		TOKENS.put(SsfPosUpdate.REF_GLOBAL_FUNCTION, token(127, 127, 0));
+		TOKENS.put(SsfPosUpdate.DECL_FUNC_NAME, token(127, 63, 0));
+		TOKENS.put(SsfPosUpdate.REF_GLOBAL_FUNCTION, token(127, 63, 0));
 		
 		TOKENS.put(SsfPosUpdate.REF_VALUE_REFERENCE_NAME, token(0, 63, 127));
 	}
