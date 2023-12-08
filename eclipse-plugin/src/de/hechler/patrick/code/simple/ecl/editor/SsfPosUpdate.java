@@ -330,6 +330,9 @@ public class SsfPosUpdate implements IPositionUpdater {
 				for (int l = tok.start().line(); l <= tok.end().line(); l++) {
 					int len = doc.getLineLength(l - 1) - offInLine - 1;// use getLineInfo instead?
 					int offset = doc.getLineOffset(l - 1) + offInLine;
+					if ( offset + len > end ) {
+						len = end - offset;
+					}
 					for (; Character.isWhitespace(doc.getChar(offset + len - 1)) && len > 0; len--);
 					if ( len > 0 ) {// remove leading and trailing whitespace, trailing may be important for windows
 						for (; Character.isWhitespace(doc.getChar(offset)); offset++, len--);
@@ -340,7 +343,7 @@ public class SsfPosUpdate implements IPositionUpdater {
 					offInLine = 0;
 					off = offset + len;
 				}
-				return off;//may differ if the token contains trailing whitespace
+				return off;// may differ if the token contains trailing whitespace
 			} catch ( BadLocationException e ) {
 				e.printStackTrace();
 				regions.subList(oldRegSize, regions.size()).clear();
@@ -467,7 +470,9 @@ public class SsfPosUpdate implements IPositionUpdater {
 					this.tree.parsedToken(ft);
 				}
 				this.ftok = null;
-				return super.consumeDynTokSpecialText();
+				String specialText = super.consumeDynTokSpecialText();
+				this.pos = ft.end();
+				return specialText;
 			} finally {
 				this.b = false;
 			}
@@ -489,6 +494,7 @@ public class SsfPosUpdate implements IPositionUpdater {
 					this.ftok = null;
 					super.consumeTok();
 				}
+				this.pos = ft.end();
 				this.pushedDynTok = false;
 				if ( ft.token() != EOF ) {
 					this.tree.parsedToken(ft);
@@ -515,6 +521,7 @@ public class SsfPosUpdate implements IPositionUpdater {
 				} else {
 					this.ftok = null;
 					super.consume();
+					this.pos = ft.end();
 					if ( ft.token() != EOF ) {
 						this.tree.parsedToken(ft);
 					}
@@ -573,7 +580,6 @@ public class SsfPosUpdate implements IPositionUpdater {
 				FilePosition start = genPos();
 				int tok = super.consumeTok();
 				FilePosition end = genPos();
-				assert tok != INVALID;
 				ft = new FilePosition.FileToken(start, tok, end);
 				return ft;
 			}

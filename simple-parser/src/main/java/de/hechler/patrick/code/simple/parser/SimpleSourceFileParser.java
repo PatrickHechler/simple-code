@@ -313,6 +313,7 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 	
 	private SimpleCommand parseCmdConstDecl(SimpleScope scope) {
 		final Object enter = enterState(STATE_EX_CODE_VAR_DECL);
+		this.in.consume();
 		SimpleType type = parseType(scope);
 		return parseCmdVarDecl0(scope, SimpleVariable.FLAG_CONSTANT, type, enter);
 	}
@@ -355,6 +356,7 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 	
 	private SimpleCommand parseCmdAsm(SimpleScope scope) {
 		final Object enter = enterState(STATE_EX_CODE_ASM);
+		this.in.consume();
 		List<AsmCmd.AsmParam> params = List.of();
 		if ( this.in.tok() == STRING ) {
 			params = new ArrayList<>();
@@ -416,7 +418,7 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 		String ignoreReg = this.in.consumeDynTokSpecialText();
 		consumeToken(LARROW,
 			"expected `<-- \\?´ after `[ASM_BLOCK] ( ( [VALUE] <-- [STRING] | [STRING] <-- \\? ) ( , [VALUE] <-- [STRING] | [STRING] <-- \\? )* )? [STRING]´");
-		expectToken(QUESTION,
+		consumeToken(QUESTION,
 			"expected `\\?´ after `[ASM_BLOCK] ( [VALUE] <-- [STRING] ( , [VALUE] <-- [STRING] )* )? [VALUE] <--´");
 		AsmCmd.AsmResult asmRes;
 		try {

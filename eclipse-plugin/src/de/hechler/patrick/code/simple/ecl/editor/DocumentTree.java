@@ -3,9 +3,11 @@ package de.hechler.patrick.code.simple.ecl.editor;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.ListIterator;
 
 import de.hechler.patrick.code.simple.ecl.editor.FilePosition.FileRegion;
 import de.hechler.patrick.code.simple.ecl.editor.FilePosition.FileState;
+import de.hechler.patrick.code.simple.ecl.editor.FilePosition.FileToken;
 
 public final class DocumentTree implements FilePosition.FileRegion, Iterable<FilePosition.FileRegion> {
 	
@@ -41,6 +43,20 @@ public final class DocumentTree implements FilePosition.FileRegion, Iterable<Fil
 			DocumentTree dt = new DocumentTree();
 			this.entries = dt.entries;
 			dt.entries = entries;
+			for (ListIterator<FileRegion> iter = entries.listIterator(); iter.hasNext();) {
+				FileRegion c = iter.next();
+				if ( c instanceof DocumentTree cTree ) {
+					cTree.parent = dt;
+				} else {
+					FilePosition.FileToken cTok = (FileToken) c;
+					int parentIndex = iter.previousIndex();
+					FilePosition cStart = cTok.start();
+					int cToken = cTok.token();
+					FilePosition cEnd = cTok.end();
+					cTok = new FilePosition.FileToken(cStart, cToken, cEnd, dt, parentIndex);
+					iter.set(cTok);
+				}
+			}
 			for (int i = 0; i < result.length - 1; i++) {
 				dt.enterState(result[i]);
 				DocumentTree parent = i == result.length - 2 ? this : new DocumentTree();
@@ -155,7 +171,9 @@ public final class DocumentTree implements FilePosition.FileRegion, Iterable<Fil
 					});
 				}
 				subList.clear();
-				p.correctEntryPositions(pos, oldParentSize);
+				if (p.global.end() != null) {
+					p.correctEntryPositions(p.global.end(), oldParentSize);
+				}
 			}
 		}
 	}
@@ -164,11 +182,11 @@ public final class DocumentTree implements FilePosition.FileRegion, Iterable<Fil
 		for (; size > 0; size--) {
 			Object obj = this.entries.get(size - 1);
 			switch ( obj ) {
-			case DocumentTree dt when dt.global.start().totalChar() >= ptc:
+			case DocumentTree dt when dt.global.start().totalChar() < ptc:
 				return size;
 			case DocumentTree dt:
 				break;
-			case FilePosition.FileToken ft when ft.start().totalChar() >= ptc:
+			case FilePosition.FileToken ft when ft.start().totalChar() < ptc:
 				return size;
 			case FilePosition.FileToken ft:
 				break;

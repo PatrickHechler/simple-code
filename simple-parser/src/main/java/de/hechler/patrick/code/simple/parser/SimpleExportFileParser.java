@@ -99,6 +99,7 @@ import de.hechler.patrick.code.simple.parser.objects.value.BinaryOpVal.BinaryOp;
 import de.hechler.patrick.code.simple.parser.objects.value.CastVal;
 import de.hechler.patrick.code.simple.parser.objects.value.CondVal;
 import de.hechler.patrick.code.simple.parser.objects.value.DataVal;
+import de.hechler.patrick.code.simple.parser.objects.value.DependencyVal;
 import de.hechler.patrick.code.simple.parser.objects.value.NameVal;
 import de.hechler.patrick.code.simple.parser.objects.value.ScalarNumericVal;
 import de.hechler.patrick.code.simple.parser.objects.value.SimpleValue;
@@ -140,14 +141,14 @@ public class SimpleExportFileParser {
 	public static final int STATE_TYPE_FUNC_ADDR       = 28;
 	public static final int STATE_TYPE_POSTFIX         = 29;
 	
-	protected final SimpleTokenStream                            in;
-	protected final BiFunction<String, String, SimpleDependency> dep;
+	protected final SimpleTokenStream                          in;
+	protected final BiFunction<String,String,SimpleDependency> dep;
 	
-	public SimpleExportFileParser(InputStream in, String file, BiFunction<String, String, SimpleDependency> dep) {
+	public SimpleExportFileParser(InputStream in, String file, BiFunction<String,String,SimpleDependency> dep) {
 		this(new SimpleTokenStream(in, file), dep);
 	}
 	
-	public SimpleExportFileParser(SimpleTokenStream in, BiFunction<String, String, SimpleDependency> dep) {
+	public SimpleExportFileParser(SimpleTokenStream in, BiFunction<String,String,SimpleDependency> dep) {
 		this.in = in;
 		this.dep = dep;
 	}
@@ -182,7 +183,7 @@ public class SimpleExportFileParser {
 		String name;
 		try {
 			name = this.in.consumeDynTokSpecialText();
-		} catch (@SuppressWarnings("unused") AssertionError ae) {
+		} catch ( @SuppressWarnings("unused") AssertionError ae ) {
 			// assertion enabled (for token stream)
 			// expectToken() failed
 			// handleError() overwritten & returned normally
@@ -193,7 +194,7 @@ public class SimpleExportFileParser {
 		String path;
 		try {
 			path = this.in.consumeDynTokSpecialText();
-		} catch (@SuppressWarnings("unused") AssertionError ae) {
+		} catch ( @SuppressWarnings("unused") AssertionError ae ) {
 			path = "invalid path\0";
 		}
 		consumeToken(SEMI, "expected to get `;´ after `dep [NAME] [STRING]´");
@@ -204,7 +205,7 @@ public class SimpleExportFileParser {
 		}
 		try {
 			sf.dependency(dependency, name, this.in.ctx());
-		} catch (NullPointerException npe) {
+		} catch ( NullPointerException npe ) {
 			if ( name != null ) throw npe;
 		}
 		exitState(STATE_DEPENDENCY, enter, name);
@@ -237,7 +238,7 @@ public class SimpleExportFileParser {
 		String name;
 		try {
 			name = this.in.consumeDynTokSpecialText();
-		} catch (@SuppressWarnings("unused") AssertionError ae) {
+		} catch ( @SuppressWarnings("unused") AssertionError ae ) {
 			name = null;
 		}
 		SimpleValue initialValue = null;
@@ -250,10 +251,10 @@ public class SimpleExportFileParser {
 		SimpleVariable result;
 		try {
 			result = new SimpleVariable(type, name, initialValue, flags);
-		} catch (NullPointerException npe) {
+		} catch ( NullPointerException npe ) {
 			if ( name != null ) throw npe;
-			result = new SimpleVariable(StructType.create(List.of(), StructType.FLAG_NOUSE, ErrorContext.NO_CONTEXT),
-				"invalid\0", initialValue, flags);
+			result = new SimpleVariable(StructType.create(List.of(), StructType.FLAG_NOUSE, ErrorContext.NO_CONTEXT), "invalid\0",
+				initialValue, flags);
 		}
 		exitState(STATE_VARIALBE, enter, result);
 		return result;
@@ -287,7 +288,7 @@ public class SimpleExportFileParser {
 			SimpleValue c = parseValueCondExp(scope, 0, null, null);
 			try {
 				a = CondVal.create(a, b, c, this.in.ctx());
-			} catch (CompileError ce) {
+			} catch ( CompileError ce ) {
 				this.in.handleError(ce);
 			}
 		}
@@ -308,7 +309,7 @@ public class SimpleExportFileParser {
 			SimpleValue b = parseValueLAndExp(scope, 0, null, null);
 			try {
 				a = BinaryOpVal.create(a, BinaryOp.BOOL_OR, b, this.in.ctx());
-			} catch (CompileError ce) {
+			} catch ( CompileError ce ) {
 				this.in.handleError(ce);
 			}
 		}
@@ -329,7 +330,7 @@ public class SimpleExportFileParser {
 			SimpleValue b = parseValueOrExp(scope, 0, null, null);
 			try {
 				a = BinaryOpVal.create(a, BinaryOp.BOOL_AND, b, this.in.ctx());
-			} catch (CompileError ce) {
+			} catch ( CompileError ce ) {
 				this.in.handleError(ce);
 			}
 		}
@@ -350,7 +351,7 @@ public class SimpleExportFileParser {
 			SimpleValue b = parseValueXOrExp(scope, 0, null, null);
 			try {
 				a = BinaryOpVal.create(a, BinaryOp.BIT_OR, b, this.in.ctx());
-			} catch (CompileError ce) {
+			} catch ( CompileError ce ) {
 				this.in.handleError(ce);
 			}
 		}
@@ -371,7 +372,7 @@ public class SimpleExportFileParser {
 			SimpleValue b = parseValueAndExp(scope, 0, null, null);
 			try {
 				a = BinaryOpVal.create(a, BinaryOp.BIT_XOR, b, this.in.ctx());
-			} catch (CompileError ce) {
+			} catch ( CompileError ce ) {
 				this.in.handleError(ce);
 			}
 		}
@@ -392,7 +393,7 @@ public class SimpleExportFileParser {
 			SimpleValue b = parseValueEqExp(scope, 0, null, null);
 			try {
 				a = BinaryOpVal.create(a, BinaryOp.BIT_AND, b, this.in.ctx());
-			} catch (CompileError ce) {
+			} catch ( CompileError ce ) {
 				this.in.handleError(ce);
 			}
 		}
@@ -414,7 +415,7 @@ public class SimpleExportFileParser {
 			SimpleValue b = parseValueRelExp(scope, 0, null, null);
 			try {
 				a = BinaryOpVal.create(a, t == EQ ? BinaryOp.CMP_EQ : BinaryOp.CMP_NEQ, b, this.in.ctx());
-			} catch (CompileError ce) {
+			} catch ( CompileError ce ) {
 				this.in.handleError(ce);
 			}
 			t = this.in.tok();
@@ -443,7 +444,7 @@ public class SimpleExportFileParser {
 				case LT -> BinaryOp.CMP_LT;
 				default -> throw new AssertionError();
 				}, b, this.in.ctx());
-			} catch (CompileError ce) {
+			} catch ( CompileError ce ) {
 				this.in.handleError(ce);
 			}
 			t = this.in.tok();
@@ -470,7 +471,7 @@ public class SimpleExportFileParser {
 				case SHIFT_RIGTH -> BinaryOp.SHIFT_RIGTH;
 				default -> throw new AssertionError();
 				}, b, this.in.ctx());
-			} catch (CompileError ce) {
+			} catch ( CompileError ce ) {
 				this.in.handleError(ce);
 			}
 			t = this.in.tok();
@@ -493,7 +494,7 @@ public class SimpleExportFileParser {
 			SimpleValue b = parseValueMulExp(scope, 0, null, null);
 			try {
 				a = BinaryOpVal.create(a, t == PLUS ? BinaryOp.MATH_ADD : BinaryOp.MATH_SUB, b, this.in.ctx());
-			} catch (CompileError ce) {
+			} catch ( CompileError ce ) {
 				this.in.handleError(ce);
 			}
 			t = this.in.tok();
@@ -521,7 +522,7 @@ public class SimpleExportFileParser {
 				case MOD -> BinaryOp.MATH_MOD;
 				default -> throw new AssertionError();
 				}, b, this.in.ctx());
-			} catch (CompileError ce) {
+			} catch ( CompileError ce ) {
 				this.in.handleError(ce);
 			}
 			t = this.in.tok();
@@ -567,7 +568,7 @@ public class SimpleExportFileParser {
 			SimpleValue a = parseValueUnaryExp(scope, 0, null, null);
 			try {
 				a = CastVal.create(a, t, this.in.ctx());
-			} catch (CompileError ce) {
+			} catch ( CompileError ce ) {
 				this.in.handleError(ce);
 			}
 			exitState(STATE_VAL_CAST, enter, a);
@@ -607,7 +608,7 @@ public class SimpleExportFileParser {
 		SimpleValue a = parseValuePostfixExp(scope, 0, null, null);
 		try {
 			a = UnaryOpVal.create(op, a, this.in.ctx());
-		} catch (CompileError ce) {
+		} catch ( CompileError ce ) {
 			this.in.handleError(ce);
 		}
 		exitState(STATE_VAL_UNARY, enter, a);
@@ -628,7 +629,7 @@ public class SimpleExportFileParser {
 				this.in.consume();
 				try {
 					a = UnaryOpVal.create(UnaryOp.DEREF_PNTR, a, this.in.ctx());
-				} catch (CompileError ce) {
+				} catch ( CompileError ce ) {
 					this.in.handleError(ce);
 				}
 			}
@@ -638,7 +639,7 @@ public class SimpleExportFileParser {
 				consumeToken(ARR_CLOSE, "expected `\\]´ after `\\[ [VALUE]´");
 				try {
 					a = BinaryOpVal.create(a, BinaryOp.ARR_PNTR_INDEX, b, this.in.ctx());
-				} catch (CompileError ce) {
+				} catch ( CompileError ce ) {
 					this.in.handleError(ce);
 				}
 			}
@@ -648,13 +649,13 @@ public class SimpleExportFileParser {
 				String name;
 				try {
 					name = this.in.consumeDynTokSpecialText();
-				} catch (@SuppressWarnings("unused") AssertionError ae) {
+				} catch ( @SuppressWarnings("unused") AssertionError ae ) {
 					name = name(this.in.consumeTok());
 				}
 				NameVal b = new NameVal(name);
 				try {
 					a = BinaryOpVal.create(a, BinaryOp.DEREF_BY_NAME, b, this.in.ctx());
-				} catch (CompileError ce) {
+				} catch ( CompileError ce ) {
 					this.in.handleError(ce);
 				}
 			}
@@ -688,7 +689,7 @@ public class SimpleExportFileParser {
 			char value = this.in.consumeDynTokSpecialText().charAt(0);
 			try {
 				yield ScalarNumericVal.create(NativeType.UBYTE, value, this.in.ctx());
-			} catch (CompileError ce) {
+			} catch ( CompileError ce ) {
 				this.in.handleError(ce);
 				yield ScalarNumericVal.createAllowTruncate(NativeType.UBYTE, value, this.in.ctx());
 			}
@@ -697,10 +698,9 @@ public class SimpleExportFileParser {
 		case NAME -> {
 			try {
 				yield scope.nameValueOrErr(this.in.consumeDynTokSpecialText(), this.in.ctx());
-			} catch (CompileError ce) {
+			} catch ( CompileError ce ) {
 				this.in.handleError(ce);
-				yield new DataVal(new byte[0], StructType.create(List.of(), StructType.FLAG_NOUSE, this.in.ctx()),
-					this.in.ctx());
+				yield new DataVal(new byte[0], StructType.create(List.of(), StructType.FLAG_NOUSE, this.in.ctx()), this.in.ctx());
 			}
 		}
 		case SMALL_OPEN -> {
@@ -711,8 +711,7 @@ public class SimpleExportFileParser {
 		}
 		default -> {
 			ErrorContext ctx = this.in.ctx();
-			this.in.handleError(ctx,
-				List.of(name(STRING), name(CHARACTER), name(NUMBER), name(NAME), name(SMALL_OPEN)));
+			this.in.handleError(ctx, List.of(name(STRING), name(CHARACTER), name(NUMBER), name(NAME), name(SMALL_OPEN)));
 			this.in.consume();
 			yield new DataVal(new byte[0], StructType.create(List.of(), StructType.FLAG_NOUSE, ctx), ctx);
 		}
@@ -797,17 +796,13 @@ public class SimpleExportFileParser {
 		}
 		switch ( bits ) {
 		case 64:
-			return ScalarNumericVal.create(NativeType.UNUM, Long.parseUnsignedLong(value.substring(off, len), sys),
-				ctx);
+			return ScalarNumericVal.create(NativeType.UNUM, Long.parseUnsignedLong(value.substring(off, len), sys), ctx);
 		case 32:
-			return ScalarNumericVal.create(NativeType.UDWORD, Integer.parseUnsignedInt(value.substring(off, len), sys),
-				ctx);
+			return ScalarNumericVal.create(NativeType.UDWORD, Integer.parseUnsignedInt(value.substring(off, len), sys), ctx);
 		case 16:
-			return ScalarNumericVal.create(NativeType.UWORD, Integer.parseUnsignedInt(value.substring(off, len), sys),
-				ctx);
+			return ScalarNumericVal.create(NativeType.UWORD, Integer.parseUnsignedInt(value.substring(off, len), sys), ctx);
 		case 8:
-			return ScalarNumericVal.create(NativeType.UBYTE, Integer.parseUnsignedInt(value.substring(off, len), sys),
-				ctx);
+			return ScalarNumericVal.create(NativeType.UBYTE, Integer.parseUnsignedInt(value.substring(off, len), sys), ctx);
 		default:
 			throw new AssertionError();
 		}
@@ -842,13 +837,13 @@ public class SimpleExportFileParser {
 					SimpleValue val = parseValueUnaryExp(scope, 0, null, null);
 					try {
 						val = CastVal.create(val, type0, this.in.ctx());
-					} catch (CompileError ce) {
+					} catch ( CompileError ce ) {
 						this.in.handleError(ce);
 					}
 					exitState(STATE_VAL_CAST, arr[0], val);
 					return parseValue(scope, CAST_MAGIC, val, arr);
 				}
-				final Object[] enters = decidedStates(new int[] { STATE_TYPE_FUNC_ADDR, STATE_TYPE }, undecided);
+				final Object[] enters = decidedStates(new int[]{ STATE_TYPE_FUNC_ADDR, STATE_TYPE }, undecided);
 				final Object subEnter = enterState(STATE_NAMED_TYPE_LIST);
 				String name = this.in.consumeDynTokSpecialText();
 				List<SimpleVariable> list = new ArrayList<>();
@@ -884,15 +879,15 @@ public class SimpleExportFileParser {
 		case NAME: {
 			final Object undecided = enterUnknownState();
 			Object firstEnd = null;
-			boolean hasMid = false;
+			SimpleValue midResult = null;
 			while ( true ) {
 				String name = this.in.consumeDynTokSpecialText();
 				Object typeOrDep = scope.nameTypeOrDepOrFuncOrNull(name);
 				switch ( typeOrDep ) {
 				case SimpleDependency dep -> {
 					scope = dep;
-					if ( !hasMid ) {
-						hasMid = true;
+					if ( midResult == null ) {
+						midResult = DependencyVal.create(dep, this.in.ctx());
 						firstEnd = maybeFinishUnknownState();
 					}
 					consumeToken(COLON, "expected `: [NAME]´ after the `[NAME]´ of a dependency");
@@ -900,7 +895,7 @@ public class SimpleExportFileParser {
 					continue;
 				}
 				case SimpleType type -> {
-					Object[] enters = decidedStates(new int[] { STATE_TYPE_TYPEDEFED_TYPE, STATE_TYPE }, undecided);
+					Object[] enters = decidedStates(new int[]{ STATE_TYPE_TYPEDEFED_TYPE, STATE_TYPE }, undecided);
 					exitState(STATE_TYPE_TYPEDEFED_TYPE, enters == null ? null : enters[0], type);
 					return parseTypePostfix(scope, type, enters == null ? null : enters[1]);
 				}
@@ -913,13 +908,13 @@ public class SimpleExportFileParser {
 					SimpleValue value;
 					try {
 						value = scope.nameValueOrErr(name, this.in.ctx());
-					} catch (CompileError ce) {
+					} catch ( CompileError ce ) {
 						this.in.handleError(ce);
-						value = new DataVal(new byte[0],
-							StructType.create(List.of(), StructType.FLAG_NOUSE, this.in.ctx()), this.in.ctx());
+						value = new DataVal(new byte[0], StructType.create(List.of(), StructType.FLAG_NOUSE, this.in.ctx()),
+							this.in.ctx());
 					}
-					if ( hasMid ) {
-						remenberExitedState(STATE_VAL_DIRECT, enters == null ? null : enters[0], firstEnd, value);
+					if ( midResult != null) {
+						remenberExitedState(STATE_VAL_DIRECT, enters == null ? null : enters[0], firstEnd, midResult);
 					} else {
 						exitState(STATE_VAL_DIRECT, enters == null ? null : enters[0], value);
 					}
@@ -930,10 +925,10 @@ public class SimpleExportFileParser {
 		}
 		default:
 			this.in.handleError(this.in.ctx(),
-				List.of(name(NUM), name(UNUM), name(FPNUM), name(FPDWORD), name(DWORD), name(UDWORD), name(WORD),
-					name(UWORD), name(BYTE), name(UBYTE), name(STRUCT), name(FSTRUCT), name(FUNC), name(NOPAD),
-					name(LT), name(STRING), name(CHARACTER), name(NUMBER), name(PLUS), name(MINUS), name(BIT_AND),
-					name(BIT_NOT), name(BOOL_AND), name(SMALL_OPEN), name(NAME)),
+				List.of(name(NUM), name(UNUM), name(FPNUM), name(FPDWORD), name(DWORD), name(UDWORD), name(WORD), name(UWORD),
+					name(BYTE), name(UBYTE), name(STRUCT), name(FSTRUCT), name(FUNC), name(NOPAD), name(LT), name(STRING),
+					name(CHARACTER), name(NUMBER), name(PLUS), name(MINUS), name(BIT_AND), name(BIT_NOT), name(BOOL_AND),
+					name(SMALL_OPEN), name(NAME)),
 				"expected a `[TYPE]´ or a `[VALUE]´");
 			return StructType.create(List.of(), StructType.FLAG_NOUSE, this.in.ctx());
 		}
@@ -1017,9 +1012,8 @@ public class SimpleExportFileParser {
 		}
 		default -> {
 			this.in.handleError(this.in.ctx(),
-				List.of(name(NUM), name(UNUM), name(FPNUM), name(FPDWORD), name(DWORD), name(WORD), name(UWORD),
-					name(BYTE), name(UBYTE), name(STRUCT), name(FSTRUCT), name(NOPAD), name(LT), name(SMALL_OPEN),
-					name(NAME)));
+				List.of(name(NUM), name(UNUM), name(FPNUM), name(FPDWORD), name(DWORD), name(WORD), name(UWORD), name(BYTE),
+					name(UBYTE), name(STRUCT), name(FSTRUCT), name(NOPAD), name(LT), name(SMALL_OPEN), name(NAME)));
 			type = StructType.create(List.of(), StructType.FLAG_NOUSE, this.in.ctx());
 		}
 		}
@@ -1063,22 +1057,21 @@ public class SimpleExportFileParser {
 	}
 	
 	@SuppressWarnings("unchecked")
-	private <T> T parseTypeNamedType(SimpleScope scope, Class<T> cls) {
+	private < T > T parseTypeNamedType(SimpleScope scope, Class<T> cls) {
 		while ( true ) {
 			String name;
 			try {
 				name = this.in.consumeDynTokSpecialText();
-			} catch (@SuppressWarnings("unused") AssertionError ae) {
+			} catch ( @SuppressWarnings("unused") AssertionError ae ) {
 				name = name(this.in.consumeTok());
-				//thats an invalid name, nothing can be found, we return soon
-				//thats also an implicit catch of EOF, if handleError returns normally
+				// thats an invalid name, nothing can be found, we return soon
+				// thats also an implicit catch of EOF, if handleError returns normally
 			}
 			Object obj = scope.nameTypeOrDepOrFuncOrNull(name);
 			if ( cls.isInstance(obj) ) return cls.cast(obj);
 			if ( !( obj instanceof SimpleDependency nscope ) ) {
-				String simpleName =
-					cls.getSimpleName().startsWith("Simple") ? cls.getSimpleName().substring("Simple".length())
-						: cls.getSimpleName();
+				String simpleName = cls.getSimpleName().startsWith("Simple") ? cls.getSimpleName().substring("Simple".length())
+					: cls.getSimpleName();
 				if ( obj == null ) {
 					this.in.handleError(this.in.ctx(), "expected the `[NAME]´ to be the [NAME] of a " + simpleName
 						+ " or a dependency, but there is nothing with the name " + name);
@@ -1131,8 +1124,8 @@ public class SimpleExportFileParser {
 		return parseNamedTypeList(end, sep, sepBeforeEnd, scope, null, enter);
 	}
 	
-	protected List<SimpleVariable> parseNamedTypeList(final int end, final int sep, final boolean sepBeforeEnd,
-		SimpleScope scope, List<SimpleVariable> add, final Object enter) {
+	protected List<SimpleVariable> parseNamedTypeList(final int end, final int sep, final boolean sepBeforeEnd, SimpleScope scope,
+		List<SimpleVariable> add, final Object enter) {
 		if ( this.in.tok() == end ) {
 			exitState(STATE_NAMED_TYPE_LIST, enter, add == null ? List.of() : add);
 			this.in.consume();
@@ -1144,7 +1137,7 @@ public class SimpleExportFileParser {
 		String name;
 		try {
 			name = this.in.consumeDynTokSpecialText();
-		} catch (@SuppressWarnings("unused") AssertionError ae) {
+		} catch ( @SuppressWarnings("unused") AssertionError ae ) {
 			name = name(this.in.consumeTok());
 		}
 		members.add(new SimpleVariable(type, name, null, 0));
@@ -1158,8 +1151,8 @@ public class SimpleExportFileParser {
 						msg = "expected `" + name(sep) + "´ after `[NAMED_TYPE]´";
 					} else {
 						list = List.of(name(sep), name(end));
-						msg = "expected to end the [NAMED_TYPE_LIST] with `" + name(end)
-							+ "´ or seperate two named types with `" + name(sep) + "´";
+						msg = "expected to end the [NAMED_TYPE_LIST] with `" + name(end) + "´ or seperate two named types with `"
+							+ name(sep) + "´";
 					}
 					this.in.handleError(this.in.ctx(), list, msg);
 					exitState(STATE_NAMED_TYPE_LIST, enter, add);
@@ -1181,7 +1174,7 @@ public class SimpleExportFileParser {
 			expectToken(NAME, "expected `[NAME]´ after `[TYPE]´");
 			try {
 				name = this.in.consumeDynTokSpecialText();
-			} catch (@SuppressWarnings("unused") AssertionError ae) {
+			} catch ( @SuppressWarnings("unused") AssertionError ae ) {
 				name = name(this.in.consumeTok());
 			}
 			members.add(new SimpleVariable(type, name, null, 0));
@@ -1215,8 +1208,7 @@ public class SimpleExportFileParser {
 		case LT:
 			results = parseNamedTypeList(GT, COMMA, false, scope);
 			consumeToken(LARROW, "expectedd `<-- \\( [NAMED_TYPE_LIST] \\)´ after `(nopad)? < [NAMED_TYPE_LIST] >´");
-			consumeToken(SMALL_OPEN,
-				"expectedd `\\( [NAMED_TYPE_LIST] \\)´ after `(nopad)? < [NAMED_TYPE_LIST] > <--´");
+			consumeToken(SMALL_OPEN, "expectedd `\\( [NAMED_TYPE_LIST] \\)´ after `(nopad)? < [NAMED_TYPE_LIST] > <--´");
 			//$FALL-THROUGH$
 		case SMALL_OPEN:
 			break;
@@ -1429,7 +1421,6 @@ public class SimpleExportFileParser {
 	 *                                  additional data
 	 */
 	@SuppressWarnings("unused")
-	protected void remenberExitedState(int state, Object enterResult, Object enterUnknownEndMarker,
-		Object additionalData) {}
+	protected void remenberExitedState(int state, Object enterResult, Object enterUnknownEndMarker, Object additionalData) {}
 	
 }
