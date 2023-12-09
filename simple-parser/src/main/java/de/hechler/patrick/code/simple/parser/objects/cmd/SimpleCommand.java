@@ -16,6 +16,8 @@
 //along with this program.  If not, see <https://www.gnu.org/licenses/>.
 package de.hechler.patrick.code.simple.parser.objects.cmd;
 
+import java.util.Set;
+
 import de.hechler.patrick.code.simple.parser.error.ErrorContext;
 import de.hechler.patrick.code.simple.parser.objects.simplefile.scope.SimpleScope;
 import de.hechler.patrick.code.simple.parser.objects.value.SimpleValue;
@@ -26,6 +28,15 @@ public abstract class SimpleCommand implements SimpleScope {
 	
 	public SimpleCommand(SimpleScope parent) {
 		this.parent = parent;
+	}
+	
+	public abstract void directAvailableNames(Set<String> add);
+	
+	@Override
+	public Set<String> availableNames() {
+		Set<String> result = parent.availableNames();
+		directAvailableNames(result);
+		return result;
 	}
 	
 	public abstract SimpleValue directNameValueOrNull(String name, ErrorContext ctx);

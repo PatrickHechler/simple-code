@@ -18,6 +18,7 @@ package de.hechler.patrick.code.simple.parser.objects.cmd;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 import de.hechler.patrick.code.simple.parser.error.ErrorContext;
 import de.hechler.patrick.code.simple.parser.objects.simplefile.scope.SimpleScope;
@@ -52,6 +53,10 @@ public class BlockCmd extends SimpleCommand {
 	
 	@Override
 	@SuppressWarnings("unused")
+	public void directAvailableNames(Set<String> add) {}
+	
+	@Override
+	@SuppressWarnings("unused")
 	public SimpleValue directNameValueOrNull(String name, ErrorContext ctx) {
 		return null;
 	}
@@ -72,6 +77,11 @@ public class BlockCmd extends SimpleCommand {
 			private final int blkLen = BlockCmd.this.cmds.size();
 			
 			@Override
+			public Set<String> availableNames() {
+				return BlockCmd.this.availableNames(blkLen);
+			}
+			
+			@Override
 			public SimpleValue nameValueOrNull(String name, ErrorContext ctx) {
 				return BlockCmd.this.nameValueOrNull(name, ctx, blkLen);
 			}
@@ -82,6 +92,14 @@ public class BlockCmd extends SimpleCommand {
 			}
 			
 		};
+	}
+	
+	protected Set<String> availableNames(int blockLength) {
+		Set<String> result = super.parent.availableNames();
+		for (int i = 0; i < blockLength; i++) {
+			this.cmds.get(i).directAvailableNames(result);
+		}
+		return result;
 	}
 	
 	private SimpleValue nameValueOrNull(String name, ErrorContext ctx, int blockLength) {

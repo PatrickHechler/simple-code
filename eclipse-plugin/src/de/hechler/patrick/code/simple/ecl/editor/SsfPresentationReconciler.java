@@ -139,7 +139,6 @@ public class SsfPresentationReconciler extends PresentationReconciler {
 			if ( data instanceof TextAttribute ta ) {
 				data = ta.getForeground() + " : " + ta;
 			}
-			System.out.println("token: " + this.off + ".." + ( this.off + this.len ) + " : " + data + " : " + type);
 			return tok;
 		}
 		

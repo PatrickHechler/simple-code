@@ -192,9 +192,6 @@ public class SsfPosUpdate implements IPositionUpdater {
 		int prevEnd = addTree(doc, this.tree, 0, regions);
 		insertWSReg(prevEnd, regions, doc.getLength());
 		this.regions = regions.toArray(new ITypedRegion[regions.size()]);
-		for (ITypedRegion reg : regions) {
-			System.out.println("reg: " + reg);
-		}
 	}
 	
 	private int addTree(IDocument doc, DocumentTree docTree, int off, List<ITypedRegion> regions) {

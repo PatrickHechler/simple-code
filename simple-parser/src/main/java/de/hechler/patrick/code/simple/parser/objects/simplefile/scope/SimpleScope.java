@@ -17,6 +17,7 @@
 package de.hechler.patrick.code.simple.parser.objects.simplefile.scope;
 
 import java.util.List;
+import java.util.Set;
 
 import de.hechler.patrick.code.simple.parser.error.CompileError;
 import de.hechler.patrick.code.simple.parser.error.ErrorContext;
@@ -28,11 +29,13 @@ import de.hechler.patrick.code.simple.parser.objects.value.VariableVal;
 
 public interface SimpleScope {
 	
+	Set<String> availableNames();
+	
 	SimpleValue nameValueOrNull(String name, ErrorContext ctx);
 	
 	default SimpleValue nameValueOrErr(String name, ErrorContext ctx) throws CompileError {
 		SimpleValue val = nameValueOrNull(name, ctx);
-		if (val != null) return val;
+		if ( val != null ) return val;
 		throw new CompileError(ctx, "nothing with the name '" + name + "' could be found");
 	}
 	
@@ -45,6 +48,14 @@ public interface SimpleScope {
 		return new SimpleScope() {
 			
 			@Override
+			public Set<String> availableNames() {
+				Set<String> result = sf.availableNames();
+				ft.argMembers().stream().map(SimpleVariable::name).forEach(result::add);
+				ft.resMembers().stream().map(SimpleVariable::name).forEach(result::add);
+				return result;
+			}
+			
+			@Override
 			public SimpleValue nameValueOrNull(String name, ErrorContext ctx) {
 				SimpleVariable sv = ft.memberOrNull(name, ctx, true);
 				if ( sv != null ) return VariableVal.create(sv, ctx);
@@ -55,6 +66,7 @@ public interface SimpleScope {
 			public Object nameTypeOrDepOrFuncOrNull(String typedefName) {
 				return sf.nameTypeOrDepOrFuncOrNull(typedefName);
 			}
+			
 		};
 	}
 	

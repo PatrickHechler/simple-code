@@ -16,6 +16,8 @@
 //along with this program.  If not, see <https://www.gnu.org/licenses/>.
 package de.hechler.patrick.code.simple.parser.objects.cmd;
 
+import java.util.Set;
+
 import de.hechler.patrick.code.simple.parser.error.ErrorContext;
 import de.hechler.patrick.code.simple.parser.objects.simplefile.scope.SimpleScope;
 import de.hechler.patrick.code.simple.parser.objects.value.SimpleValue;
@@ -37,6 +39,11 @@ public class AssignCmd extends SimpleCommand {
 	}
 	
 	@Override
+	@SuppressWarnings("unused")
+	public void directAvailableNames(Set<String> add) {}
+	
+	@Override
+	@SuppressWarnings("unused")
 	public SimpleValue directNameValueOrNull(String name, ErrorContext ctx) {
 		return null;
 	}

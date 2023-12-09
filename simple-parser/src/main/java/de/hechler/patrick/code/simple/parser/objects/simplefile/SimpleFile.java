@@ -18,8 +18,10 @@ package de.hechler.patrick.code.simple.parser.objects.simplefile;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.Map.Entry;
 
 import de.hechler.patrick.code.simple.parser.error.CompileError;
@@ -32,12 +34,12 @@ import de.hechler.patrick.code.simple.parser.objects.value.VariableVal;
 
 public class SimpleFile extends SimpleDependency {
 	
-	private Map<String, SimpleDependency> dependencies;
-	private Map<String, SimpleTypedef>    typedefs;
-	private Map<String, SimpleVariable>   variables;
-	private Map<String, SimpleFunction>   functions;
-	private SimpleFunction                main;
-	private SimpleFunction                init;
+	private Map<String,SimpleDependency> dependencies;
+	private Map<String,SimpleTypedef>    typedefs;
+	private Map<String,SimpleVariable>   variables;
+	private Map<String,SimpleFunction>   functions;
+	private SimpleFunction               main;
+	private SimpleFunction               init;
 	
 	public SimpleFile(String sourceFile, String binaryTarget) {
 		super(sourceFile, binaryTarget);
@@ -45,6 +47,16 @@ public class SimpleFile extends SimpleDependency {
 		this.typedefs = new LinkedHashMap<>();
 		this.variables = new LinkedHashMap<>();
 		this.functions = new LinkedHashMap<>();
+	}
+	
+	@Override
+	public Set<String> availableNames() {
+		Set<String> result = new HashSet<>();
+		result.addAll(this.variables.keySet());
+		result.addAll(this.functions.keySet());
+		result.addAll(this.dependencies.keySet());
+		result.addAll(this.typedefs.keySet());
+		return result;
 	}
 	
 	@Override
@@ -101,7 +113,7 @@ public class SimpleFile extends SimpleDependency {
 	}
 	
 	private void mergeMeDep(SimpleFile dep, ErrorContext ctx) {
-		for (Entry<String, SimpleDependency> e : dep.dependencies.entrySet()) {
+		for (Entry<String,SimpleDependency> e : dep.dependencies.entrySet()) {
 			dependencyFromMeDep(e.getValue(), e.getKey(), ctx);
 		}
 		for (SimpleTypedef t : dep.typedefs.values()) {
@@ -186,8 +198,8 @@ public class SimpleFile extends SimpleDependency {
 	private void nameUsed(String name, String type, ErrorContext ctx) {
 		throw new CompileError(ctx,
 			"there is already a something (a " + type + ") with the name " + name + " (known dependencies: "
-				+ this.dependencies.keySet() + ", typedefs: " + this.typedefs.keySet() + ", variables: "
-				+ this.variables.keySet() + ", functions: " + this.functions.keySet() + ")");
+				+ this.dependencies.keySet() + ", typedefs: " + this.typedefs.keySet() + ", variables: " + this.variables.keySet()
+				+ ", functions: " + this.functions.keySet() + ")");
 	}
 	
 	private static final int CDN_DEP = 1;
@@ -253,7 +265,7 @@ public class SimpleFile extends SimpleDependency {
 	@Override
 	public String toString() {
 		StringBuilder b = new StringBuilder();
-		for (Entry<String, SimpleDependency> e : this.dependencies.entrySet()) {
+		for (Entry<String,SimpleDependency> e : this.dependencies.entrySet()) {
 			b.append("dep ").append(e.getKey()).append(" [PATH] \"").append(e.getValue().binaryTarget).append("\";\n");
 		}
 		for (SimpleTypedef t : this.typedefs.values()) {
@@ -311,12 +323,11 @@ public class SimpleFile extends SimpleDependency {
 	
 	public String toExportString() {
 		StringBuilder b = new StringBuilder();
-		for (Entry<String, SimpleDependency> e : this.dependencies.entrySet()) {
+		for (Entry<String,SimpleDependency> e : this.dependencies.entrySet()) {
 			if ( e.getValue().sourceFile != null ) {
 				b.append("dep ").append(e.getKey()).append(" \"").append(e.getValue().sourceFile).append("\";\n");
 			} else if ( !"std".equals(e.getKey()) ) {
-				b.append("dep ").append(e.getKey()).append(" NULL \"").append(e.getValue().binaryTarget)
-					.append("\";\n");
+				b.append("dep ").append(e.getKey()).append(" NULL \"").append(e.getValue().binaryTarget).append("\";\n");
 			}
 		}
 		for (SimpleTypedef t : this.typedefs.values()) {

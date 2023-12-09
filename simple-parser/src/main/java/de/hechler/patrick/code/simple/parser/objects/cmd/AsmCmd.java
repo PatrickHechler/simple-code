@@ -17,6 +17,7 @@
 package de.hechler.patrick.code.simple.parser.objects.cmd;
 
 import java.util.List;
+import java.util.Set;
 
 import de.hechler.patrick.code.simple.parser.error.ErrorContext;
 import de.hechler.patrick.code.simple.parser.objects.simplefile.scope.SimpleScope;
@@ -39,6 +40,10 @@ public class AsmCmd extends SimpleCommand {
 		@SuppressWarnings("unused") ErrorContext ctx) {
 		return new AsmCmd(parent, params, asm, results);
 	}
+	
+	@Override
+	@SuppressWarnings("unused")
+	public void directAvailableNames(Set<String> add) { }
 	
 	@Override
 	@SuppressWarnings("unused")

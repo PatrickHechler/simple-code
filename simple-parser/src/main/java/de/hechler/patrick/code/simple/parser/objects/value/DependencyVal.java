@@ -44,7 +44,10 @@ public record DependencyVal(SimpleDependency dep, ErrorContext ctx) implements S
 	
 	@Override
 	public String toString() {
-		return "(dependency: " + dep.binaryTarget + ")";
+		return "(dependency: " + //
+			( dep.binaryTarget != null ? dep.binaryTarget : //
+				dep.sourceFile != null ? dep.sourceFile : dep.toString() )
+			+ ')';
 	}
 	
 }

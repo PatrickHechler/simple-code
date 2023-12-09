@@ -16,6 +16,8 @@
 //along with this program.  If not, see <https://www.gnu.org/licenses/>.
 package de.hechler.patrick.code.simple.parser.objects.cmd;
 
+import java.util.Set;
+
 import de.hechler.patrick.code.simple.parser.error.ErrorContext;
 import de.hechler.patrick.code.simple.parser.objects.simplefile.SimpleExportable;
 import de.hechler.patrick.code.simple.parser.objects.simplefile.SimpleVariable;
@@ -37,6 +39,11 @@ public class VarDeclCmd extends SimpleCommand {
 			throw new AssertionError(ctx);
 		}
 		return new VarDeclCmd(parent, sv);
+	}
+	
+	@Override
+	public void directAvailableNames(Set<String> add) {
+		add.add(this.sv.name());
 	}
 	
 	@Override

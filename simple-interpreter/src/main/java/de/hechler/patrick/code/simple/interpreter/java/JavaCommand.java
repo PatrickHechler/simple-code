@@ -1,5 +1,7 @@
 package de.hechler.patrick.code.simple.interpreter.java;
 
+import java.util.Set;
+
 import de.hechler.patrick.code.simple.parser.error.ErrorContext;
 import de.hechler.patrick.code.simple.parser.objects.cmd.SimpleCommand;
 import de.hechler.patrick.code.simple.parser.objects.simplefile.scope.SimpleScope;
@@ -13,6 +15,10 @@ public class JavaCommand extends SimpleCommand {
 		super(parent);
 		this.func = func;
 	}
+	
+	@Override
+	@SuppressWarnings("unused")
+	public void directAvailableNames(Set<String> add) {}
 	
 	@Override
 	@SuppressWarnings("unused")

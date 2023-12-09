@@ -5,9 +5,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
 
-import de.hechler.patrick.code.simple.ecl.editor.FilePosition.FileRegion;
-import de.hechler.patrick.code.simple.ecl.editor.FilePosition.FileState;
-import de.hechler.patrick.code.simple.ecl.editor.FilePosition.FileToken;
 
 public final class DocumentTree implements FilePosition.FileRegion, Iterable<FilePosition.FileRegion> {
 	
@@ -24,7 +21,7 @@ public final class DocumentTree implements FilePosition.FileRegion, Iterable<Fil
 	
 	public FilePosition.FileState decideState(FilePosition.FileState undecidedState, int state) {
 		if ( undecidedState == this.global ) {
-			FileState result = this.global.decide(state);
+			FilePosition.FileState result = this.global.decide(state);
 			this.global = result;
 			return result;
 		}
@@ -43,12 +40,12 @@ public final class DocumentTree implements FilePosition.FileRegion, Iterable<Fil
 			DocumentTree dt = new DocumentTree();
 			this.entries = dt.entries;
 			dt.entries = entries;
-			for (ListIterator<FileRegion> iter = entries.listIterator(); iter.hasNext();) {
-				FileRegion c = iter.next();
+			for (ListIterator<FilePosition.FileRegion> iter = entries.listIterator(); iter.hasNext();) {
+				FilePosition.FileRegion c = iter.next();
 				if ( c instanceof DocumentTree cTree ) {
 					cTree.parent = dt;
 				} else {
-					FilePosition.FileToken cTok = (FileToken) c;
+					FilePosition.FileToken cTok = (FilePosition.FileToken) c;
 					int parentIndex = iter.previousIndex();
 					FilePosition cStart = cTok.start();
 					int cToken = cTok.token();
@@ -103,7 +100,7 @@ public final class DocumentTree implements FilePosition.FileRegion, Iterable<Fil
 		this.entries.add(subDt);
 	}
 	
-	public void exitState(FilePosition pos, int state, Object info, FileState enterResult) {
+	public void exitState(FilePosition pos, int state, Object info, FilePosition.FileState enterResult) {
 		int size = this.entries.size();
 		if ( size == 0 ) {
 			finishGlobal(pos, state, info, enterResult);
@@ -118,7 +115,8 @@ public final class DocumentTree implements FilePosition.FileRegion, Iterable<Fil
 		}
 	}
 	
-	private void finishGlobal(FilePosition pos, int state, Object info, FileState enterResult) throws AssertionError {
+	private void finishGlobal(FilePosition pos, int state, Object info, FilePosition.FileState enterResult)
+		throws AssertionError {
 		if ( this.global != enterResult ) throw new AssertionError();
 		this.global = this.global.finish(pos, state, info);
 	}
@@ -171,7 +169,7 @@ public final class DocumentTree implements FilePosition.FileRegion, Iterable<Fil
 					});
 				}
 				subList.clear();
-				if (p.global.end() != null) {
+				if ( p.global.end() != null ) {
 					p.correctEntryPositions(p.global.end(), oldParentSize);
 				}
 			}
@@ -233,6 +231,55 @@ public final class DocumentTree implements FilePosition.FileRegion, Iterable<Fil
 		sb.append(indent).append("}\n");
 	}
 	
+	public FilePosition.FileToken find(int offset) {
+		List<FilePosition.FileRegion> es = this.entries;
+		int low = 0;
+		int high = es.size() - 1;
+		while ( low <= high ) {
+			int mid = ( low + high ) >>> 1;
+			FilePosition.FileRegion e = es.get(mid);
+			if ( e.start().totalChar() > offset ) {
+				high = mid - 1;
+				if ( high < 0 ) {
+					while ( e.parentIndex() == 0 ) {
+						e = e.parent();
+					}
+					e = e.parent().child(e.parentIndex() - 1);
+					if ( e instanceof FilePosition.FileToken ft ) {
+						return ft;
+					}
+					es = ( (DocumentTree) e ).entries;
+					low = 0;
+					high = es.size();
+				}
+				continue;
+			}
+			if ( mid + 1 < es.size() ) {
+				// the whitespace is included here to fill the holes
+				FilePosition end = es.get(mid + 1).start();
+				if ( end != null && end.totalChar() <= offset ) {
+					low = mid + 1;
+					continue;
+				}
+			}
+			if ( e instanceof FilePosition.FileToken ft ) {
+				return ft;
+			}
+			es = ( (DocumentTree) e ).entries;
+			low = 0;
+			high = es.size() - 1;
+		}
+		throw new IllegalArgumentException("offset out of bounds: " + offset);
+	}
+	
+	public int childCount() {
+		return this.entries.size();
+	}
+	
+	public FilePosition.FileRegion child(int index) {
+		return this.entries.get(index);
+	}
+	
 	@Override
 	public DocumentTree parent() {
 		return this.parent;
@@ -258,7 +305,7 @@ public final class DocumentTree implements FilePosition.FileRegion, Iterable<Fil
 	}
 	
 	@Override
-	public Iterator<FileRegion> iterator() {
+	public Iterator<FilePosition.FileRegion> iterator() {
 		return this.entries.iterator();
 	}
 	

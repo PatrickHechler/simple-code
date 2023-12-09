@@ -121,7 +121,7 @@ public class SimpleCodeBuilder extends IncrementalProjectBuilder {
 	}
 	
 	public record ProjectProps(IProject project, IFolder[] src, IProject[] deps, IFolder bin, IFolder exp,
-		Map<IPath, SimpleDependency> laodedDeps) {
+		Map<IPath,SimpleDependency> laodedDeps) {
 		
 		public ProjectProps(IProject project, IFolder[] src, IProject[] deps, IFolder bin, IFolder exp) {
 			this(project, src, deps, bin, exp, new HashMap<>());
@@ -146,12 +146,11 @@ public class SimpleCodeBuilder extends IncrementalProjectBuilder {
 				marker.setAttribute(IMarker.CHAR_START, charStart);
 				marker.setAttribute(IMarker.CHAR_END, charEnd);
 			}
-		} catch (@SuppressWarnings("unused") CoreException e) {
-		}
+		} catch ( @SuppressWarnings("unused") CoreException e ) {}
 	}
 	
 	@Override
-	protected IProject[] build(int kind, Map<String, String> args, IProgressMonitor monitor) throws CoreException {
+	protected IProject[] build(int kind, Map<String,String> args, IProgressMonitor monitor) throws CoreException {
 		if ( Activator.doLog(LogLevel.DEBUG) ) {
 			log("build( " + kind + " , " + args + " , " + monitor + " ) called");
 		}
@@ -187,8 +186,8 @@ public class SimpleCodeBuilder extends IncrementalProjectBuilder {
 	private static final String BINARY_START  = "binary=";
 	private static final String EXPORTS_START = "exports=";
 	
-	private static ProjectProps parseProps(IProject project, IProgressMonitor monitor,
-		boolean createSoruceDirIfNotExists) throws CoreException {
+	private static ProjectProps parseProps(IProject project, IProgressMonitor monitor, boolean createSoruceDirIfNotExists)
+		throws CoreException {
 		if ( Activator.doLog(LogLevel.DEBUG) ) {
 			log("parseProps( " + project + " , " + monitor + " ) called");
 		}
@@ -212,7 +211,7 @@ public class SimpleCodeBuilder extends IncrementalProjectBuilder {
 		}
 		Charset cs = Charset.forName(confFile.getCharset(), StandardCharsets.UTF_8);
 		deleteMarkers(confFile);
-		try (InputStream in = confFile.getContents(); Scanner sc = new Scanner(in, cs)) {
+		try ( InputStream in = confFile.getContents(); Scanner sc = new Scanner(in, cs) ) {
 			String block = "";
 			List<IFolder> source = new ArrayList<>();
 			List<IProject> dependencies = new ArrayList<>();
@@ -251,8 +250,7 @@ public class SimpleCodeBuilder extends IncrementalProjectBuilder {
 				case "depend" -> {
 					IProject dep = project.getWorkspace().getRoot().getProject(line);
 					if ( !dep.exists() ) {
-						addMarker(confFile, "the project '" + line + "' could not be found", lineNumber,
-							IMarker.SEVERITY_ERROR);
+						addMarker(confFile, "the project '" + line + "' could not be found", lineNumber, IMarker.SEVERITY_ERROR);
 						return null;
 					}
 					dependencies.add(dep);
@@ -260,8 +258,7 @@ public class SimpleCodeBuilder extends IncrementalProjectBuilder {
 				case "target" -> {
 					if ( line.startsWith(BINARY_START) ) {
 						if ( binary != null ) {
-							addMarker(confFile, "only one binary folder can be specified", lineNumber,
-								IMarker.SEVERITY_ERROR);
+							addMarker(confFile, "only one binary folder can be specified", lineNumber, IMarker.SEVERITY_ERROR);
 							return null;
 						}
 						IFolder folder = project.getFolder(line.substring(BINARY_START.length()));
@@ -271,8 +268,7 @@ public class SimpleCodeBuilder extends IncrementalProjectBuilder {
 						binary = folder;
 					} else if ( line.startsWith(EXPORTS_START) ) {
 						if ( exports != null ) {
-							addMarker(confFile, "only one exports folder can be specified", lineNumber,
-								IMarker.SEVERITY_ERROR);
+							addMarker(confFile, "only one exports folder can be specified", lineNumber, IMarker.SEVERITY_ERROR);
 							return null;
 						}
 						IFolder folder = project.getFolder(line.substring(EXPORTS_START.length()));
@@ -298,12 +294,11 @@ public class SimpleCodeBuilder extends IncrementalProjectBuilder {
 				return null;
 			}
 			if ( source.size() == 0 ) {
-				addMarker(confFile, "it whould be nice to have at least one source folder", -1,
-					IMarker.SEVERITY_WARNING);
+				addMarker(confFile, "it whould be nice to have at least one source folder", -1, IMarker.SEVERITY_WARNING);
 			}
 			return new ProjectProps(project, source.toArray(new IFolder[source.size()]),
 				dependencies.toArray(new IProject[dependencies.size()]), binary, exports);
-		} catch (IOException e) {
+		} catch ( IOException e ) {
 			throw new CoreException(new Status(IStatus.ERROR, SimpleCodeBuilder.class, e.toString()));
 		}
 	}
@@ -332,7 +327,7 @@ public class SimpleCodeBuilder extends IncrementalProjectBuilder {
 		IFile file = project.getFile(appended.makeRelativeTo(project.getFullPath()));
 		try {
 			file.delete(IResource.FORCE, monitor);
-		} catch (CoreException e) {
+		} catch ( CoreException e ) {
 			System.err.println("failed to delete the file " + file + ": " + e);
 		}
 	}
@@ -399,7 +394,7 @@ public class SimpleCodeBuilder extends IncrementalProjectBuilder {
 				SimpleExportable.FLAG_EXPORT | FuncType.FLAG_FUNC_ADDRESS, ErrorContext.NO_CONTEXT)), ErrorContext.NO_CONTEXT);
 			STDLIB.dependency(stdSys, "sys", ErrorContext.NO_CONTEXT);
 			//@formatter:on
-		} catch (Throwable t) {
+		} catch ( Throwable t ) {
 			log("failed to initilize the builder class: " + t);
 			throw t;
 		}
@@ -414,6 +409,9 @@ public class SimpleCodeBuilder extends IncrementalProjectBuilder {
 			@Override
 			public int hashCode() { return name.hashCode(); }
 			
+			@Override
+			public String toString() { return name; }
+			
 		};
 	}
 	
@@ -424,8 +422,8 @@ public class SimpleCodeBuilder extends IncrementalProjectBuilder {
 		if ( resource instanceof IFile file && "ssf".equals(resource.getFileExtension()) ) {
 			deleteMarkers(file);
 			monitor.subTask(file.toString());
-			try (InputStream in = file.getContents()) {
-				BiFunction<String, String, SimpleDependency> dep = dep(props, curSrc, file, monitor);
+			try ( InputStream in = file.getContents() ) {
+				BiFunction<String,String,SimpleDependency> dep = dep(props, curSrc, file, monitor);
 				SimpleSourceFileParser ssfp = new SimpleSourceFileParser(in, file.toString(), dep);
 				IPath relPath = file.getFullPath().makeRelativeTo(curSrc);
 				IPath relPath1 = relPath.removeLastSegments(1);
@@ -451,15 +449,15 @@ public class SimpleCodeBuilder extends IncrementalProjectBuilder {
 					exportTarget.setContents(bais, IResource.FORCE, monitor);
 					exportTarget.setDerived(true, monitor);
 				}
-			} catch (CompileError err) {
+			} catch ( CompileError err ) {
 				addMarker(file, err.toString(), err.line, err.totalChar - 1, err.totalChar, IMarker.SEVERITY_ERROR);
-			} catch (CoreException | IOException e) {
+			} catch ( CoreException | IOException e ) {
 				addMarker(file, e.toString(), -1, IMarker.SEVERITY_ERROR);
 			}
 		}
 	}
 	
-	public static BiFunction<String, String, SimpleDependency> dep(ProjectProps props, IPath curSrc, IFile parseFile,
+	public static BiFunction<String,String,SimpleDependency> dep(ProjectProps props, IPath curSrc, IFile parseFile,
 		IProgressMonitor monitor) {
 		if ( Activator.doLog(LogLevel.TRACE) ) {
 			log("dep( " + props + " , " + curSrc + " , " + monitor + " ) called");
@@ -485,10 +483,9 @@ public class SimpleCodeBuilder extends IncrementalProjectBuilder {
 							fProps = subProps;
 							break;
 						}
-					} catch (CoreException e) {
+					} catch ( CoreException e ) {
 						if ( Activator.doLog(LogLevel.WARN) ) {
-							log("could not parse the properties of a depend project (" + dep + "): "
-								+ e.getLocalizedMessage());
+							log("could not parse the properties of a depend project (" + dep + "): " + e.getLocalizedMessage());
 						}
 						return null;
 					}
@@ -497,17 +494,17 @@ public class SimpleCodeBuilder extends IncrementalProjectBuilder {
 			if ( f == null ) {
 				return null;
 			}
-			try (InputStream in = f.getContents()) {
+			try ( InputStream in = f.getContents() ) {
 				Charset cs = Charset.forName(f.getCharset(), StandardCharsets.UTF_8);
-				try (InputStreamReader reader = new InputStreamReader(in, cs)) {
+				try ( InputStreamReader reader = new InputStreamReader(in, cs) ) {
 					SimpleTokenStream sts = new SimpleTokenStream(reader, f.toString());
-					BiFunction<String, String, SimpleDependency> dep = dep(fProps, null, f, monitor);
+					BiFunction<String,String,SimpleDependency> dep = dep(fProps, null, f, monitor);
 					SimpleExportFileParser sefp = new SimpleExportFileParser(sts, dep);
 					SimpleFile sf = new SimpleFile(f.toString(), f.toString());
 					sefp.parse(sf);
 					return sf;
 				}
-			} catch (IOException | CoreException e) {
+			} catch ( IOException | CoreException e ) {
 				if ( Activator.doLog(LogLevel.WARN) ) {
 					log("could not parse the dependency " + f + ": " + e.getLocalizedMessage());
 				}
@@ -519,7 +516,7 @@ public class SimpleCodeBuilder extends IncrementalProjectBuilder {
 	private static void deleteMarkers(IFile file) {
 		try {
 			file.deleteMarkers(MARKER_TYPE, false, IResource.DEPTH_ZERO);
-		} catch (CoreException e) {
+		} catch ( CoreException e ) {
 			System.err.println("failed to delete markers of " + file + ": " + e);
 		}
 	}
@@ -533,8 +530,7 @@ public class SimpleCodeBuilder extends IncrementalProjectBuilder {
 		}
 	}
 	
-	protected void incrementalBuild(IResourceDelta delta, IProgressMonitor monitor, ProjectProps props)
-		throws CoreException {
+	protected void incrementalBuild(IResourceDelta delta, IProgressMonitor monitor, ProjectProps props) throws CoreException {
 		if ( Activator.doLog(LogLevel.DEBUG) ) {
 			log("incrementalBuild( " + delta + " , " + monitor + " , " + props + " ) called");
 		}

@@ -16,6 +16,8 @@
 //along with this program.  If not, see <https://www.gnu.org/licenses/>.
 package de.hechler.patrick.code.simple.parser.objects.cmd;
 
+import java.util.Set;
+
 import de.hechler.patrick.code.simple.parser.error.ErrorContext;
 import de.hechler.patrick.code.simple.parser.objects.simplefile.scope.SimpleScope;
 import de.hechler.patrick.code.simple.parser.objects.types.NativeType;
@@ -36,6 +38,10 @@ public class WhileCmd extends SimpleCommand {
 		condition.type().checkCastable(NativeType.UNUM, ctx, false);
 		return new WhileCmd(parent, condition, loop);
 	}
+	
+	@Override
+	@SuppressWarnings("unused")
+	public void directAvailableNames(Set<String> add) {}
 	
 	@Override
 	public SimpleValue directNameValueOrNull(String name, ErrorContext ctx) {

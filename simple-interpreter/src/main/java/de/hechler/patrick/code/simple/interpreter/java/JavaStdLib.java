@@ -24,8 +24,8 @@ import de.hechler.patrick.code.simple.parser.objects.value.ScalarNumericVal;
 
 public class JavaStdLib extends JavaDependency {
 	
-	private static final SimpleType PNTR  =
-		PointerType.create(StructType.create(List.of(), 0, ErrorContext.NO_CONTEXT), ErrorContext.NO_CONTEXT);
+	private static final SimpleType PNTR  = PointerType.create(StructType.create(List.of(), 0, ErrorContext.NO_CONTEXT),
+		ErrorContext.NO_CONTEXT);
 	private static final SimpleType BPNTR = PointerType.create(UBYTE, ErrorContext.NO_CONTEXT);
 	
 	private SimpleInterpreter si;
@@ -110,8 +110,7 @@ public class JavaStdLib extends JavaDependency {
 			System.out.print(str);
 			return List.of(new ConstantValue.ScalarValue(UNUM, len), new ConstantValue.ScalarValue(UNUM, 0L));
 		});
-		function("readln",
-			ft(of(sv(UNUM, "read_len"), sv(UNUM, "errno")), of(sv(BPNTR, "buffer"), sv(UNUM, "max_length"))),
+		function("readln", ft(of(sv(UNUM, "read_len"), sv(UNUM, "errno")), of(sv(BPNTR, "buffer"), sv(UNUM, "max_length"))),
 			(si_, args) -> {
 				long addr = ( (ConstantValue.ScalarValue) args.get(0) ).value();
 				long maxLen = ( (ConstantValue.ScalarValue) args.get(1) ).value();
@@ -122,6 +121,7 @@ public class JavaStdLib extends JavaDependency {
 				return readLine(addr, maxLen - 1L, mem);
 			});
 		JavaDependency sys = new JavaDependency(null) {
+			
 			@Override
 			public int hashCode() {
 				return "std:sys".hashCode();
@@ -131,6 +131,12 @@ public class JavaStdLib extends JavaDependency {
 			public boolean equals(Object obj) {
 				return obj == this;
 			}
+			
+			@Override
+			public String toString() {
+				return "std:sys";
+			}
+			
 		};
 		sys.function("pagesize", ft(of(sv(UNUM, "result")), of()),
 			(si_, args) -> List.of(new ConstantValue.ScalarValue(UNUM, si_.memManager().pageSize())));
@@ -205,10 +211,10 @@ public class JavaStdLib extends JavaDependency {
 				len += r;
 				addr += r;
 			}
-		} catch (ClosedChannelException e) {
+		} catch ( ClosedChannelException e ) {
 			errno = 2L;
 			System.err.println(e);
-		} catch (IOException e) {
+		} catch ( IOException e ) {
 			errno = 3L;
 			System.err.println(e);
 		}
@@ -249,8 +255,7 @@ public class JavaStdLib extends JavaDependency {
 	}
 	
 	private static FuncType ft(List<SimpleVariable> res, List<SimpleVariable> args) {
-		return FuncType.create(res, args, FuncType.FLAG_FUNC_ADDRESS | SimpleExportable.FLAG_EXPORT,
-			ErrorContext.NO_CONTEXT);
+		return FuncType.create(res, args, FuncType.FLAG_FUNC_ADDRESS | SimpleExportable.FLAG_EXPORT, ErrorContext.NO_CONTEXT);
 	}
 	
 	public long alloc(SimpleInterpreter si, final long len, final long align) {
@@ -281,8 +286,7 @@ public class JavaStdLib extends JavaDependency {
 				blockAddr = nextPage(mem, pageSize, offSize, blockAddr);
 				continue;
 			}
-			long resultAddress =
-				allocInPage(len, align, mem, blockAddr, offSize, tableEndAddr, tableStartOffset, tableStartAddr);
+			long resultAddress = allocInPage(len, align, mem, blockAddr, offSize, tableEndAddr, tableStartOffset, tableStartAddr);
 			if ( resultAddress != 0L ) return resultAddress;
 			blockAddr = nextPage(mem, pageSize, offSize, blockAddr);
 		}
@@ -312,8 +316,7 @@ public class JavaStdLib extends JavaDependency {
 					continue;
 				}
 			}
-			long resultAddress =
-				allocInPage(len, align, mem, pageAddr, offSize, tableEndAddr, tableStartOffset, tableStartAddr);
+			long resultAddress = allocInPage(len, align, mem, pageAddr, offSize, tableEndAddr, tableStartOffset, tableStartAddr);
 			if ( resultAddress != 0L ) return resultAddress;
 			blockEnd = nextPage(mem, pageSize, offSize, pageAddr);
 		}
@@ -327,8 +330,8 @@ public class JavaStdLib extends JavaDependency {
 		return nextPageSize;
 	}
 	
-	private static long allocInPage(final long len, final long align, final MemoryManager mem, long pageAddr,
-		final int offSize, final long tableEndAddr, final long tableStartOffset, final long tableStartAddr) {
+	private static long allocInPage(final long len, final long align, final MemoryManager mem, long pageAddr, final int offSize,
+		final long tableEndAddr, final long tableStartOffset, final long tableStartAddr) {
 		final long alignM1 = align - 1L;
 		long addr = tableEndAddr - offSize;
 		while ( true ) {
@@ -526,8 +529,8 @@ public class JavaStdLib extends JavaDependency {
 		throw new IllegalStateException(noAllocMsg(addr));
 	}
 	
-	private static boolean freeImpl(MemoryManager mem, final long freeAddr, final long pageAddr,
-		final long tableEndStartAddr, final int offSize) {
+	private static boolean freeImpl(MemoryManager mem, final long freeAddr, final long pageAddr, final long tableEndStartAddr,
+		final int offSize) {
 		final long tableStartAddr = pageAddr + btGetOffset(mem, tableEndStartAddr, offSize);
 		final int dOffSize = offSize << 1;
 		final long mask = ~( dOffSize - 1 );
@@ -576,9 +579,8 @@ public class JavaStdLib extends JavaDependency {
 			sb.append("  tableEndAddr[").append(i).append("] : (page + ").append(off).append(" : 0x")
 				.append(Long.toHexString(off)).append("): ").append(startOff).append("..").append(endOff).append(" 0x")
 				.append(Long.toHexString(startOff)).append("..0x").append(Long.toHexString(endOff)).append(", addr: ")
-				.append(Long.toUnsignedString(pageAddr + startOff)).append("..")
-				.append(Long.toUnsignedString(pageAddr + endOff)).append(" 0x")
-				.append(Long.toHexString(pageAddr + startOff)).append("..0x")
+				.append(Long.toUnsignedString(pageAddr + startOff)).append("..").append(Long.toUnsignedString(pageAddr + endOff))
+				.append(" 0x").append(Long.toHexString(pageAddr + startOff)).append("..0x")
 				.append(Long.toHexString(pageAddr + endOff)).append('\n');
 		}
 		return sb.toString();
@@ -654,6 +656,11 @@ public class JavaStdLib extends JavaDependency {
 	@Override
 	public boolean equals(Object obj) {
 		return obj == this;
+	}
+	
+	@Override
+	public String toString() {
+		return "std";
 	}
 	
 }

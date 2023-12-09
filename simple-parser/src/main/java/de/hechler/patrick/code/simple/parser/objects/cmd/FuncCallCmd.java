@@ -19,6 +19,7 @@ package de.hechler.patrick.code.simple.parser.objects.cmd;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 
 import de.hechler.patrick.code.simple.parser.error.CompileError;
 import de.hechler.patrick.code.simple.parser.error.ErrorContext;
@@ -42,8 +43,8 @@ public class FuncCallCmd extends SimpleCommand {
 		this.arguments = Collections.unmodifiableList(arguments);
 	}
 	
-	public static FuncCallCmd create(SimpleScope parent, SimpleValue func, List<SimpleValue> results,
-		List<SimpleValue> arguments, ErrorContext ctx) {
+	public static FuncCallCmd create(SimpleScope parent, SimpleValue func, List<SimpleValue> results, List<SimpleValue> arguments,
+		ErrorContext ctx) {
 		SimpleType type = func.type();
 		if ( !( type instanceof FuncType ft ) || ( ft.flags() & FuncType.FLAG_FUNC_ADDRESS ) == 0 ) {
 			throw new CompileError(ctx, "I need something of type function address to call it (got: " + type + ")!");
@@ -53,8 +54,7 @@ public class FuncCallCmd extends SimpleCommand {
 		return new FuncCallCmd(parent, func, res, args);
 	}
 	
-	private static List<SimpleValue> convert(List<SimpleValue> results, List<SimpleVariable> resMembers,
-		ErrorContext ctx) {
+	private static List<SimpleValue> convert(List<SimpleValue> results, List<SimpleVariable> resMembers, ErrorContext ctx) {
 		List<SimpleValue> res = new ArrayList<>(resMembers.size());
 		if ( resMembers.size() != results.size() ) {
 			throw new CompileError(ctx, "wrong number of function result assignments!");
@@ -72,8 +72,12 @@ public class FuncCallCmd extends SimpleCommand {
 	}
 	
 	@Override
-	public SimpleValue directNameValueOrNull(@SuppressWarnings("unused") String name,
-		@SuppressWarnings("unused") ErrorContext ctx) {
+	@SuppressWarnings("unused")
+	public void directAvailableNames(Set<String> add) {}
+	
+	@Override
+	@SuppressWarnings("unused")
+	public SimpleValue directNameValueOrNull(String name, ErrorContext ctx) {
 		return null;
 	}
 	
