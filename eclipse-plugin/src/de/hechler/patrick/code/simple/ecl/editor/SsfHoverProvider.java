@@ -31,7 +31,7 @@ public class SsfHoverProvider implements ITextHover {
     }
 
     @Override
-    public IRegion getHoverRegion(ITextViewer textViewer, int offset) {
+    public IRegion getHoverRegion(@SuppressWarnings("unused") ITextViewer textViewer, int offset) {
         return new Region(offset, 0);
     }
 }

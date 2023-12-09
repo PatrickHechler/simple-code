@@ -344,7 +344,7 @@ public class SimpleSourceFileParser extends SimpleExportFileParser {
 			if ( err instanceof CompileError ce ) {
 				this.in.handleError(ce);
 			} else if ( name != null ) {
-				throw new AssertionError(err);
+				throw err;
 			}
 			BlockCmd bc = new BlockCmd(scope);
 			bc.seal();

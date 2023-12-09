@@ -102,8 +102,7 @@ public class SimpleTokenStream {
 	public static final int  ASM_BLOCK   = 62;
 	public static final int  MAX_TOKEN   = ASM_BLOCK;
 	
-	private static final String[] NAMES =
-		{ // @formatter:off
+	private static final String[] NAMES = { // @formatter:off
 		"!",           // BOOL_NOT
 		"!=",          // NOT_EQ
 		"#",           // DIAMOND
@@ -168,7 +167,7 @@ public class SimpleTokenStream {
 		"[CHARACTER]", // CHARACTER
 		"[ASM_BLOCK]", // ASM_BLOCK
 	};//@formatter:on
-		
+	
 	public static String name(int token) { // NOSONAR
 		if ( token < 0 || token >= NAMES.length ) {
 			if ( token == EOF ) return "EOF";
@@ -221,13 +220,13 @@ public class SimpleTokenStream {
 	}
 	
 	public String offendingToken() {
-		if ( this.dynTok != null ) {
+		if ( this.tok >= FIRST_DYN || this.tok < 0 && this.dynTok != null ) {
 			switch ( this.tok ) {
 			case NAME, NUMBER:
 				return this.dynTok;
 			case STRING:
-				return "\"" + this.dynTok.replace("\\", "\\\\").replace("\t", "\\t").replace("\r", "\\r")
-					.replace("\n", "\\n").replace("\0", "\\0") + "\"";
+				return "\"" + this.dynTok.replace("\\", "\\\\").replace("\t", "\\t").replace("\r", "\\r").replace("\n", "\\n")
+					.replace("\0", "\\0") + "\"";
 			case CHARACTER:
 				switch ( this.dynTok ) {
 				case "\\":
@@ -302,7 +301,7 @@ public class SimpleTokenStream {
 					return res;
 				} // else: was a comment
 			}
-		} catch (IOException e) {
+		} catch ( IOException e ) {
 			handleError(e.toString());
 			return EOF;
 		}
@@ -462,8 +461,8 @@ public class SimpleTokenStream {
 						this.in.reset();
 						skip(i + 1);
 					}
+					this.totalChar += i + 3;// include the //
 					this.charInLine = 0;
-					this.totalChar += i + 1;
 					this.line++;
 					return;
 				}
@@ -475,6 +474,7 @@ public class SimpleTokenStream {
 	
 	
 	private void skipBlockComment() throws IOException {
+		this.charInLine += 2;
 		char[] buf = new char[128];
 		int state = 0;
 		while ( true ) {
@@ -499,7 +499,7 @@ public class SimpleTokenStream {
 							this.in.reset();
 							skip(i + 1);
 						}
-						this.totalChar += i + 1;
+						this.totalChar += i + 3;// include the /*
 						return;
 					}
 					state = 0;
@@ -686,8 +686,8 @@ public class SimpleTokenStream {
 		}
 		int off = 1;
 		switch ( chars[0] ) {
-		case '\n', '\r' -> throw new CompileError(this.file, this.line, this.charInLine, this.totalChar,
-			"\'" + (char) r, null, "line seperator inside of a character");
+		case '\n', '\r' -> throw new CompileError(this.file, this.line, this.charInLine, this.totalChar, "\'" + (char) r, null,
+			"line seperator inside of a character");
 		case '\'' -> throw new CompileError(this.file, this.line, this.charInLine, this.totalChar, "''", null,
 			"character closed before a character occured");
 		case '\\' -> {
@@ -708,8 +708,7 @@ public class SimpleTokenStream {
 		}
 		if ( chars[off] != '\'' ) {
 			throw new CompileError(this.file, this.line, this.charInLine, this.totalChar,
-				"'" + ( off == 2 ? "\\" + chars[1] : Character.toString(chars[0]) ), null,
-				"character not directly closed");
+				"'" + ( off == 2 ? "\\" + chars[1] : Character.toString(chars[0]) ), null, "character not directly closed");
 		}
 		this.in.reset();
 		skip(off + 1);
@@ -793,7 +792,7 @@ public class SimpleTokenStream {
 								val |= parseBSUHex(sb, chars[i + 5]);
 								try {
 									sb.append(Character.toString(val));
-								} catch (IllegalArgumentException iae) {
+								} catch ( IllegalArgumentException iae ) {
 									this.in.reset();
 									skip(i + 1 - origOff);
 									throw new CompileError(this.ctx(), iae.toString());
@@ -833,8 +832,8 @@ public class SimpleTokenStream {
 			}
 			len += r;
 			if ( r < 32 - origOff ) {
-				throw new CompileError(this.file, this.line, this.charInLine, this.totalChar,
-					sb.insert(0, '"').toString(), null, "the string does not end!");
+				throw new CompileError(this.file, this.line, this.charInLine, this.totalChar, sb.insert(0, '"').toString(), null,
+					"the string does not end!");
 			}
 		}
 	}
@@ -862,8 +861,8 @@ public class SimpleTokenStream {
 	}
 	
 	private CompileError invalidBSUFormat(StringBuilder sb) {
-		throw new CompileError(this.file, this.line, this.charInLine, this.totalChar, sb.insert(0, '"').toString(),
-			null, "invalid \\u formatting");
+		throw new CompileError(this.file, this.line, this.charInLine, this.totalChar, sb.insert(0, '"').toString(), null,
+			"invalid \\u formatting");
 	}
 	
 	private int returnAsm(StringBuilder sb) throws IOException {
@@ -896,8 +895,8 @@ public class SimpleTokenStream {
 				}
 			}
 			if ( r < 128 ) {
-				throw new CompileError(this.file, this.line, this.charInLine, this.totalChar,
-					sb.insert(0, ":::").toString(), null, "the asm block does not end!");
+				throw new CompileError(this.file, this.line, this.charInLine, this.totalChar, sb.insert(0, ":::").toString(),
+					null, "the asm block does not end!");
 			}
 			off = 0;
 			if ( chars[127] == '>' ) {

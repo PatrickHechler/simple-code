@@ -862,7 +862,8 @@ public class SimpleExportFileParser {
 					break;
 				default:
 					this.in.handleError(this.in.ctx(), List.of(name(COMMA), name(SMALL_CLOSE)),
-						"expected `, | \\)´ after `[TYPE] [NAME]´");
+						"expected `, | \\)´ after `\\( [TYPE] [NAME]´");
+					this.in.consume();
 				}
 				FuncType ftype = FuncType.create(List.of(), list, FuncType.FLAG_FUNC_ADDRESS, this.in.ctx());
 				exitState(STATE_TYPE_FUNC_ADDR, enters == null ? null : enters[0], ftype);
@@ -930,6 +931,7 @@ public class SimpleExportFileParser {
 					name(CHARACTER), name(NUMBER), name(PLUS), name(MINUS), name(BIT_AND), name(BIT_NOT), name(BOOL_AND),
 					name(SMALL_OPEN), name(NAME)),
 				"expected a `[TYPE]´ or a `[VALUE]´");
+			this.in.consume();
 			return StructType.create(List.of(), StructType.FLAG_NOUSE, this.in.ctx());
 		}
 	}
@@ -1014,6 +1016,7 @@ public class SimpleExportFileParser {
 			this.in.handleError(this.in.ctx(),
 				List.of(name(NUM), name(UNUM), name(FPNUM), name(FPDWORD), name(DWORD), name(WORD), name(UWORD), name(BYTE),
 					name(UBYTE), name(STRUCT), name(FSTRUCT), name(NOPAD), name(LT), name(SMALL_OPEN), name(NAME)));
+			this.in.consume();
 			type = StructType.create(List.of(), StructType.FLAG_NOUSE, this.in.ctx());
 		}
 		}
@@ -1161,6 +1164,7 @@ public class SimpleExportFileParser {
 							+ name(sep) + "´";
 					}
 					this.in.handleError(this.in.ctx(), list, msg);
+					this.in.consume();
 					exitState(STATE_NAMED_TYPE_LIST, enter, add);
 					return members;
 				}
