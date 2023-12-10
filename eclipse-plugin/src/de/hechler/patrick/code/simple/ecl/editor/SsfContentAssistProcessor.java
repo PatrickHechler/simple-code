@@ -41,26 +41,23 @@ public class SsfContentAssistProcessor implements IContentAssistProcessor {
 			} else {
 				replaceLen = 0;
 				FilePosition.FileRegion before = tok;
-				boolean needsEnd = false;
 				while ( true ) {
 					if ( before instanceof FilePosition.FileToken ft ) {
-						if ( needsEnd && ft.end().totalChar() != offset ) return null;
 						if ( ft.token() == SimpleTokenStream.NAME && ft.end().totalChar() == offset ) {
 							tok = ft;
 							int start = tok.start().totalChar();
 							toks.add(viewer.getDocument().get(start, offset - start));
 							break;
 						}
-						if ( ft.token() == SimpleTokenStream.COLON && ft.end().totalChar() == offset ) {
+						if ( ft.token() == SimpleTokenStream.COLON && ft.end().totalChar() >= offset ) {
 							toks.add(":");
 							break;
 						}
 						if ( ( ft.token() == SimpleTokenStream.ARR_CLOSE || ft.token() == SimpleTokenStream.DIAMOND )
-							&& ft.end().totalChar() == offset ) {
+							&& ft.end().totalChar() >= offset ) {
 							toks.add("]");
 							break;
 						}
-						if ( needsEnd ) return null;
 						if ( ft.token() == SimpleTokenStream.MAX_TOKEN + 1 ) {
 							before = tok;
 							while ( before.parentIndex() == 0 ) {
@@ -70,9 +67,8 @@ public class SsfContentAssistProcessor implements IContentAssistProcessor {
 							before = before.parent().child(before.parentIndex() - 1);
 							continue;
 						}
-						if ( ft.parentIndex() > 0 ) {
+						if ( ft.parentIndex() > 0 && ft.start().totalChar() >= offset ) {
 							before = tok.parent().child(tok.parentIndex() - 1);
-							needsEnd = true;
 							continue;
 						}
 					} else {
