@@ -681,15 +681,12 @@ public class SimpleTokenStream {
 		this.in.mark(4);
 		int r = read(chars, 0, 4);
 		if ( r < 2 ) {
-			throw new CompileError(this.file, this.line, this.charInLine, this.totalChar, "\'", null,
-				"reached EOF too early, character could not be closed");
+			handleError("\'", "reached EOF too early, character could not be closed");
 		}
 		int off = 1;
 		switch ( chars[0] ) {
-		case '\n', '\r' -> throw new CompileError(this.file, this.line, this.charInLine, this.totalChar, "\'" + (char) r, null,
-			"line seperator inside of a character");
-		case '\'' -> throw new CompileError(this.file, this.line, this.charInLine, this.totalChar, "''", null,
-			"character closed before a character occured");
+		case '\n', '\r' -> handleError("\'" + (char) r, "line seperator inside of a character");
+		case '\'' -> handleError("''", "character closed before a character occured");
 		case '\\' -> {
 			off = 2;
 			switch ( chars[1] ) {
@@ -698,8 +695,7 @@ public class SimpleTokenStream {
 			case 'r' -> this.dynTok = "\r";
 			case 't' -> this.dynTok = "\t";
 			case '\'' -> this.dynTok = "\'";
-			default -> throw new CompileError(this.file, this.line, this.charInLine, this.totalChar, "'\\", null,
-				"invalid character escape");
+			default -> handleError("'\\", "invalid character escape");
 			}
 		}
 		default -> {
@@ -707,8 +703,7 @@ public class SimpleTokenStream {
 		}
 		}
 		if ( chars[off] != '\'' ) {
-			throw new CompileError(this.file, this.line, this.charInLine, this.totalChar,
-				"'" + ( off == 2 ? "\\" + chars[1] : Character.toString(chars[0]) ), null, "character not directly closed");
+			handleError("'" + ( off == 2 ? "\\" + chars[1] : Character.toString(chars[0]) ), "character not directly closed");
 		}
 		this.in.reset();
 		skip(off + 1);
@@ -749,7 +744,7 @@ public class SimpleTokenStream {
 					String tok = sb.insert(0, '"').append(chars, sbi, i - sbi).toString().replace("\n", "\\n")
 						.replace("\r", "\\r").replace("\t", "\\t").replace("\0", "\\0");
 					String msg = "line seperator inside of a string";
-					throw new CompileError(this.file, this.line, this.charInLine, this.totalChar, tok, null, msg);
+					handleError(tok, msg);
 				}
 				case '\\' -> {
 					sb.append(chars, sbi, i - sbi);
@@ -795,7 +790,7 @@ public class SimpleTokenStream {
 								} catch ( IllegalArgumentException iae ) {
 									this.in.reset();
 									skip(i + 1 - origOff);
-									throw new CompileError(this.ctx(), iae.toString());
+									handleError(iae.toString());
 								}
 								i += 5;
 								sbi = i + 1;
@@ -822,8 +817,7 @@ public class SimpleTokenStream {
 							sbi = i + 1;
 							sb.append('\t');
 						}
-						default -> throw new CompileError(this.file, this.line, this.charInLine, this.totalChar,
-							sb.insert(0, '"').append(chars, sbi, i - sbi).toString(), null, "invalid string escape");
+						default -> handleError(sb.insert(0, '"').append(chars, sbi, i - sbi).toString(), "invalid string escape");
 						}
 					}
 				}
@@ -832,8 +826,7 @@ public class SimpleTokenStream {
 			}
 			len += r;
 			if ( r < 32 - origOff ) {
-				throw new CompileError(this.file, this.line, this.charInLine, this.totalChar, sb.insert(0, '"').toString(), null,
-					"the string does not end!");
+				handleError(sb.insert(0, '"').toString(), "the string does not end!");
 			}
 		}
 	}
@@ -857,12 +850,12 @@ public class SimpleTokenStream {
 		if ( c <= 'f' ) {
 			return c - 'a';
 		} // just make the compiler happy
-		throw invalidBSUFormat(sb);
+		invalidBSUFormat(sb);
+		return 0;
 	}
 	
-	private CompileError invalidBSUFormat(StringBuilder sb) {
-		throw new CompileError(this.file, this.line, this.charInLine, this.totalChar, sb.insert(0, '"').toString(), null,
-			"invalid \\u formatting");
+	private void invalidBSUFormat(StringBuilder sb) {
+		handleError(sb.insert(0, '"').toString(), "invalid \\u formatting");
 	}
 	
 	private int returnAsm(StringBuilder sb) throws IOException {
@@ -895,8 +888,7 @@ public class SimpleTokenStream {
 				}
 			}
 			if ( r < 128 ) {
-				throw new CompileError(this.file, this.line, this.charInLine, this.totalChar, sb.insert(0, ":::").toString(),
-					null, "the asm block does not end!");
+				handleError(sb.insert(0, ":::").toString(), "the asm block does not end!");
 			}
 			off = 0;
 			if ( chars[127] == '>' ) {

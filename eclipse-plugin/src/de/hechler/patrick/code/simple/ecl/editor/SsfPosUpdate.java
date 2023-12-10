@@ -297,7 +297,11 @@ public class SsfPosUpdate implements IPositionUpdater {
 						yield REF_LOCAL_VARIABLE;
 					}
 					case DataVal _v -> REF_VALUE_REFERENCE_NAME;
-					default -> throw new AssertionError("illegal info " + p.global().info().getClass());
+					case null -> TOKEN_OTHER_SYMBOL;
+					default -> {
+						new Throwable("illegal info " + p.global().info().getClass()).printStackTrace();
+						yield TOKEN_OTHER_SYMBOL;
+					}
 					};
 				}
 				case SimpleExportFileParser.STATE_TYPE_TYPEDEFED_TYPE:
@@ -426,7 +430,11 @@ public class SsfPosUpdate implements IPositionUpdater {
 		SimpleExportFileParser sp = createParser(tree, sts, dep);
 		SimpleFile sf = new SimpleFile(this.file.toString(), this.file.toString());
 		SimpleCodeBuilder.initilizeSimpleFile(sf);
-		sp.parse(sf);
+		try {
+			sp.parse(sf);
+		} catch ( CompileError err ) {
+			addMarker(this.file, err.getLocalizedMessage(), err.line, IMarker.SEVERITY_ERROR);
+		}
 		SsfPosUpdate.this.tree = tree;
 	}
 	
@@ -595,7 +603,7 @@ public class SsfPosUpdate implements IPositionUpdater {
 		
 		@Override
 		public void handleError(CompileError err) {
-			addMarker(this.myFile, err.getLocalizedMessage(), err.line, IMarker.SEVERITY_ERROR);
+			throw err;
 		}
 		
 	}

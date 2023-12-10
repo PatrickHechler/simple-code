@@ -338,53 +338,9 @@ public class SimpleCodeBuilder extends IncrementalProjectBuilder {
 	static {
 		try {
 			//@formatter:off
+			PointerType esPntr = PointerType.create(StructType.create(List.of(), 0, ErrorContext.NO_CONTEXT), ErrorContext.NO_CONTEXT);
+			
 			STDLIB = noRuntimeLib("std");
-			STDLIB.typedef(new SimpleTypedef("file_handle", SimpleTypedef.FLAG_EXPORT, NativeType.UDWORD), ErrorContext.NO_CONTEXT);
-			STDLIB.typedef(new SimpleTypedef("fs_e_handle", SimpleTypedef.FLAG_EXPORT, NativeType.UDWORD), ErrorContext.NO_CONTEXT);
-			PointerType pntr = PointerType.create(StructType.create(List.of(), 0, ErrorContext.NO_CONTEXT), ErrorContext.NO_CONTEXT);
-			STDLIB.variable(new SimpleVariable(
-				pntr, "NULL", null, SimpleVariable.FLAG_CONSTANT | SimpleExportable.FLAG_EXPORT), ErrorContext.NO_CONTEXT);
-			STDLIB.function(new SimpleFunction(STDLIB, "puts", FuncType.create(
-				List.of(
-						new SimpleVariable(NativeType.UNUM, "wrote", null, 0),
-						new SimpleVariable(NativeType.UNUM, "errno", null, 0)
-					),
-				List.of(new SimpleVariable(PointerType.create(NativeType.UBYTE, ErrorContext.NO_CONTEXT), "string", null, 0)),
-				SimpleExportable.FLAG_EXPORT | FuncType.FLAG_FUNC_ADDRESS, ErrorContext.NO_CONTEXT)), ErrorContext.NO_CONTEXT);
-			STDLIB.function(new SimpleFunction(STDLIB, "mem_move", FuncType.create(
-				List.of(),
-				List.of(
-						new SimpleVariable(pntr, "from", null, 0),
-						new SimpleVariable(pntr, "to", null, 0),
-						new SimpleVariable(NativeType.UNUM, "length", null, 0)
-					), SimpleExportable.FLAG_EXPORT | FuncType.FLAG_FUNC_ADDRESS, ErrorContext.NO_CONTEXT)), ErrorContext.NO_CONTEXT);
-			STDLIB.function(new SimpleFunction(STDLIB, "mem_copy", FuncType.create(
-				List.of(),
-				List.of(
-						new SimpleVariable(pntr, "from", null, 0),
-						new SimpleVariable(pntr, "to", null, 0),
-						new SimpleVariable(NativeType.UNUM, "length", null, 0)
-					), SimpleExportable.FLAG_EXPORT | FuncType.FLAG_FUNC_ADDRESS, ErrorContext.NO_CONTEXT)), ErrorContext.NO_CONTEXT);
-			STDLIB.function(new SimpleFunction(STDLIB, "mem_free", FuncType.create(
-				List.of(), List.of(new SimpleVariable(pntr, "addr", null, 0)),
-				SimpleExportable.FLAG_EXPORT | FuncType.FLAG_FUNC_ADDRESS, ErrorContext.NO_CONTEXT)), ErrorContext.NO_CONTEXT);
-			STDLIB.function(new SimpleFunction(STDLIB, "mem_realloc", FuncType.create(
-				List.of(new SimpleVariable(pntr, "new_addr", null, 0)),
-				List.of(
-						new SimpleVariable(pntr, "old_addr", null, 0),
-						new SimpleVariable(NativeType.UNUM, "new_length", null, 0),
-						new SimpleVariable(NativeType.UNUM, "new_align", null, 0)
-					), SimpleExportable.FLAG_EXPORT | FuncType.FLAG_FUNC_ADDRESS, ErrorContext.NO_CONTEXT)), ErrorContext.NO_CONTEXT);
-			STDLIB.function(new SimpleFunction(STDLIB, "mem_alloc", FuncType.create(
-				List.of(new SimpleVariable(pntr, "addr", null, 0)),
-				List.of(
-					new SimpleVariable(NativeType.UNUM, "length", null, 0),
-					new SimpleVariable(NativeType.UNUM, "align", null, 0)
-				),
-				SimpleExportable.FLAG_EXPORT | FuncType.FLAG_FUNC_ADDRESS, ErrorContext.NO_CONTEXT)), ErrorContext.NO_CONTEXT);
-			STDLIB.function(new SimpleFunction(STDLIB, "exit", FuncType.create(
-				List.of(), List.of(new SimpleVariable(NativeType.UBYTE, "exitnum", null, 0)),
-				SimpleExportable.FLAG_EXPORT | FuncType.FLAG_FUNC_ADDRESS, ErrorContext.NO_CONTEXT)), ErrorContext.NO_CONTEXT);
 			SimpleFile stdSys = noRuntimeLib("std:sys");
 			stdSys.function(new SimpleFunction(stdSys, "pagesize", FuncType.create(
 				List.of(new SimpleVariable(NativeType.UNUM, "result", null, 0)), List.of(), 
@@ -393,6 +349,66 @@ public class SimpleCodeBuilder extends IncrementalProjectBuilder {
 				List.of(new SimpleVariable(NativeType.UNUM, "result", null, 0)), List.of(), 
 				SimpleExportable.FLAG_EXPORT | FuncType.FLAG_FUNC_ADDRESS, ErrorContext.NO_CONTEXT)), ErrorContext.NO_CONTEXT);
 			STDLIB.dependency(stdSys, "sys", ErrorContext.NO_CONTEXT);
+			
+			STDLIB.function(new SimpleFunction(STDLIB, "exit", FuncType.create(
+				List.of(), List.of(new SimpleVariable(NativeType.UBYTE, "exitnum", null, 0)),
+				SimpleExportable.FLAG_EXPORT | FuncType.FLAG_FUNC_ADDRESS, ErrorContext.NO_CONTEXT)), ErrorContext.NO_CONTEXT);
+			
+			STDLIB.function(new SimpleFunction(STDLIB, "mem_alloc", FuncType.create(
+				List.of(new SimpleVariable(esPntr, "addr", null, 0)),
+				List.of(
+					new SimpleVariable(NativeType.UNUM, "length", null, 0),
+					new SimpleVariable(NativeType.UNUM, "align", null, 0)
+					),
+				SimpleExportable.FLAG_EXPORT | FuncType.FLAG_FUNC_ADDRESS, ErrorContext.NO_CONTEXT)), ErrorContext.NO_CONTEXT);
+			STDLIB.function(new SimpleFunction(STDLIB, "mem_realloc", FuncType.create(
+				List.of(new SimpleVariable(esPntr, "new_addr", null, 0)),
+				List.of(
+						new SimpleVariable(esPntr, "old_addr", null, 0),
+						new SimpleVariable(NativeType.UNUM, "new_length", null, 0),
+						new SimpleVariable(NativeType.UNUM, "new_align", null, 0)
+					), SimpleExportable.FLAG_EXPORT | FuncType.FLAG_FUNC_ADDRESS, ErrorContext.NO_CONTEXT)), ErrorContext.NO_CONTEXT);
+			STDLIB.function(new SimpleFunction(STDLIB, "mem_free", FuncType.create(
+				List.of(), List.of(new SimpleVariable(esPntr, "addr", null, 0)),
+				SimpleExportable.FLAG_EXPORT | FuncType.FLAG_FUNC_ADDRESS, ErrorContext.NO_CONTEXT)), ErrorContext.NO_CONTEXT);
+			STDLIB.function(new SimpleFunction(STDLIB, "mem_copy", FuncType.create(
+				List.of(),
+				List.of(
+					new SimpleVariable(esPntr, "from", null, 0),
+					new SimpleVariable(esPntr, "to", null, 0),
+					new SimpleVariable(NativeType.UNUM, "length", null, 0)
+					), SimpleExportable.FLAG_EXPORT | FuncType.FLAG_FUNC_ADDRESS, ErrorContext.NO_CONTEXT)), ErrorContext.NO_CONTEXT);
+			STDLIB.function(new SimpleFunction(STDLIB, "mem_move", FuncType.create(
+				List.of(),
+				List.of(
+						new SimpleVariable(esPntr, "from", null, 0),
+						new SimpleVariable(esPntr, "to", null, 0),
+						new SimpleVariable(NativeType.UNUM, "length", null, 0)
+					), SimpleExportable.FLAG_EXPORT | FuncType.FLAG_FUNC_ADDRESS, ErrorContext.NO_CONTEXT)), ErrorContext.NO_CONTEXT);
+			
+			STDLIB.function(new SimpleFunction(STDLIB, "writestr", FuncType.create(
+				List.of(
+						new SimpleVariable(NativeType.UNUM, "wrote", null, 0),
+						new SimpleVariable(NativeType.UNUM, "errno", null, 0)
+					),
+				List.of(new SimpleVariable(PointerType.create(NativeType.UBYTE, ErrorContext.NO_CONTEXT), "string", null, 0)),
+				SimpleExportable.FLAG_EXPORT | FuncType.FLAG_FUNC_ADDRESS, ErrorContext.NO_CONTEXT)), ErrorContext.NO_CONTEXT);
+			STDLIB.function(new SimpleFunction(STDLIB, "readln", FuncType.create(
+				List.of(
+						new SimpleVariable(NativeType.UNUM, "read_len", null, 0),
+						new SimpleVariable(NativeType.UNUM, "errno", null, 0)
+					),
+				List.of(
+					new SimpleVariable(PointerType.create(NativeType.UBYTE, ErrorContext.NO_CONTEXT), "buffer", null, 0),
+					new SimpleVariable(NativeType.UNUM, "max_length", null, 0)
+				),
+				SimpleExportable.FLAG_EXPORT | FuncType.FLAG_FUNC_ADDRESS, ErrorContext.NO_CONTEXT)), ErrorContext.NO_CONTEXT);
+			
+			STDLIB.variable(new SimpleVariable(
+				esPntr, "NULL", null, SimpleVariable.FLAG_CONSTANT | SimpleExportable.FLAG_EXPORT), ErrorContext.NO_CONTEXT);
+			
+			STDLIB.typedef(new SimpleTypedef("file_handle", SimpleTypedef.FLAG_EXPORT, NativeType.UNUM), ErrorContext.NO_CONTEXT);
+			STDLIB.typedef(new SimpleTypedef("fs_element_handle", SimpleTypedef.FLAG_EXPORT, NativeType.UNUM), ErrorContext.NO_CONTEXT);
 			//@formatter:on
 		} catch ( Throwable t ) {
 			log("failed to initilize the builder class: " + t);
