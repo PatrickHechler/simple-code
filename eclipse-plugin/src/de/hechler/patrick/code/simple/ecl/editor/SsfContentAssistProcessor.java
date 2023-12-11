@@ -58,7 +58,7 @@ public class SsfContentAssistProcessor implements IContentAssistProcessor {
 							tokStr = doc.get(start, offset - start);
 							break;
 						}
-						if ( ft.token() == SimpleTokenStream.COLON && ft.end().totalChar() >= offset ) {
+						if ( ft.token() == SimpleTokenStream.COLON && ft.end().totalChar() <= offset ) {
 							tok = ft;
 							tokStr = ":";
 							break;
@@ -182,12 +182,15 @@ public class SsfContentAssistProcessor implements IContentAssistProcessor {
 					} else if ( ":".equals(tokStr) ) {
 						tokStr = "";
 					} else return null;
+					int flags = CFS_F_DEP | CFS_F_VAR | CFS_F_FNC;
 					if ( obj instanceof SimpleDependency dep ) {
 						names = dep.availableNames();
 					} else if ( obj instanceof StructType struct ) {
+						flags |= CFS_F_IS_STRUCT;
 						names = new HashSet<>();
 						struct.members().stream().map(v -> v.name()).forEach(names::add);
 					} else if ( obj instanceof FuncType func && ( func.flags() & FuncType.FLAG_FUNC_ADDRESS ) == 0 ) {
+						flags |= CFS_F_IS_STRUCT;
 						names = new HashSet<>();
 						func.argMembers().stream().map(v -> v.name()).forEach(names::add);
 						func.resMembers().stream().map(v -> v.name()).forEach(names::add);
@@ -215,11 +218,21 @@ public class SsfContentAssistProcessor implements IContentAssistProcessor {
 						} else {
 							return null;
 						}
-					}, CFS_F_DEP | CFS_F_VAR | CFS_F_FNC);
+					}, flags);
 				}
 			}
-			case SimpleSourceFileParser.STATE_TYPE -> {}
-			case SimpleSourceFileParser.STATE_TYPE_TYPEDEFED_TYPE -> {}
+			case SimpleSourceFileParser.STATE_TYPE, SimpleSourceFileParser.STATE_TYPE_TYPEDEFED_TYPE -> {
+				DocumentTree pdt = parent(dt, SimpleSourceFileParser.STATE_EX_CODE);
+				if ( pdt == null ) pdt = spu.tree();
+				Object inf = pdt.global().info();
+				if ( inf instanceof SimpleScope scope ) {
+					return completesFromScope(offset, replaceLen, tokStr, scope.availableNames(), str -> {
+						Object res = scope.nameTypeOrDepOrFuncOrNull(str);
+						if ( res != null ) return res;
+						return scope.nameValueOrNull(str, ErrorContext.NO_CONTEXT);
+					}, CFS_F_DEP | CFS_F_TYP);
+				}
+			}
 			case SimpleSourceFileParser.STATE_TYPE_FUNC_ADDR -> {}
 			case SimpleSourceFileParser.STATE_TYPE_FUNC_STRUCT -> {}
 			case SimpleSourceFileParser.STATE_TYPE_FUNC_ADDR_REF -> {}
@@ -238,6 +251,8 @@ public class SsfContentAssistProcessor implements IContentAssistProcessor {
 	private static final int CFS_F_FNC = 0x02;
 	private static final int CFS_F_TYP = 0x04;
 	private static final int CFS_F_VAR = 0x08;
+	
+	private static final int CFS_F_IS_STRUCT = 0x10;
 	
 	private ICompletionProposal[] completesFromScope(final int offset, final int replaceLen, String nameStart, Set<String> names,
 		Function<String,Object> getInfo, final int flags) {
@@ -280,27 +295,30 @@ public class SsfContentAssistProcessor implements IContentAssistProcessor {
 				if ( ( flags & CFS_F_VAR ) == 0 ) {
 					return;
 				}
-				SimpleVariable sv = vv.sv();
-				if ( ( sv.flags() & SimpleVariable.FLAG_GLOBAL ) != 0 ) {
-					addInfo = "global variable: " + sv;
-				} else {
-					addInfo = "local variable: " + sv;
-				}
+				addInfo = varAddInfo(flags, vv.sv());
 			} else if ( obj instanceof SimpleVariable sv ) {
-				if ( ( sv.flags() & SimpleVariable.FLAG_GLOBAL ) != 0 ) {
-					addInfo = "global variable: " + sv;
-				} else {
-					addInfo = "local variable: " + sv;
+				if ( ( flags & CFS_F_VAR ) == 0 ) {
+					return;
 				}
+				addInfo = varAddInfo(flags, sv);
 			} else {
 				return;
 			}
 			CompletionProposal cp = new CompletionProposal(str, offset, replaceLen, str.length(), null, n, null, addInfo);
-			System.out.println("replacementString=" + str + " , replacementOffset=" + offset + " , replacementLength="
-				+ replaceLen + " , cursorPosition=" + ( offset + str.length() ) + " , displayString=" + n
-				+ " , additionalProposalInfo=" + addInfo);
 			c.accept(cp);
 		}).toArray(l -> new ICompletionProposal[l]);
+	}
+	
+	private String varAddInfo(final int flags, SimpleVariable sv) {
+		String addInfo;
+		if ( ( flags & CFS_F_IS_STRUCT ) != 0 ) {
+			addInfo = "struct member: " + sv;
+		} else if ( ( sv.flags() & SimpleVariable.FLAG_GLOBAL ) != 0 ) {
+			addInfo = "global variable: " + sv;
+		} else {
+			addInfo = "local variable: " + sv;
+		}
+		return addInfo;
 	}
 	
 	private DocumentTree parent(DocumentTree dt, int wantedState) {

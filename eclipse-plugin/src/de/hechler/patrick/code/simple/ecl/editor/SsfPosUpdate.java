@@ -247,7 +247,7 @@ public class SsfPosUpdate implements IPositionUpdater {
 		case SimpleTokenStream.FPNUM -> TOKEN_PRIM_TYPE;
 		case SimpleTokenStream.FSTRUCT -> KEYWORD_FSTRUCT_STRUCT;
 		case SimpleTokenStream.FUNC -> {
-			for (DocumentTree p = tok.parent();; p = p.parent()) {
+			for (DocumentTree p = tok.parent(); p != null; p = p.parent()) {
 				int ps = p.global().state();
 				if ( ps == SimpleExportFileParser.STATE_FUNCTION ) {
 					yield KEYWORD_FUNC;
@@ -256,6 +256,7 @@ public class SsfPosUpdate implements IPositionUpdater {
 					yield KEYWORD_FUNC_AS_FUNC_ADDR;
 				}
 			}
+			yield KEYWORD_FUNC;
 		}
 		case SimpleTokenStream.IF -> KEYWORD_WHILE_IF_ELSE;
 		case SimpleTokenStream.INIT -> KEYWORD_MAIN_INIT;
@@ -276,7 +277,7 @@ public class SsfPosUpdate implements IPositionUpdater {
 		case SimpleTokenStream.BLOCK_CLOSE -> TOKEN_OTHER_SYMBOL;
 		case SimpleTokenStream.BIT_NOT -> TOKEN_OTHER_SYMBOL;
 		case SimpleTokenStream.NAME -> {
-			for (DocumentTree p = tok.parent();; p = p.parent()) {
+			for (DocumentTree p = tok.parent(); p != null; p = p.parent()) {
 				switch ( p.global().state() ) {
 				case SimpleSourceFileParser.STATE_EX_CODE_VAR_DECL:
 					yield DECL_LOCAL_VARIABLE_NAME;
@@ -317,6 +318,7 @@ public class SsfPosUpdate implements IPositionUpdater {
 				default:
 				}
 			}
+			yield TOKEN_OTHER_SYMBOL;
 		}
 		case SimpleTokenStream.NUMBER -> TOKEN_NUMBER;
 		case SimpleTokenStream.STRING -> TOKEN_STRING;
