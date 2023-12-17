@@ -2,6 +2,24 @@
 <?eclipse version="3.4"?>
 <plugin>
 
+<!--
+   <extension
+         point="org.eclipse.debug.ui.launchShortcuts">
+	   <shortcut
+	         id="de.hechler.patrick.code.simple.ecl.launch.interpreter"
+	         label="Interpret Simple Code"
+	         mode="run"
+	         point="org.eclipse.debug.ui.launchShortcuts"/>
+   </extension>
+   <extension
+         id="de.hechler.patrick.code.simple.ecl.launch.interpret"
+         class="de.hechler.patrick.codesprachen.primitive.eclplugin.launcher.PrimitiveCodeLaunchShortcut"
+         point="org.eclipse.debug.ui.launchShortcuts">
+      <perspective id="org.eclipse.jdt.ui.JavaPerspective"/>
+      <perspective id="org.eclipse.jdt.ui.JavaHierarchyPerspective"/>
+      <perspective id="org.eclipse.jdt.ui.JavaBrowsingPerspective"/>
+      <perspective id="org.eclipse.debug.ui.DebugPerspective"/>
+   </extension>
    <extension
          id="de.hechler.patrick.code.simple.ecl.project.builder"
          name="Simple Code Project Builder"
@@ -13,6 +31,7 @@
          </run>
       </builder>
    </extension>
+-->
    <extension
          id="de.hechler.patrick.code.simple.ecl.project.nature"
          name="Simple Code Project Nature"
